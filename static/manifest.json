@@ -1,0 +1,21 @@
+{
+    "name": "JitaKyoApp",
+    "short_name": "JitaKyoApp",
+    "theme_color": "#363636",
+    "background_color": "#ffffff",
+    "display": "standalone",
+    "scope": "/admin/",
+    "start_url": "/admin/",
+    "icons": [
+        {
+            "src": "/static/web-app-manifest-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/web-app-manifest-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

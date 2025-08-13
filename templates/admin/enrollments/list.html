@@ -1,0 +1,48 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Gerenciar Matrículas - JitaKyoApp{% endblock %}
+
+{% block content %}
+<div class="box">
+    <h1 class="title">Gerenciar Matrículas</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="notification mt-4 {% if category == 'success' %}is-success{% elif category == 'danger' %}is-danger{% elif category == 'info' %}is-info{% elif category == 'warning' %}is-warning{% endif %}">
+                {% for category, message in messages %}
+                    <div class="message-body">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% if enrollments %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Aluno</th>
+                <th>Turma</th>
+                <th>Data da Matrícula</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for enrollment in enrollments %}
+            <tr>
+                <td>{{ enrollment.student_name }}</td>
+                <td>{{ enrollment.class_name }}</td>
+                <td>{{ enrollment.enrollment_date }}</td>
+                <td>
+                    <form action="{{ url_for('admin.delete_enrollment', enrollment_id=enrollment.id) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="button is-danger is-small" onclick="return confirm('Tem certeza que deseja deletar esta matrícula?');">Deletar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>Nenhuma matrícula encontrada.</p>
+    {% endif %}
+</div>
+{% endblock %}

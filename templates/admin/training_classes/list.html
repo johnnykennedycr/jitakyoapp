@@ -1,0 +1,123 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block admin_title %}Gerenciar Turmas{% endblock %}
+
+{% block content %}
+<div class="p-6 md:p-10 bg-gray-100 min-h-screen">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Gerenciar Turmas</h1>
+            <a href="{{ url_for('admin.add_class') }}" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 transition duration-150 ease-in-out">
+                Adicionar Nova Turma
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="mb-6">
+                    {% for category, message in messages %}
+                        <li class="p-3 mb-2 rounded-md {{ 'bg-red-100 text-red-700' if category == 'error' else 'bg-green-100 text-green-700' }}">
+                            {{ message }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        {% if classes %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for class_obj in classes %}
+                    <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800 mb-2">{{ class_obj.name }}</h2>
+                            <p class="text-gray-600 mb-1"><strong>Disciplina:</strong> {{ class_obj.discipline }}</p>
+                            <p class="text-gray-600 mb-1"><strong>Professor:</strong> {{ teachers_map.get(class_obj.teacher_id, 'Desconhecido') }}</p>
+                            <p class="text-gray-600 mb-4"><strong>Capacidade:</strong> {{ class_obj.capacity }}</p>
+
+                            {% if class_obj.schedule %}
+                                <h3 class="text-lg font-semibold text-gray-700 mb-2">Horários:</h3>
+                                <ul class="list-disc list-inside text-sm text-gray-600 mb-4">
+                                    {% for slot in class_obj.schedule %}
+                                        <li>{{ slot.day_of_week }}: {{ slot.start_time }} - {{ slot.end_time }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-sm text-gray-500 mb-4">N/A</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="flex justify-end space-x-2 mt-4">
+                            <!-- Botão "Resumo de Presença" adicionado aqui -->
+                            <a href="{{ url_for('admin.all_calls', class_id=class_obj.id) }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                                Resumo de Presença
+                            </a>
+                            <a href="{{ url_for('admin.get_attendance_list', class_id=class_obj.id) }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                Presença
+                            </a>
+                            <a href="{{ url_for('admin.edit_class', class_id=class_obj.id) }}" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Editar
+                            </a>
+                            <form action="{{ url_for('admin.delete_class', class_id=class_obj.id) }}" method="POST" class="inline-block" onsubmit="return showCustomConfirm('Tem certeza que deseja deletar a turma \'{{ class_obj.name }}\'?');">
+                                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                    Deletar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-center text-gray-500">Nenhuma turma cadastrada ainda.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- O modal de confirmação é o mesmo do formulário e pode ser adicionado aqui também para consistência. -->
+<div id="custom-confirm-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-gray-600 bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-8 shadow-xl max-w-sm w-full mx-4">
+        <h3 class="text-xl font-bold text-gray-900 mb-4">Confirmação</h3>
+        <p id="confirm-message" class="text-gray-700 mb-6"></p>
+        <div class="flex justify-end space-x-4">
+            <button id="confirm-cancel-btn" type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition duration-150 ease-in-out">Cancelar</button>
+            <button id="confirm-ok-btn" type="button" class="px-4 py-2 border border-transparent rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">Sim</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Lógica do Modal de Confirmação
+        const modal = document.getElementById('custom-confirm-modal');
+        const confirmMessage = document.getElementById('confirm-message');
+        const confirmOkBtn = document.getElementById('confirm-ok-btn');
+        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        let currentForm = null;
+
+        window.showCustomConfirm = function(message) {
+            currentForm = event.target.closest('form');
+            confirmMessage.textContent = message;
+            modal.classList.remove('hidden');
+            return false; // Previne o envio imediato do formulário
+        };
+
+        confirmOkBtn.addEventListener('click', function() {
+            if (currentForm) {
+                currentForm.submit();
+            }
+            modal.classList.add('hidden');
+        });
+
+        confirmCancelBtn.addEventListener('click', function() {
+            modal.classList.add('hidden');
+            currentForm = null;
+        });
+
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                currentForm = null;
+            }
+        });
+    });
+</script>
+{% endblock %}

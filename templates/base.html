@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}JitaKyoApp{% endblock %}</title>
+    
+    <!-- Favicon e Ícones para Dispositivos Móveis -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='logo_32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='logo_16.png') }}">
+    
+    <!-- Este é o link principal para o favicon.ico padrão -->
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <!-- Opcional: Adicionar um manifesto para Progressive Web App (PWA) -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head_extras %}{% endblock %}
+</head>
+<body>
+    {# Este é o bloco principal que os templates filhos irão preencher #}
+    {% block body_content %}{% endblock %}
+</body>
+</html>

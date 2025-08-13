@@ -1,0 +1,289 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block admin_title %}{{ 'Editar' if user else 'Adicionar' }} Aluno{% endblock %}
+
+{% block content %}
+<div class="p-6">
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">{{ 'Editar' if user else 'Adicionar' }} Aluno</h1>
+    
+    {# Exibição de mensagens flash #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-md shadow-sm 
+                        {% if category == 'success' %}bg-green-100 text-green-700{% elif category == 'danger' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="bg-white rounded-lg shadow-xl p-8">
+        <form method="POST">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="flex flex-col">
+                    <label for="name" class="mb-2 text-sm font-medium text-gray-700">Nome Completo:</label>
+                    <input type="text" id="name" name="name" value="{{ user.name if user else '' }}" required class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                </div>
+                <div class="flex flex-col">
+                    <label for="email" class="mb-2 text-sm font-medium text-gray-700">E-mail:</label>
+                    <input type="email" id="email" name="email" value="{{ user.email if user else '' }}" required class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                </div>
+                
+                {% if user %}
+                <div class="flex flex-col md:col-span-2">
+                    <label for="password" class="mb-2 text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar):</label>
+                    <input type="password" id="password" name="password" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 md:col-span-2">A senha será gerada automaticamente e enviada para o e-mail do aluno.</p>
+                {% endif %}
+
+                <div class="flex flex-col">
+                    <label for="phone" class="mb-2 text-sm font-medium text-gray-700">Telefone de Contato:</label>
+                    <input type="tel" id="phone" name="phone" value="{{ user.phone if user else '' }}" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="date_of_birth" class="mb-2 text-sm font-medium text-gray-700">Data de Nascimento:</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" value="{{ user.date_of_birth.strftime('%Y-%m-%d') if user and user.date_of_birth else '' }}" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                </div>
+            </div>
+
+            <h3 class="text-xl font-semibold mt-8 mb-4 text-gray-800">Modalidades Matriculadas e Graduações</h3>
+            <div id="enrolled-disciplines-container" class="space-y-4">
+                {% if user and user.enrolled_disciplines %}
+                    {% for discipline in user.enrolled_disciplines %}
+                        <div class="flex items-end space-x-4 dynamic-item">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="student_discipline_name_{{ loop.index0 }}">Modalidade:</label>
+                                <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_discipline_name_{{ loop.index0 }}" value="{{ discipline.discipline_name }}" required>
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="student_graduation_{{ loop.index0 }}">Graduação:</label>
+                                <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_graduation_{{ loop.index0 }}" value="{{ discipline.graduation }}" required>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-enrolled-discipline">Remover</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="flex items-end space-x-4 dynamic-item">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="student_discipline_name_0">Modalidade:</label>
+                            <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_discipline_name_0">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="student_graduation_0">Graduação:</label>
+                            <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_graduation_0">
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-enrolled-discipline">Remover</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <button type="button" id="add-enrolled-discipline" class="mt-4 px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-150">Adicionar Outra Modalidade de Aluno</button>
+
+            <h3 class="text-xl font-semibold mt-8 mb-4 text-gray-800">Responsáveis (para menores de idade)</h3>
+            <div id="guardians-container" class="space-y-4">
+                {% if user and user.guardians %}
+                    {% for guardian in user.guardians %}
+                        <div class="flex items-end space-x-4 dynamic-item">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_name_{{ loop.index0 }}">Nome:</label>
+                                <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_name_{{ loop.index0 }}" value="{{ guardian.name }}" required>
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_contact_{{ loop.index0 }}">Contato:</label>
+                                <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_contact_{{ loop.index0 }}" value="{{ guardian.contact }}" required>
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_kinship_{{ loop.index0 }}">Parentesco:</label>
+                                <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_kinship_{{ loop.index0 }}" value="{{ guardian.kinship if guardian.kinship else '' }}">
+                            </div>
+                            <div class="flex-shrink-0">
+                                <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-guardian">Remover</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="flex items-end space-x-4 dynamic-item">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_name_0">Nome:</label>
+                            <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_name_0">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_contact_0">Contato:</label>
+                            <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_contact_0">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_kinship_0">Parentesco:</label>
+                            <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_kinship_0">
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-guardian">Remover</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <button type="button" id="add-guardian" class="mt-4 px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-150">Adicionar Outro Responsável</button>
+            
+            <h3 class="text-xl font-semibold mt-8 mb-4 text-gray-800">Turmas Matriculadas</h3>
+            <div class="class-list space-y-2">
+                {% for class_item in classes %}
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="class_{{ class_item.id }}" name="enrolled_classes" value="{{ class_item.id }}"
+                            {% if class_item.id in current_class_ids %}checked{% endif %} class="form-checkbox h-4 w-4 text-blue-600 rounded">
+                        <label for="class_{{ class_item.id }}" class="text-sm font-medium text-gray-700">{{ class_item.name }} ({{ class_item.discipline }})</label>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <div class="mt-8">
+                <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition duration-150 ease-in-out">{{ 'Salvar Alterações' if user else 'Adicionar Aluno' }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addEnrolledDisciplineBtn = document.getElementById('add-enrolled-discipline');
+        const enrolledDisciplinesContainer = document.getElementById('enrolled-disciplines-container');
+        let enrolledDisciplineIndex = enrolledDisciplinesContainer.children.length;
+
+        // Se não houver disciplinas, adiciona um campo inicial
+        if (enrolledDisciplinesContainer.children.length === 0) {
+            addEnrolledDisciplineField();
+        }
+
+        addEnrolledDisciplineBtn.addEventListener('click', addEnrolledDisciplineField);
+        enrolledDisciplinesContainer.addEventListener('click', function(event) {
+            if (event.target.classList.contains('remove-enrolled-discipline')) {
+                // Previne a remoção do último campo
+                if (enrolledDisciplinesContainer.children.length > 1) {
+                    event.target.closest('.dynamic-item').remove();
+                    updateEnrolledDisciplineFieldNames();
+                }
+            }
+        });
+
+        function addEnrolledDisciplineField() {
+            const div = document.createElement('div');
+            div.classList.add('flex', 'items-end', 'space-x-4', 'dynamic-item');
+            div.innerHTML = `
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="student_discipline_name_${enrolledDisciplineIndex}">Modalidade:</label>
+                    <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_discipline_name_${enrolledDisciplineIndex}" required>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="student_graduation_${enrolledDisciplineIndex}">Graduação:</label>
+                    <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="student_graduation_${enrolledDisciplineIndex}" required>
+                </div>
+                <div class="flex-shrink-0">
+                    <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-enrolled-discipline">Remover</button>
+                </div>
+            `;
+            enrolledDisciplinesContainer.appendChild(div);
+            enrolledDisciplineIndex++;
+            updateEnrolledDisciplineFieldNames();
+        }
+
+        function updateEnrolledDisciplineFieldNames() {
+            const items = enrolledDisciplinesContainer.querySelectorAll('.dynamic-item');
+            items.forEach((item, index) => {
+                const disciplineNameInput = item.querySelector(`input[name^="student_discipline_name_"]`);
+                const graduationInput = item.querySelector(`input[name^="student_graduation_"]`);
+                const disciplineNameLabel = item.querySelector(`label[for^="student_discipline_name_"]`);
+                const graduationLabel = item.querySelector(`label[for^="student_graduation_"]`);
+
+                if (disciplineNameInput) {
+                    disciplineNameInput.name = `student_discipline_name_${index}`;
+                    disciplineNameLabel.htmlFor = `student_discipline_name_${index}`;
+                }
+                if (graduationInput) {
+                    graduationInput.name = `student_graduation_${index}`;
+                    graduationLabel.htmlFor = `student_graduation_${index}`;
+                }
+            });
+            enrolledDisciplineIndex = items.length;
+        }
+
+        const addGuardianBtn = document.getElementById('add-guardian');
+        const guardiansContainer = document.getElementById('guardians-container');
+        let guardianIndex = guardiansContainer.children.length;
+
+        // Se não houver responsáveis, adiciona um campo inicial
+        if (guardiansContainer.children.length === 0) {
+            addGuardianField();
+        }
+
+        addGuardianBtn.addEventListener('click', addGuardianField);
+        guardiansContainer.addEventListener('click', function(event) {
+            if (event.target.classList.contains('remove-guardian')) {
+                // Previne a remoção do último campo
+                if (guardiansContainer.children.length > 1) {
+                    event.target.closest('.dynamic-item').remove();
+                    updateGuardianFieldNames();
+                }
+            }
+        });
+
+        function addGuardianField() {
+            const div = document.createElement('div');
+            div.classList.add('flex', 'items-end', 'space-x-4', 'dynamic-item');
+            div.innerHTML = `
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_name_${guardianIndex}">Nome:</label>
+                    <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_name_${guardianIndex}" required>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_contact_${guardianIndex}">Contato:</label>
+                    <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_contact_${guardianIndex}" required>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="guardian_kinship_${guardianIndex}">Parentesco:</label>
+                    <input class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" type="text" name="guardian_kinship_${guardianIndex}">
+                </div>
+                <div class="flex-shrink-0">
+                    <button type="button" class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition duration-150 remove-guardian">Remover</button>
+                </div>
+            `;
+            guardiansContainer.appendChild(div);
+            guardianIndex++;
+            updateGuardianFieldNames();
+        }
+
+        function updateGuardianFieldNames() {
+            const items = guardiansContainer.querySelectorAll('.dynamic-item');
+            items.forEach((item, index) => {
+                const nameInput = item.querySelector(`input[name^="guardian_name_"]`);
+                const contactInput = item.querySelector(`input[name^="guardian_contact_"]`);
+                const kinshipInput = item.querySelector(`input[name^="guardian_kinship_"]`);
+                
+                const nameLabel = item.querySelector(`label[for^="guardian_name_"]`);
+                const contactLabel = item.querySelector(`label[for^="guardian_contact_"]`);
+                const kinshipLabel = item.querySelector(`label[for^="guardian_kinship_"]`);
+
+                if (nameInput) {
+                    nameInput.name = `guardian_name_${index}`;
+                    nameLabel.htmlFor = `guardian_name_${index}`;
+                }
+                if (contactInput) {
+                    contactInput.name = `guardian_contact_${index}`;
+                    contactLabel.htmlFor = `guardian_contact_${index}`;
+                }
+                if (kinshipInput) {
+                    kinshipInput.name = `guardian_kinship_${index}`;
+                    kinshipLabel.htmlFor = `guardian_kinship_${index}`;
+                }
+            });
+            guardianIndex = items.length;
+        }
+    });
+</script>
+{% endblock %}

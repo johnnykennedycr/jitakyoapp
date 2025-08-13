@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumo de Presença</title>
+    <!-- Inclui o Tailwind CSS para um estilo moderno e responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white shadow-xl rounded-lg p-8 w-full max-w-2xl">
+        <!-- Título da página com o nome da turma -->
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-2">Resumo de Presença</h1>
+        <p class="text-xl font-semibold text-gray-600 text-center mb-6">Turma: {{ training_class.name }}</p>
+        
+        <!-- Mensagem se a lista de alunos estiver vazia -->
+        {% if not students_attendance_list %}
+            <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6" role="alert">
+                <p>Nenhum aluno encontrado nesta turma ou não há registro de presença.</p>
+            </div>
+        {% else %}
+            <!-- Tabela de alunos com porcentagem de presença -->
+            <div class="overflow-x-auto rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Nome do Aluno
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Presença no Semestre
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for student in students_attendance_list %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ student.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                                {% if student.attendance_percentage is not none %}
+                                    <span class="font-bold text-{{ 'green-600' if student.attendance_percentage >= 75 else 'red-600' }}">
+                                        {{ "%.2f"|format(student.attendance_percentage) }}%
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+        
+        <div class="mt-8 text-center">
+            <a href="{{ url_for('admin.list_classes') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Voltar para as Turmas
+            </a>
+        </div>
+    </div>
+</body>
+</html>

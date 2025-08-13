@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}{% block admin_title %}{% endblock %} - Painel Administrativo{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- Font Awesome 6 - Referência local para os outros ícones.
+         A pasta `static` deve conter as subpastas `css` e `webfonts`. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/all.min.css') }}">
+{% endblock %}
+
+{% block body_content %}
+    <div class="app-container">
+        <!-- Menu Lateral Esquerdo (para Desktop) -->
+        
+        <nav class="left-sidebar">
+            <div class="sidebar-logo-container">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="sidebar-nav-logo">
+            </div>
+            <ul class="sidebar-nav-list">
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.dashboard') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='painel-do-painel.svg') }}" alt="Ícone de Dashboard" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.list_enrollments') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='lista-de-retangulos.svg') }}" alt="Ícone de Matrículas" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Matrículas</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.list_classes') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='oficina.svg') }}" alt="Ícone de Turmas" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Turmas</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.list_students') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='usuarios-alt.svg') }}" alt="Ícone de Alunos" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Alunos</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.list_teachers') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='pessoa-que-apresenta.svg') }}" alt="Ícone de Professores" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Professores</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="{{ url_for('admin.financial_dashboard') }}" class="sidebar-nav-link">
+                        <img src="{{ url_for('static', filename='dinheiro-cheque-editar.svg') }}" alt="Ícone de Financeiro" class="sidebar-nav-icon">
+                        <span class="sidebar-nav-text">Financeiro</span>
+                    </a>
+                </li>
+            </ul>
+            
+        </nav>
+
+        <main class="content-wrapper">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Menu Fixo Inferior (para Mobile) -->
+    <nav class="bottom-navbar">
+        <ul class="bottom-nav-list">
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.dashboard') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='painel-do-painel.svg') }}" alt="Ícone de Turmas" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.list_enrollments') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='lista-de-retangulos.svg') }}" alt="Ícone de Turmas" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Matrículas</span>
+                </a>
+            </li>
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.list_classes') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='oficina.svg') }}" alt="Ícone de Turmas" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Turmas</span>
+                </a>
+            </li>
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.list_students') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='usuarios-alt.svg') }}" alt="Ícone de Alunos" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Alunos</span>
+                </a>
+            </li>
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.list_teachers') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='pessoa-que-apresenta.svg') }}" alt="Ícone de Professores" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Professores</span>
+                </a>
+            </li>
+            <li class="bottom-nav-item">
+                <a href="{{ url_for('admin.financial_dashboard') }}" class="bottom-nav-link">
+                    <img src="{{ url_for('static', filename='dinheiro-cheque-editar.svg') }}" alt="Ícone de Financeiro" class="bottom-nav-icon">
+                    <span class="bottom-nav-text">Financeiro</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+{% endblock %}
