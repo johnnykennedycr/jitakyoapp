@@ -1,0 +1,13 @@
+# Arquivos de credenciais e configuração local
+firebase_credentials.json
+config.ini
+.env
+.cod
+
+# Pasta de ambiente virtual do Python
+venv/
+__pycache__/
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
