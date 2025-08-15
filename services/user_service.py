@@ -1,173 +1,145 @@
 from firebase_admin import firestore
 from models.user import User
 from datetime import datetime
-import bcrypt
 import secrets
 import string
-from flask_mail import Message
+
+# Funções para criptografar e verificar senhas
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class UserService:
     def __init__(self, db, mail=None):
         self.db = db
-        self.users_collection = self.db.collection('users')
         self.mail = mail
+        self.users_collection = self.db.collection('users')
 
     def _generate_random_password(self, length=12):
-        """
-        Gera uma senha aleatória segura.
-        """
-        characters = string.ascii_letters + string.digits + string.punctuation
-        password = ''.join(secrets.choice(characters) for i in range(length))
+        """Gera uma senha aleatória segura."""
+        alphabet = string.ascii_letters + string.digits + string.punctuation
+        password = ''.join(secrets.choice(alphabet) for i in range(length))
         return password
 
-    def _send_welcome_email(self, user_email, username, password):
+    def create_user(self, name, email, role, password=None, **kwargs):
         """
-        Envia um e-mail de boas-vindas com a senha para o novo usuário.
+        Cria um novo usuário, garantindo que o e-mail não esteja duplicado.
         """
-        if not self.mail:
-            print("Erro: Instância de Flask-Mail não configurada. E-mail de boas-vindas não enviado.")
-            return False
-        
         try:
-            msg = Message(
-                subject="Bem-vindo(a) ao JitaKyoApp! Sua Conta de Aluno Foi Criada",
-                recipients=[user_email],
-                body=f"""Olá {username},
+            existing_user_docs = self.users_collection.where('email', '==', email).limit(1).get()
 
-Sua conta de aluno no JitaKyoApp foi criada com sucesso!
+            if existing_user_docs:
+                print(f"Erro: Usuário com e-mail {email} já existe.")
+                return None
 
-Seu e-mail de acesso é: {user_email}
-Sua senha temporária é: {password}
+            if not password:
+                password_to_use = self._generate_random_password()
+                send_email = True
+            else:
+                password_to_use = password
+                send_email = False
+            
+            hashed_password = generate_password_hash(password_to_use)
 
-Por favor, faça login em http://127.0.0.1:5000/ e altere sua senha para uma de sua preferência.
+            user_data = {
+                'name': name,
+                'email': email,
+                'password': hashed_password,
+                'role': role,
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
+            }
+            user_data.update(kwargs)
 
-Se tiver alguma dúvida, entre em contato.
+            timestamp, doc_ref = self.users_collection.add(user_data)
+            new_user_id = doc_ref.id
+            
+            created_user_doc = self.users_collection.document(new_user_id).get()
+            
+            if send_email and self.mail:
+                subject = "Sua conta foi criada no JitaKyoApp!"
+                body = f"Olá {name},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password_to_use}\n\nRecomendamos que você a altere após o primeiro login."
+                # Assumindo que você tem uma instância de mail configurada
+                # from flask_mail import Message
+                # msg = Message(subject=subject, recipients=[email], body=body)
+                # self.mail.send(msg)
+                print(f"E-mail de boas-vindas (simulado) enviado para {email}")
 
-Atenciosamente,
-Equipe JitaKyoApp
-"""
-            )
-            self.mail.send(msg)
-            print(f"E-mail de boas-vindas enviado para {user_email}.")
-            return True
+
+            # --- CORREÇÃO AQUI ---
+            user_obj = User.from_dict(created_user_doc.to_dict())
+            user_obj.id = new_user_id
+            return user_obj
+
         except Exception as e:
-            print(f"Erro ao enviar e-mail para {user_email}: {e}")
-            return False
-
-    def create_user(self, name, email, role='student', date_of_birth=None, phone=None, enrolled_disciplines=None, guardians=None):
-        """
-        Cria um novo usuário. A senha é gerada automaticamente, e-mail de boas-vindas é enviado.
-        Retorna o objeto User se criado com sucesso, ou None se o e-mail já existe.
-        """
-        existing_user_docs = self.users_collection.where('email', '==', email).limit(1).get()
-        if not existing_user_docs.empty: # Correto: verifica se a lista de documentos está vazia
-            print(f"Erro: E-mail '{email}' já está em uso.")
+            print(f"Ocorreu um erro ao criar o usuário: {e}")
             return None
-
-        generated_password = self._generate_random_password()
-        hashed_password = bcrypt.hashpw(generated_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-        user = User(
-            name=name,
-            email=email,
-            password_hash=hashed_password,
-            role=role,
-            date_of_birth=date_of_birth,
-            phone=phone,
-            enrolled_disciplines=enrolled_disciplines,
-            guardians=guardians
-        )
-        user_dict = user.to_dict()
-        
-        _, doc_ref = self.users_collection.add(user_dict)
-        
-        user.id = doc_ref.id
-        print(f"Usuário '{user.name}' criado com ID: {user.id}")
-
-        self._send_welcome_email(user.email, user.name, generated_password)
-
-        return user
 
     def authenticate_user(self, email, password):
         """
-        Autentica um usuário pelo e-mail e senha.
-        Retorna o objeto User (do models.user) se as credenciais forem válidas, caso contrário, None.
-        Esta é a função que o Flask-Login usará para verificar as credenciais.
+        Autentica um usuário, verificando e-mail e senha.
         """
-        user_docs = self.users_collection.where('email', '==', email).limit(1).get()
-        if not user_docs:
-            print(f"Erro: Usuário com e-mail '{email}' não encontrado.")
+        try:
+            user_docs = self.users_collection.where('email', '==', email).limit(1).get()
+            if not user_docs:
+                return None
+            
+            user_doc = user_docs[0]
+            user_data = user_doc.to_dict()
+            
+            if check_password_hash(user_data.get('password', ''), password):
+                # --- CORREÇÃO AQUI ---
+                user = User.from_dict(user_data)
+                user.id = user_doc.id
+                return user
+            
             return None
-
-        user_doc = user_docs[0]
-        user_data = user_doc.to_dict()
-        user_data['id'] = user_doc.id
-        user = User.from_dict(user_data)
-
-        if user and user.password_hash and bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
-            return user
-        else:
-            print("Erro: Senha incorreta.")
+        except Exception as e:
+            print(f"Ocorreu um erro durante a autenticação: {e}")
             return None
 
     def get_user_by_id(self, user_id):
-        """
-        Busca um usuário pelo ID. Esta é a função que o Flask-Login usa 
-        para recarregar o usuário a partir de sua sessão.
-        Retorna o objeto User ou None se não encontrado.
-        """
-        doc_ref = self.users_collection.document(user_id)
-        doc = doc_ref.get()
-        if doc.exists:
-            user_data = doc.to_dict()
-            user_data['id'] = doc.id
-            return User.from_dict(user_data)
-        return None
-
-    def get_all_users(self):
-        """
-        Retorna uma lista de todos os usuários.
-        """
-        users = []
-        docs = self.users_collection.stream()
-        for doc in docs:
-            user_data = doc.to_dict()
-            user_data['id'] = doc.id
-            users.append(User.from_dict(user_data))
-        return users
+        """Busca um usuário pelo seu ID."""
+        try:
+            doc = self.users_collection.document(user_id).get()
+            if doc.exists:
+                # --- CORREÇÃO AQUI ---
+                user = User.from_dict(doc.to_dict())
+                user.id = doc.id
+                return user
+            return None
+        except Exception as e:
+            print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
+            return None
 
     def get_users_by_role(self, role):
-        """
-        Retorna uma lista de usuários com uma função (role) específica.
-        """
-        users = []
-        docs = self.users_collection.where('role', '==', role).stream()
-        for doc in docs:
-            user_data = doc.to_dict()
-            user_data['id'] = doc.id
-            users.append(User.from_dict(user_data))
-        return users
-
+        """Busca todos os usuários com uma determinada role (ex: 'student')."""
+        try:
+            docs = self.users_collection.where('role', '==', role).stream()
+            users_list = []
+            for doc in docs:
+                # --- CORREÇÃO AQUI ---
+                user = User.from_dict(doc.to_dict())
+                user.id = doc.id
+                users_list.append(user)
+            return users_list
+        except Exception as e:
+            print(f"Erro ao buscar usuários por role '{role}': {e}")
+            return []
+            
+    # Inclua aqui seus outros métodos (update_user, delete_user, etc.)
+    # Se eles também usarem User.from_dict(), a mesma correção se aplica.
     def update_user(self, user_id, update_data):
-        """
-        Atualiza dados de um usuário existente.
-        Se 'password' estiver em update_data, a senha será hashed antes de atualizar.
-        """
         if 'password' in update_data and update_data['password']:
-            update_data['password_hash'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            del update_data['password']
+            update_data['password'] = generate_password_hash(update_data['password'])
 
         update_data['updated_at'] = datetime.now()
         
-        user_ref = self.users_collection.document(user_id)
-        user_ref.update(update_data)
-        print(f"Usuário com ID '{user_id}' atualizado.")
+        self.users_collection.document(user_id).update(update_data)
         return True
 
     def delete_user(self, user_id):
-        """
-        Deleta um usuário pelo ID.
-        """
-        self.users_collection.document(user_id).delete()
-        print(f"Usuário com ID '{user_id}' deletado.")
-        return True
+        try:
+            self.users_collection.document(user_id).delete()
+            return True
+        except Exception as e:
+            print(f"Erro ao deletar usuário com ID '{user_id}': {e}")
+            return False

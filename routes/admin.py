@@ -1,9 +1,10 @@
 # routes/admin.py
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user, login_user, logout_user
 from functools import wraps
 from firebase_admin import firestore
-from datetime import datetime, date, time # Importar time para combinar com a data
+from datetime import datetime, date, time, timedelta 
 
 from services.user_service import UserService
 from services.teacher_service import TeacherService
@@ -248,6 +249,8 @@ def edit_class(class_id):
     all_students = user_service.get_users_by_role('student')
     enrolled_student_ids = {s.id for s in enrolled_students}
     available_students = [s for s in all_students if s.id not in enrolled_student_ids]
+    
+    available_students_data = [{'id': s.id, 'name': s.name, 'email': s.email} for s in available_students]
 
     if request.method == 'POST':
         if 'student_id_to_enroll' in request.form and request.form['student_id_to_enroll']:
@@ -311,8 +314,8 @@ def edit_class(class_id):
                            training_class=training_class,
                            teachers=teachers,
                            enrolled_students=enrolled_students,
-                           all_students=all_students,
-                           available_students=available_students)
+                           available_students=available_students,
+                           available_students_json=available_students_data)
 
 @admin_bp.route('/classes/delete/<string:class_id>', methods=['POST'])
 @login_required
@@ -532,7 +535,7 @@ def delete_enrollment(enrollment_id):
     return redirect(url_for('admin.list_enrollments'))
 
 
-# --- ROTAS PARA LISTA DE PRESENÇA (CORRIGIDO) ---
+# --- ROTAS PARA LISTA DE PRESENÇA ---
 @admin_bp.route('/classes/<string:class_id>/attendance', methods=['GET'])
 @login_required
 @admin_required
@@ -542,22 +545,29 @@ def get_attendance_list(class_id):
         flash('Turma não encontrada.', 'danger')
         return redirect(url_for('admin.list_classes'))
 
+    weekday_map_to_js = {
+        'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3,
+        'Quinta': 4, 'Sexta': 5, 'Sábado': 6
+    }
+    scheduled_days_js = []
+    if training_class.schedule:
+        for item in training_class.schedule:
+            day_number = weekday_map_to_js.get(item.day_of_week)
+            if day_number is not None:
+                scheduled_days_js.append(day_number)
+    
     selected_date_str = request.args.get('date')
     if selected_date_str:
         selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
     else:
         selected_date = date.today()
-        selected_date_str = selected_date.isoformat()
-
-    # Converte o objeto date para datetime (meia-noite) para ser compatível com o Firestore
-    selected_datetime = datetime.combine(selected_date, time.min)
-
+    
     enrollments = enrollment_service.get_enrollments_by_class(class_id) or []
     
     students_with_none = [user_service.get_user_by_id(e.student_id) for e in enrollments]
     students = [s for s in students_with_none if s is not None]
 
-    attendance_record = attendance_service.get_attendance_by_class_and_date(class_id, selected_datetime)
+    attendance_record = attendance_service.get_attendance_by_class_and_date(class_id, selected_date)
 
     student_attendance_map = {}
     if attendance_record and attendance_record.students:
@@ -565,57 +575,49 @@ def get_attendance_list(class_id):
             student_id = record.get('student_id')
             status = record.get('status')
             if student_id:
-                # O mapa agora armazena o status, 'present' ou 'absent'
                 student_attendance_map[student_id] = (status == 'present')
 
     return render_template('admin/training_classes/call_list.html',
                            training_class=training_class,
                            students=students,
                            selected_date=selected_date,
-                           student_attendance_map=student_attendance_map)
+                           student_attendance_map=student_attendance_map,
+                           scheduled_days_js=scheduled_days_js)
 
 
+# --- ROTA SAVE_ATTENDANCE CORRIGIDA ---
 @admin_bp.route('/classes/<string:class_id>/attendance', methods=['POST'])
 @login_required
 @admin_required
 def save_attendance(class_id):
-    """
-    CORRIGIDO: Salva a chamada para uma turma e data e redireciona para a página all_calls.
-    """
     try:
         selected_date_str = request.form['date']
         selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
         selected_datetime = datetime.combine(selected_date, time.min)
 
-        # 1. Obter todos os alunos da turma.
         enrollments = enrollment_service.get_enrollments_by_class(class_id) or []
         students_in_class = [user_service.get_user_by_id(e.student_id) for e in enrollments]
         
-        # 2. Criar a lista de presença completa (presente ou ausente)
         attendance_data = []
         for student in students_in_class:
-            if student: # Verifica se o aluno existe
+            if student: 
                 student_id = student.id
-                # O nome do campo do formulário é 'student_present_<id>'. Se estiver no request.form, está presente.
                 is_present = f'student_present_{student_id}' in request.form
                 status = 'present' if is_present else 'absent'
                 attendance_data.append({'student_id': student_id, 'status': status})
 
-        # 3. Salvar o registro completo no Firestore.
         if attendance_service.save_attendance_record(class_id, selected_datetime, attendance_data):
             flash('Lista de presença salva com sucesso!', 'success')
         else:
             flash('Erro ao salvar a lista de presença.', 'danger')
         
-        # 4. Redirecionar para a página all_calls da turma.
         return redirect(url_for('admin.all_calls', class_id=class_id))
     
     except Exception as e:
         flash(f'Ocorreu um erro ao salvar a presença: {e}', 'danger')
-        return redirect(url_for('admin.get_attendance_list', class_id=class_id, date=selected_date_str))
+        return redirect(url_for('admin.get_attendance_list', class_id=class_id, date=request.form.get('date')))
 
-
-# --- Rota para o resumo de presença (adicionada) ---
+# --- ROTA DE RESUMO DE PRESENÇA ---
 @admin_bp.route('/classes/all_calls/<string:class_id>')
 @login_required
 @admin_required
@@ -625,41 +627,95 @@ def all_calls(class_id):
         flash('Turma não encontrada.', 'danger')
         return redirect(url_for('admin.list_classes'))
 
+    # Lógica de cálculo de total_classes (permanece a mesma)
+    weekday_map = {
+        'Segunda': 'Monday', 'Terça': 'Tuesday', 'Quarta': 'Wednesday',
+        'Quinta': 'Thursday', 'Sexta': 'Friday', 'Sábado': 'Saturday', 'Domingo': 'Sunday'
+    }
+    scheduled_days_pt = [item.day_of_week for item in training_class.schedule]
+    scheduled_days_en = [weekday_map.get(day) for day in scheduled_days_pt if weekday_map.get(day)]
+    today = date.today()
+    start_date = today.replace(day=1) 
+    actual_class_dates = []
+    current_date = start_date
+    while current_date <= today:
+        if current_date.strftime('%A') in scheduled_days_en:
+            actual_class_dates.append(current_date)
+        current_date += timedelta(days=1)
+    total_classes = len(actual_class_dates)
+    
+    all_attendance_records = attendance_service.get_all_attendance_by_class(class_id)
     enrollments = enrollment_service.get_enrollments_by_class(class_id) or []
     
-    # Busque todos os registros de presença para esta turma
-    all_attendance_records = attendance_service.get_all_attendance_by_class(class_id)
-    total_classes = len(all_attendance_records)
-
-    student_summary = {}
+    student_summary_dict = {}
     for enrollment in enrollments:
         student = user_service.get_user_by_id(enrollment.student_id)
         if student:
-            student_summary[student.id] = {
-                'name': student.name,
+            student_graduation = "N/A"
+            if student.enrolled_disciplines:
+                for discipline_info in student.enrolled_disciplines:
+                    if discipline_info.get('discipline_name') == training_class.discipline:
+                        student_graduation = discipline_info.get('graduation', 'N/A')
+                        break
+            
+            # --- MUDANÇA PRINCIPAL AQUI ---
+            # Formatamos o nome para incluir a idade, se disponível
+            student_name_with_age = student.name
+            if student.age is not None:
+                student_name_with_age = f"{student.name} ({student.age} anos)"
+
+            student_summary_dict[student.id] = {
+                'id': student.id,
+                'name': student_name_with_age, # <-- Usamos a nova variável com a idade
+                'graduation': student_graduation,
                 'present_count': 0,
                 'total_classes': total_classes
             }
 
+    # O resto da lógica para contar presença e calcular porcentagem permanece igual
+    present_dates_by_student = {} 
     for record in all_attendance_records:
+        attendance_date_obj = record.attendance_date
         if record.students:
             for student_record in record.students:
                 student_id = student_record.get('student_id')
                 status = student_record.get('status')
-                if student_id in student_summary and status == 'present':
-                    student_summary[student_id]['present_count'] += 1
-
-    for student_id in student_summary:
+                if student_id in student_summary_dict and status == 'present':
+                    if student_id not in present_dates_by_student:
+                        present_dates_by_student[student_id] = set()
+                    present_dates_by_student[student_id].add(attendance_date_obj)
+    
+    for student_id, dates_attended in present_dates_by_student.items():
+        student_summary_dict[student_id]['present_count'] = len(dates_attended)
+    
+    for student_id in student_summary_dict:
         if total_classes > 0:
-            present_count = student_summary[student_id]['present_count']
-            student_summary[student_id]['attendance_percentage'] = (present_count / total_classes) * 100
+            present_count = student_summary_dict[student_id]['present_count']
+            student_summary_dict[student_id]['attendance_percentage'] = (present_count / total_classes) * 100
         else:
-            student_summary[student_id]['attendance_percentage'] = 0
+            student_summary_dict[student_id]['attendance_percentage'] = 0
 
     return render_template('admin/training_classes/all_calls.html',
                            training_class=training_class,
-                           student_summary=list(student_summary.values()))
+                           student_summary=list(student_summary_dict.values()))
 
+# --- ROTA PARA DESMATRICULAR ALUNO ---
+@admin_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
+@login_required
+@admin_required
+def unenroll_student_from_class(class_id, student_id):
+    enrollments_to_delete = enrollment_service.get_enrollments_by_student_and_class(student_id, class_id)
+    
+    if enrollments_to_delete:
+        enrollment_id = enrollments_to_delete[0].id
+        if enrollment_service.delete_enrollment(enrollment_id):
+            flash('Aluno desmatriculado com sucesso!', 'success')
+        else:
+            flash('Erro ao tentar desmatricular o aluno.', 'danger')
+    else:
+        flash('Matrícula não encontrada.', 'warning')
+        
+    return redirect(url_for('admin.all_calls', class_id=class_id))
 
 # --- Rotas Financeiras (Exemplo) ---
 @admin_bp.route('/financial')

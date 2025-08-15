@@ -1,58 +1,68 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resumo de Presença</title>
-    <!-- Inclui o Tailwind CSS para um estilo moderno e responsivo -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+{% extends 'admin/base_admin.html' %}
 
-    <div class="bg-white shadow-xl rounded-lg p-8 w-full max-w-2xl">
-        <!-- Título da página com o nome da turma -->
-        <h1 class="text-3xl font-bold text-gray-800 text-center mb-2">Resumo de Presença</h1>
-        <p class="text-xl font-semibold text-gray-600 text-center mb-6">Turma: {{ training_class.name }}</p>
+{% block admin_title %}Resumo de Presença{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 md:p-10">
+
+    <div class="bg-white shadow-xl rounded-lg p-8 w-full max-w-5xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Resumo de Presença</h1>
+            <p class="text-xl font-semibold text-indigo-600 mt-1">Turma: {{ training_class.name }}</p>
+        </div>
         
-        <!-- Mensagem se a lista de alunos estiver vazia -->
-        {% if not students_attendance_list %}
+        {% include 'admin/partials/flash_messages.html' ignore missing %}
+
+        {% if not student_summary %}
             <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6" role="alert">
                 <p>Nenhum aluno encontrado nesta turma ou não há registro de presença.</p>
             </div>
         {% else %}
-            <!-- Tabela de alunos com porcentagem de presença -->
-            <div class="overflow-x-auto rounded-lg shadow">
+            <div class="overflow-x-auto rounded-lg shadow border">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Nome do Aluno
+                                Aluno
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Graduação
                             </th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Presença no Semestre
+                                Presença
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Ações
                             </th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        {% for student in students_attendance_list %}
+                        {% for student in student_summary %}
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{ student.name }}
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ student.graduation }}
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                                 {% if student.attendance_percentage is not none %}
-                                    <span class="font-bold text-{{ 'green-600' if student.attendance_percentage >= 75 else 'red-600' }}">
-                                        {{ "%.2f"|format(student.attendance_percentage) }}%
+                                    <span class="font-semibold text-{{ 'green-600' if student.attendance_percentage >= 75 else ('yellow-600' if student.attendance_percentage >= 50 else 'red-600') }}">
+                                        {{ "%.1f"|format(student.attendance_percentage) }}%
+                                    </span>
+                                    <span class="text-xs text-gray-400 ml-1">
+                                        ({{ student.present_count }}/{{ student.total_classes }})
                                     </span>
                                 {% else %}
                                     -
                                 {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <form action="{{ url_for('admin.unenroll_student_from_class', class_id=training_class.id, student_id=student.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja desmatricular {{ student.name }} desta turma?');">
+                                    <button type="submit" class="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-md hover:bg-red-700 transition-colors">
+                                        Desmatricular
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}
@@ -62,10 +72,10 @@
         {% endif %}
         
         <div class="mt-8 text-center">
-            <a href="{{ url_for('admin.list_classes') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <a href="{{ url_for('admin.list_classes') }}" class="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 Voltar para as Turmas
             </a>
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

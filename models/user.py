@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 class User:
     def __init__(self, id=None, name=None, email=None, password_hash=None, role='student',
@@ -54,3 +54,18 @@ class User:
 
     def __repr__(self):
         return f"<User(id='{self.id}', name='{self.name}', role='{self.role}')>"
+    
+    def calculate_age(self):
+        """Calcula a idade com base na data de nascimento."""
+        if not self.date_of_birth:
+            return None
+        today = date.today()
+        # Calcula a idade subtraindo o ano de nascimento do ano atual.
+        # Depois, subtrai 1 se o aniversário deste ano ainda não chegou.
+        age = today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+        return age
+
+    @property
+    def age(self):
+        """Propriedade que retorna a idade calculada."""
+        return self.calculate_age()
