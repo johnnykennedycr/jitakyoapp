@@ -1,11 +1,4 @@
 {
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "runtime": "python311"
-    }
-  ],
   "hosting": {
     "public": "static",
     "ignore": [
@@ -16,7 +9,10 @@
     "rewrites": [
       {
         "source": "**",
-        "function": "api"
+        "run": {
+          "serviceId": "jitakyoapp",
+          "region": "southamerica-east1"
+        }
       }
     ]
   }
