@@ -1,0 +1,31 @@
+{% extends 'base_student.html' %}
+
+{% block student_title %}Minhas Aulas{% endblock %}
+
+{% block student_content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">Suas Próximas Aulas</h2>
+    {% if upcoming_classes %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for class in upcoming_classes %}
+            <div class="bg-white rounded-lg shadow p-5">
+                <p class="text-sm font-semibold text-indigo-600">{{ class.day }}</p>
+                <h3 class="text-xl font-bold text-gray-900 mt-1">{{ class.name }}</h3>
+                <p class="text-gray-600 mt-2">{{ class.time }}</p>
+                <p class="text-sm text-gray-500">com Prof. {{ class.teacher }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-600">Nenhuma aula agendada para os próximos 7 dias.</p>
+    {% endif %}
+
+    <div class="mt-12">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Cronograma da Semana</h2>
+        <div class="bg-white rounded-lg shadow p-5 text-center text-gray-500">
+            <p>O calendário completo da academia aparecerá aqui em breve.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

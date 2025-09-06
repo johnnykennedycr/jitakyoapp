@@ -1,0 +1,49 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block admin_title %}{{ action }} Usuário do Sistema{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 md:p-10">
+    <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">{{ action }} Usuário do Sistema</h1>
+
+        {% include 'admin/partials/flash_messages.html' ignore missing %}
+
+        <form method="POST" class="space-y-6">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700">Nome Completo:</label>
+                <input type="text" id="name" name="name" value="{{ user.name if user else '' }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700">E-mail:</label>
+                <input type="email" id="email" name="email" value="{{ user.email if user else '' }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
+                <label for="role" class="block text-sm font-medium text-gray-700">Nível de Permissão (Role):</label>
+                <select id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Selecione um nível...</option>
+                    <option value="student" {% if user and user.role == 'student' %}selected{% endif %}>Aluno</option>
+                    <option value="teacher" {% if user and user.role == 'teacher' %}selected{% endif %}>Professor</option>
+                    <option value="receptionist" {% if user and user.role == 'receptionist' %}selected{% endif %}>Recepcionista</option>
+                    <option value="admin" {% if user and user.role == 'admin' %}selected{% endif %}>Administrador</option>
+                    <option value="super_admin" {% if user and user.role == 'super_admin' %}selected{% endif %}>Super Administrador</option>
+                </select>
+            </div>
+             <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Nova Senha (Opcional):</label>
+                <input type="password" id="password" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Deixe em branco para não alterar">
+                {% if not user %}
+                <p class="mt-2 text-xs text-gray-500">Se deixado em branco, uma senha aleatória será gerada e enviada por e-mail.</p>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-4">
+                <a href="{{ url_for('admin.list_all_users') }}" class="px-6 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">Cancelar</a>
+                <button type="submit" class="px-6 py-2 border border-transparent rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                    {{ 'Salvar Alterações' if user else 'Criar Usuário' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

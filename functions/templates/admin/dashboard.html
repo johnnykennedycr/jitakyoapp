@@ -1,0 +1,44 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block admin_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 md:p-10">
+    <h1 class="text-3xl font-bold text-gray-100 mb-8">Agenda da Semana</h1>
+
+    <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
+        <div class="relative grid" style="grid-template-columns: auto repeat({{ days_order|length }}, minmax(150px, 1fr)); grid-template-rows: auto repeat({{ time_slots|length }}, minmax(60px, auto));">
+            
+            <div class="sticky top-0 left-0 z-30 bg-white border-b border-r border-gray-200"></div>
+
+            {% for day in days_order %}
+                <div class="sticky top-0 z-20 p-2 text-center font-bold text-gray-700 bg-gray-50 border-b border-gray-200">
+                    {{ day }}
+                </div>
+            {% endfor %}
+
+            {% for slot in time_slots %}
+                <div class="sticky left-0 z-20 px-2 text-right text-xs font-mono text-gray-500 bg-gray-50 border-r border-b border-gray-200 flex items-center justify-end">
+                    <span>{{ slot }}</span>
+                </div>
+                {% for day in days_order %}
+                    <div class="border-r border-b border-gray-200"></div>
+                {% endfor %}
+            {% endfor %}
+
+            {% for event in scheduled_events %}
+                <div class="absolute p-px z-10" style="{{ event.style|safe }}">
+                    <a href="{{ url_for('admin.edit_class', class_id=event.id) }}" 
+                       class="block h-full bg-indigo-100 border border-indigo-300 text-indigo-800 rounded-lg p-2 overflow-hidden flex flex-col justify-center
+                              transform transition-all duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-20">
+                        <p class="font-bold text-sm leading-tight truncate">{{ event.name }}</p>
+                        <p class="text-xs">{{ event.time }}</p>
+                        <p class="text-xs text-indigo-600 truncate">Prof. {{ event.teacher }}</p>
+                    </a>
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
