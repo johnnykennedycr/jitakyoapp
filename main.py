@@ -43,6 +43,14 @@ app.config.from_mapping(
     MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
 )
 
+
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
+
+
 # --- INICIALIZAÇÃO DOS SERVIÇOS E DEPENDÊNCIAS ---
 mail = Mail(app)
 login_manager = LoginManager()
