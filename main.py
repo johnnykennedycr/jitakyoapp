@@ -5,6 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from flask_mail import Mail
 from flask_login import LoginManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Suas importações de módulos (models, routes, services)
 from models.user import User
@@ -30,6 +31,7 @@ db = firestore.client()
 
 # --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.config.from_mapping(
     SECRET_KEY=os.getenv('SECRET_KEY', 'fallback_secret_key_para_seguranca'),
     VAPID_PUBLIC_KEY=os.getenv('VAPID_PUBLIC_KEY'),
