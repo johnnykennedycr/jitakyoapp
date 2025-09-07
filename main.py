@@ -2,15 +2,11 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, render_template
 import firebase_admin
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 from flask_mail import Mail
 from flask_login import LoginManager
 
-# Importações para o Firebase Functions
-from firebase_functions import https_fn
-from firebase_admin import initialize_app
-
-# Importações dos seus módulos
+# Suas importações de módulos (models, routes, services)
 from models.user import User
 from routes.admin import admin_bp, init_admin_bp
 from routes.student import student_bp, init_student_bp
@@ -27,9 +23,9 @@ from services.notification_service import NotificationService
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# Inicialização do Firebase (forma correta para o ambiente de nuvem)
+# Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
 if not firebase_admin._apps:
-    initialize_app()
+    firebase_admin.initialize_app()
 db = firestore.client()
 
 # --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
@@ -85,10 +81,3 @@ app.register_blueprint(student_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(teacher_bp)
 
-
-# --- PONTO DE ENTRADA PARA O FIREBASE FUNCTIONS ---
-@https_fn.on_request
-def api(req: https_fn.Request) -> https_fn.Response:
-    """Serve a aplicação Flask inteira como uma única Cloud Function."""
-    with app.request_context(req.environ):
-        return app.full_dispatch_request()
