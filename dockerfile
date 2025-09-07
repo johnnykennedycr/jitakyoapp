@@ -14,5 +14,5 @@ COPY . .
 # Expõe a porta que o Cloud Run usará
 EXPOSE 8080
 
-# Comando para iniciar a aplicação agora vai mesmo
+# Comando para iniciar a aplicação agora vai mesmo mesmo
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "main:app"]
