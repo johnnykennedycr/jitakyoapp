@@ -54,20 +54,46 @@ class UserService:
             return None
 
     def authenticate_user(self, email, password):
-        user_docs = self.users_collection.where('email', '==', email).limit(1).get()
-        if not user_docs:
+        print("--- AUTHENTICATION ATTEMPT START ---")
+        try:
+            print(f"1. Searching for user with email: {email}")
+            user_docs = self.users_collection.where('email', '==', email).limit(1).get()
+            
+            if not user_docs:
+                print("2. Auth failed: User not found in database.")
+                print("--- AUTHENTICATION ATTEMPT END ---\n")
+                return None
+            
+            user_doc = user_docs[0]
+            user_data = user_doc.to_dict()
+            print(f"2. User found. Data from DB: {user_data}")
+            
+            stored_hash = user_data.get('password_hash')
+            print(f"3. Stored password hash from DB: {stored_hash}")
+            
+            if not stored_hash:
+                print("4. Auth failed: 'password_hash' field is missing or empty for this user.")
+                print("--- AUTHENTICATION ATTEMPT END ---\n")
+                return None
+
+            is_match = check_password_hash(stored_hash, password)
+            print(f"5. Does provided password match the stored hash? -> {is_match}")
+
+            if is_match:
+                print("6. SUCCESS: Password matches. Returning user object.")
+                user = User.from_dict(user_data)
+                user.id = user_doc.id
+                print("--- AUTHENTICATION ATTEMPT END ---\n")
+                return user
+            else:
+                print("6. FAILURE: Password does not match.")
+                print("--- AUTHENTICATION ATTEMPT END ---\n")
+                return None
+        
+        except Exception as e:
+            print(f"!!! UNEXPECTED ERROR during authentication: {e}")
+            print("--- AUTHENTICATION ATTEMPT END ---\n")
             return None
-        
-        user_doc = user_docs[0]
-        user_data = user_doc.to_dict()
-        stored_hash = user_data.get('password_hash')
-        
-        if stored_hash and check_password_hash(stored_hash, password):
-            user = User.from_dict(user_data)
-            user.id = user_doc.id
-            return user
-        
-        return None
 
     def get_user_by_id(self, user_id):
         try:

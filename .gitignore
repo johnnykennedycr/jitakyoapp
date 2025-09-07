@@ -3,6 +3,8 @@ firebase_credentials.json
 config.ini
 .env
 .cod
+test_enrollments.py
+create_admin_user.py
 
 # Pasta de ambiente virtual do Python
 venv/
