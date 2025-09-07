@@ -26,9 +26,16 @@ load_dotenv()
 
 # --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
 app = Flask(__name__)
+# --- CONFIGURAÇÃO ESSENCIAL ---
+# Use atribuição direta para a chave secreta. É mais seguro e padrão.
+app.secret_key = os.getenv('SECRET_KEY') 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-app.config.from_mapping(
-    SECRET_KEY=os.getenv('SECRET_KEY'),
+
+# Adicione outras configurações ao objeto 'config'
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
     VAPID_PUBLIC_KEY=os.getenv('VAPID_PUBLIC_KEY'),
     VAPID_PRIVATE_KEY=os.getenv('VAPID_PRIVATE_KEY'),
     VAPID_ADMIN_EMAIL=os.getenv('VAPID_ADMIN_EMAIL'),
@@ -39,14 +46,6 @@ app.config.from_mapping(
     MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
     MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
 )
-
-
-app.config.update(
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
-)
-
 
 # --- INICIALIZAÇÃO DOS SERVIÇOS E DEPENDÊNCIAS ---
 mail = Mail(app)
