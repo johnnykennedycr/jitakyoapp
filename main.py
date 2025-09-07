@@ -67,7 +67,19 @@ payment_service = PaymentService(db, enrollment_service)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return user_service.get_user_by_id(user_id)
+    print(f"\n--- USER LOADER ATIVADO ---")
+    print(f"1. Tentando carregar usuário da sessão com ID: {user_id}")
+    if user_service:
+        user = user_service.get_user_by_id(user_id)
+        if user:
+            print(f"2. SUCESSO: Usuário {user.email} (Role: {user.role}) carregado da sessão.")
+        else:
+            print(f"2. FALHA: Nenhum usuário encontrado no DB com o ID {user_id}.")
+        print("--- USER LOADER FIM ---\n")
+        return user
+    print("2. FALHA: user_service não está disponível.")
+    print("--- USER LOADER FIM ---\n")
+    return None
 
 @app.context_processor
 def inject_branding_settings():
