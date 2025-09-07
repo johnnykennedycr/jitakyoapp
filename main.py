@@ -22,11 +22,13 @@ from services.payment_service import PaymentService
 from services.notification_service import NotificationService
 
 
+load_dotenv()
+
 # --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.config.from_mapping(
-    SECRET_KEY=os.getenv('SECRET_KEY', 'fallback_secret_key_para_seguranca'),
+    SECRET_KEY=os.getenv('SECRET_KEY'),
     VAPID_PUBLIC_KEY=os.getenv('VAPID_PUBLIC_KEY'),
     VAPID_PRIVATE_KEY=os.getenv('VAPID_PRIVATE_KEY'),
     VAPID_ADMIN_EMAIL=os.getenv('VAPID_ADMIN_EMAIL'),
@@ -53,7 +55,6 @@ login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
 
 
-load_dotenv()
 
 # Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
 # --- INICIALIZAÇÃO DOS SERVIÇOS ---
