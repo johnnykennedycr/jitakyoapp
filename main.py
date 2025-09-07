@@ -21,13 +21,6 @@ from services.attendance_service import AttendanceService
 from services.payment_service import PaymentService
 from services.notification_service import NotificationService
 
-# Carrega variáveis de ambiente
-load_dotenv()
-
-# Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
-db = firestore.client()
 
 # --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
 app = Flask(__name__)
@@ -59,6 +52,16 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
 
+
+load_dotenv()
+
+# Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
+# --- INICIALIZAÇÃO DOS SERVIÇOS ---
+# (O Firebase precisa ser inicializado antes de usar o db)
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+db = firestore.client()
+
 user_service = UserService(db, mail)
 teacher_service = TeacherService(db)
 training_class_service = TrainingClassService(db)
@@ -67,32 +70,22 @@ attendance_service = AttendanceService(db)
 notification_service = NotificationService(db, user_service)
 payment_service = PaymentService(db, enrollment_service)
 
+# --- 5. CONFIGURAÇÃO DO USER LOADER (ESSENCIAL ESTAR AQUI) ---
 @login_manager.user_loader
 def load_user(user_id):
+    """Carrega o usuário da sessão. Essencial para o Flask-Login funcionar."""
     print(f"\n--- USER LOADER ATIVADO ---")
-    print(f"1. Tentando carregar usuário da sessão com ID: {user_id}")
-    if user_service:
-        user = user_service.get_user_by_id(user_id)
-        if user:
-            print(f"2. SUCESSO: Usuário {user.email} (Role: {user.role}) carregado da sessão.")
-        else:
-            print(f"2. FALHA: Nenhum usuário encontrado no DB com o ID {user_id}.")
-        print("--- USER LOADER FIM ---\n")
-        return user
-    print("2. FALHA: user_service não está disponível.")
+    print(f"Tentando carregar usuário da sessão com ID: {user_id}")
+    # O user_service já foi inicializado, então podemos usá-lo com segurança
+    user = user_service.get_user_by_id(user_id)
+    if user:
+        print(f"SUCESSO: Usuário {user.email} (Role: {user.role}) carregado.")
+    else:
+        print(f"FALHA: Nenhum usuário encontrado no DB com o ID {user_id}.")
     print("--- USER LOADER FIM ---\n")
-    return None
+    return user
 
-@app.context_processor
-def inject_branding_settings():
-    settings_doc = db.collection('settings').document('branding').get()
-    settings = settings_doc.to_dict() if settings_doc.exists else {}
-    return {
-        'academy_name': settings.get('academy_name', 'JitaKyoApp'),
-        'academy_logo_path': settings.get('logo_path', 'logo-horizontal.png')
-    }
 
-# --- INICIALIZAÇÃO E REGISTRO DOS BLUEPRINTS ---
 init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
 init_auth_bp(user_service)
 init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
@@ -102,3 +95,14 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(teacher_bp)
+
+# Context processor para o branding pode ficar aqui no final
+@app.context_processor
+def inject_branding_settings():
+    settings_doc = db.collection('settings').document('branding').get()
+    settings = settings_doc.to_dict() if settings_doc.exists else {}
+    return {
+        'academy_name': settings.get('academy_name', 'JitaKyoApp'),
+        'academy_logo_path': settings.get('logo_path', 'logo-horizontal.png')
+    }
+
