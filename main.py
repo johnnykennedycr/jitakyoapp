@@ -81,3 +81,4 @@ app.register_blueprint(student_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(teacher_bp)
 
+#2
