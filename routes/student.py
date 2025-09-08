@@ -28,7 +28,7 @@ def init_student_bp(us, es, tcs, ts, ps):
 
 @student_bp.route('/dashboard')
 @login_required
-@student_required
+
 def dashboard():
     print("\n--- DEBUGGING STUDENT DASHBOARD ACCESS ---")
     print(f"Request Headers: {request.headers}")
