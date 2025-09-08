@@ -27,7 +27,6 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard')
-@login_required
 
 def dashboard():
     print("\n--- DEBUGGING STUDENT DASHBOARD ACCESS ---")
