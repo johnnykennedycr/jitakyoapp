@@ -33,7 +33,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Adicione outras configurações ao objeto 'config'
 app.config.update(
-    SESSION_COOKIE_DOMAIN='jitakyoapp.web.app',
+    SESSION_COOKIE_DOMAIN='.jitakyoapp.web.app',
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
