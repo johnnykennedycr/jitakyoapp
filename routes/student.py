@@ -27,14 +27,9 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard')
-
+@login_required
+@student_required
 def dashboard():
-    print("\n--- DEBUGGING STUDENT DASHBOARD ACCESS ---")
-    print(f"Request Headers: {request.headers}")
-    print(f"Request Cookies: {request.cookies}")
-    print(f"Flask Session Contents: {dict(session)}")
-    print(f"Is user authenticated according to Flask-Login? {current_user.is_authenticated}")
-    print("--- END OF DEBUGGING BLOCK ---\n")
     # 1. Busca as matrículas do aluno logado
     enrollments = enrollment_service.get_enrollments_by_student(current_user.id)
     student_class_ids = {e.class_id for e in enrollments}
