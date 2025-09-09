@@ -21,7 +21,11 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
+            "value": "private"
+          },
+          {
+            "key": "set-cookie",
+            "value": "session"
           }
         ]
       }
