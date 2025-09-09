@@ -14,21 +14,7 @@
           "region": "southamerica-east1"
         }
       }
-    ],
-    "headers": [
-      {
-        "source": "**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "private"
-          },
-          {
-            "key": "set-cookie",
-            "value": "session"
-          }
-        ]
-      }
     ]
+    
   }
 }

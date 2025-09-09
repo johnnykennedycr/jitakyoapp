@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, make_response, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user, login_required
 
 user_service = None
@@ -31,15 +31,26 @@ def login():
 
         if user:
             login_user(user)
+            # --- CONSTRUÇÃO DA RESPOSTA CORRETA ---
+            # 2. Determine para onde redirecionar
             if user.role in ['admin', 'super_admin']:
-                return redirect(url_for('admin.dashboard'))
+                target_url = url_for('admin.dashboard')
             elif user.role == 'student':
-                return redirect(url_for('student.dashboard'))
-            # --- LÓGICA DE REDIRECIONAMENTO DO PROFESSOR ---
+                target_url = url_for('student.dashboard')
             elif user.role == 'teacher':
-                return redirect(url_for('teacher.dashboard'))
+                target_url = url_for('teacher.dashboard')
             else:
-                return redirect(url_for('index')) # Fallback
+                target_url = url_for('index') 
+            
+            # 3. Crie a resposta de redirecionamento
+            response = make_response(redirect(target_url))
+            
+            # 4. Adicione o cabeçalho Cache-Control. Esta é a chave!
+            response.headers['Cache-Control'] = 'private'
+            
+            # 5. Retorne a resposta construída
+            return response
+            # --- FIM DA ALTERAÇÃO ---
         else:
             flash('Credenciais inválidas.', 'danger')
     
