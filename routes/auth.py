@@ -47,7 +47,7 @@ def login():
             
             # 4. Adicione o cabeçalho Cache-Control. Esta é a chave!
             response.headers['Cache-Control'] = 'private'
-            
+            print(f"DEBUG: Enviando cabeçalhos de resposta: {response.headers}")
             # 5. Retorne a resposta construída
             return response
             # --- FIM DA ALTERAÇÃO ---
