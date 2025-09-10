@@ -1,4 +1,4 @@
-from flask import Blueprint, make_response, render_template, request, redirect, url_for, flash
+from flask import Blueprint, make_response, render_template, request, redirect, session, url_for, flash
 from flask_login import login_user, logout_user, current_user, login_required
 
 user_service = None
@@ -30,9 +30,16 @@ def login():
         user = user_service.authenticate_user(email, password)
 
         if user:
-            login_user(user)
+            # login_user(user)
             # --- CONSTRUÇÃO DA RESPOSTA CORRETA ---
             # 2. Determine para onde redirecionar
+            # --- SUBSTITUA O LOGIN_USER PELA CRIAÇÃO MANUAL DA SESSÃO ---
+            
+            # login_user(user) # <- Comente ou remova esta linha
+
+            # Salve o ID do usuário na sessão manualmente
+            session['user_id'] = user.get_id()
+            session.permanent = True # Opcional: faz a sessão durar mais tempo
             if user.role in ['admin', 'super_admin']:
                 target_url = url_for('admin.dashboard')
             elif user.role == 'student':
