@@ -1,13 +1,19 @@
 {
   "hosting": {
-    "source": ".",
+    "public": "static",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "frameworksBackend": {
-      "region": "southamerica-east1"
-    }
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "jitakyoapp",
+          "region": "southamerica-east1"
+        }
+      }
+    ]
   }
 }
