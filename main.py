@@ -6,6 +6,7 @@ from firebase_admin import credentials, firestore
 from flask_mail import Mail
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_session import Session
 
 # Suas importações de módulos (models, routes, services)
 from models.user import User
@@ -30,6 +31,18 @@ app = Flask(__name__)
 # Use atribuição direta para a chave secreta. É mais seguro e padrão.
 app.secret_key = os.getenv('SECRET_KEY') 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+db = firestore.client()
+
+app.config['SESSION_TYPE'] = 'firestore'
+app.config['SESSION_FIRESTORE'] = db
+app.config['SESSION_USE_SIGNER'] = True # Assina o cookie de ID de sessão
+app.config['SESSION_PERMANENT'] = False # A sessão expira quando o navegador fecha
+
+server_session = Session(app)
+
 
 # Adicione outras configurações ao objeto 'config'
 app.config.update(
@@ -59,9 +72,7 @@ login_manager.login_view = 'auth.login'
 # Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
 # --- INICIALIZAÇÃO DOS SERVIÇOS ---
 # (O Firebase precisa ser inicializado antes de usar o db)
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
-db = firestore.client()
+
 
 user_service = UserService(db, mail)
 teacher_service = TeacherService(db)

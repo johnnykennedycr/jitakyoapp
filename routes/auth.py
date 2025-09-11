@@ -38,7 +38,7 @@ def login():
             # login_user(user) # <- Comente ou remova esta linha
 
             # Salve o ID do usuário na sessão manualmente
-            session['user_id'] = user.get_id()
+            session['_user_id'] = user.get_id()
             session.permanent = True # Opcional: faz a sessão durar mais tempo
             if user.role in ['admin', 'super_admin']:
                 target_url = url_for('admin.dashboard')
