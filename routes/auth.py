@@ -10,14 +10,7 @@ def init_auth_bp(us):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        if current_user.role in ['admin', 'super_admin']:
-            return redirect(url_for('admin.dashboard'))
-        elif current_user.role == 'student':
-            return redirect(url_for('student.dashboard'))
-        # --- LÓGICA DE REDIRECIONAMENTO DO PROFESSOR ---
-        elif current_user.role == 'teacher':
-            return redirect(url_for('teacher.dashboard'))
+    
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -52,8 +45,18 @@ def login():
             # --- FIM DA ALTERAÇÃO ---
         else:
             flash('Credenciais inválidas.', 'danger')
+
+    if current_user.is_authenticated:
+        if current_user.role in ['admin', 'super_admin']:
+            return redirect(url_for('admin.dashboard'))
+        elif current_user.role == 'student':
+            return redirect(url_for('student.dashboard'))
+        # --- LÓGICA DE REDIRECIONAMENTO DO PROFESSOR ---
+        elif current_user.role == 'teacher':
+            return redirect(url_for('teacher.dashboard'))
     
     return render_template('auth/login.html')
+
 
 @auth_bp.route('/logout')
 @login_required
