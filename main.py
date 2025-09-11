@@ -42,6 +42,10 @@ def create_app():
 
     app.config.update(
         # --- A CORREÇÃO FINAL ESTÁ AQUI ---
+        # Define o domínio para o qual o cookie é válido. O '.' no início
+        # o torna válido para 'jitakyoapp.web.app' e 'www.jitakyoapp.web.app'.
+        SESSION_COOKIE_DOMAIN='.jitakyoapp.web.app',
+        
         # Permite que o cookie funcione em um cenário de proxy entre domínios.
         SESSION_COOKIE_SAMESITE='None',
         SESSION_COOKIE_SECURE=True,
