@@ -1,23 +1,30 @@
 steps:
-  # 1. Instala as dependências do Python (este passo está correto e não muda)
+  # 1. Este passo de instalação não muda.
   - name: 'python:3.11'
     entrypoint: 'pip'
     args: ['install', '-r', 'requirements.txt', '--user']
 
-  # 2. Executa o deploy no Cloud Run com o comando de inicialização correto
+  # 2. O passo de deploy agora define explicitamente o comando de inicialização
+  #    para o Gunicorn, garantindo que ele confie no proxy do Google.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'jitakyoapp'                 # O nome do seu serviço
+      - 'jitakyoapp'
       - '--source'
       - '.'
       - '--region'
-      - 'southamerica-east1'         # A sua região
+      - 'southamerica-east1'
       - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
+      # --- A CORREÇÃO FINAL ESTÁ AQUI ---
+      # Define o comando e os argumentos para iniciar o Gunicorn corretamente.
+      - '--command'
+      - 'gunicorn'
+      - '--args'
+      - "main:app,--bind,:8080,--forwarded-allow-ips='*'"
 
 options:
   logging: CLOUD_LOGGING_ONLY

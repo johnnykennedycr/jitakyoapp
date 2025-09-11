@@ -1,1 +1,0 @@
-web: gunicorn --bind :8080 --forwarded-allow-ips='*' main:app
