@@ -6,7 +6,6 @@ from firebase_admin import credentials, firestore
 from flask_mail import Mail
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_session import Session
 
 # Suas importações de módulos (models, routes, services)
 from models.user import User

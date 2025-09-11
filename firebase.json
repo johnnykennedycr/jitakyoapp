@@ -11,7 +11,7 @@
         "source": "**",
         "run": {
           "serviceId": "jitakyoapp",
-          "region": "southamerica-east1"
+          "region": "southamerica-east1" 
         }
       }
     ]
