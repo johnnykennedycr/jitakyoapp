@@ -18,11 +18,6 @@ steps:
       - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
-      # --- AS LINHAS DE CORREÇÃO ESTÃO AQUI ---
-      # Define o comando que o contêiner deve executar ao iniciar
-      - '--command=gunicorn'
-      # Define os argumentos para o comando gunicorn, agora com a sintaxe YAML correta
-      - "--args=main:app,--bind,:8080,--forwarded-allow-ips='*'"
 
 options:
   logging: CLOUD_LOGGING_ONLY
