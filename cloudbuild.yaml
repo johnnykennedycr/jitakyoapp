@@ -4,8 +4,8 @@ steps:
     entrypoint: 'pip'
     args: ['install', '-r', 'requirements.txt', '--user']
 
-  # 2. O passo de deploy agora define explicitamente o comando de inicialização
-  #    para o Gunicorn, garantindo que ele confie no proxy do Google.
+  # 2. O passo de deploy agora é mais limpo.
+  #    Ele irá ler o comando de inicialização do seu novo ficheiro Procfile.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -19,12 +19,6 @@ steps:
       - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
-      # --- A CORREÇÃO FINAL ESTÁ AQUI ---
-      # Define o comando e os argumentos para iniciar o Gunicorn corretamente.
-      - '--command'
-      - 'gunicorn'
-      - '--args'
-      - "main:app,--bind,:8080,--forwarded-allow-ips='*'"
 
 options:
   logging: CLOUD_LOGGING_ONLY
