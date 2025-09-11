@@ -37,14 +37,17 @@ def create_app():
     app = Flask(__name__)
     
     # --- CONFIGURAÇÃO ESSENCIAL ---
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,
+    x_proto=1,
+    x_host=1,
+    x_port=1,
+    x_prefix=1
+)
     app.secret_key = os.getenv('SECRET_KEY')
 
     app.config.update(
-        # --- A CORREÇÃO FINAL ESTÁ AQUI ---
-        # Define o domínio para o qual o cookie é válido. O '.' no início
-        # o torna válido para 'jitakyoapp.web.app' e 'www.jitakyoapp.web.app'.
-        SESSION_COOKIE_DOMAIN='.jitakyoapp.web.app',
         
         # Permite que o cookie funcione em um cenário de proxy entre domínios.
         SESSION_COOKIE_SAMESITE='None',
