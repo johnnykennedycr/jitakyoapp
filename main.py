@@ -23,30 +23,20 @@ from services.payment_service import PaymentService
 from services.notification_service import NotificationService
 
 
+# --- 1. Carregue as variáveis de ambiente PRIMEIRO ---
 load_dotenv()
 
-# --- CRIAÇÃO E CONFIGURAÇÃO DO APP FLASK ---
+# --- 2. Crie e configure o app ---
 app = Flask(__name__)
-# --- CONFIGURAÇÃO ESSENCIAL ---
-# Use atribuição direta para a chave secreta. É mais seguro e padrão.
-app.secret_key = os.getenv('SECRET_KEY') 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
-db = firestore.client()
+# Configuração essencial para proxy reverso (Cloud Run + Firebase)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-app.config['SESSION_TYPE'] = 'firestore'
-app.config['SESSION_FIRESTORE'] = db
-app.config['SESSION_USE_SIGNER'] = True # Assina o cookie de ID de sessão
-app.config['SESSION_PERMANENT'] = False # A sessão expira quando o navegador fecha
+# Chave secreta, lida da variável de ambiente
+app.secret_key = os.getenv('SECRET_KEY')
 
-server_session = Session(app)
-
-
-# Adicione outras configurações ao objeto 'config'
+# Outras configurações
 app.config.update(
-    
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
@@ -61,13 +51,15 @@ app.config.update(
     MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
 )
 
-# --- INICIALIZAÇÃO DOS SERVIÇOS E DEPENDÊNCIAS ---
+# --- 3. Inicialize as extensões e serviços ---
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+db = firestore.client()
+
 mail = Mail(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
-
-
 
 # Inicialização do Firebase (usará as credenciais padrão do ambiente do Google Cloud)
 # --- INICIALIZAÇÃO DOS SERVIÇOS ---

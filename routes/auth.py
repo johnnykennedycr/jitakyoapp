@@ -30,16 +30,8 @@ def login():
         user = user_service.authenticate_user(email, password)
 
         if user:
-            # login_user(user)
-            # --- CONSTRUÇÃO DA RESPOSTA CORRETA ---
-            # 2. Determine para onde redirecionar
-            # --- SUBSTITUA O LOGIN_USER PELA CRIAÇÃO MANUAL DA SESSÃO ---
-            
-            # login_user(user) # <- Comente ou remova esta linha
-
-            # Salve o ID do usuário na sessão manualmente
-            session['_user_id'] = user.get_id()
-            session.permanent = True # Opcional: faz a sessão durar mais tempo
+            login_user(user, remember=True)
+        
             if user.role in ['admin', 'super_admin']:
                 target_url = url_for('admin.dashboard')
             elif user.role == 'student':
