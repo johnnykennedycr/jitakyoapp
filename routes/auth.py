@@ -66,7 +66,8 @@ def login():
         elif user.role == 'teacher':
             return redirect(url_for('teacher.dashboard'))
 
-    return render_template('auth/html')
+    # CORREÇÃO DO ERRO DE DIGITAÇÃO AQUI:
+    return render_template('auth/login.html')
 
 
 @auth_bp.route('/logout')
