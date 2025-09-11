@@ -45,7 +45,8 @@ def create_app():
     x_port=1,
     x_prefix=1
 )
-    app.secret_key = os.getenv('SECRET_KEY')
+    app.secret_key = os.environ.get("SECRET_KEY")
+
 
     app.config.update(
         
