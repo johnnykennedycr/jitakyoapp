@@ -21,27 +21,34 @@ def login():
         return redirect(url_for('student.dashboard'))
 
     if request.method == 'POST':
+        print("\n--- ROTA DE LOGIN (POST) ---")
+        print(f"Request Scheme (antes do login): {request.scheme}")
+        print(f"Request is_secure (antes do login): {request.is_secure}")
+        
         email = request.form.get('email')
         password = request.form.get('password')
         remember = True if request.form.get('remember') else False
 
         user = user_service.get_user_by_email(email)
 
-        # A verificação agora é feita aqui, em duas etapas, como é o padrão do Flask
         if user and check_password_hash(user.password_hash, password):
             login_user(user, remember=remember)
+            session.update({}) # Força a escrita da sessão
             
-            # Lógica de redirecionamento após o login bem-sucedido
+            print(">>> LOGIN BEM-SUCEDIDO <<<")
+            print(f"Request Scheme (após login): {request.scheme}")
+            print(f"Conteúdo da sessão a ser enviada: {dict(session)}")
+
             if user.role == 'admin':
                 next_page = url_for('admin.dashboard')
             elif user.role == 'teacher':
                 next_page = url_for('teacher.dashboard')
-            else: # Assume que é 'student'
+            else:
                 next_page = url_for('student.dashboard')
             
             return redirect(next_page)
         
-        # Se o usuário não existir ou a senha estiver errada
+        print(">>> LOGIN FALHOU <<<")
         flash('Email ou senha inválidos. Por favor, tente novamente.', 'error')
         return redirect(url_for('auth.login'))
 

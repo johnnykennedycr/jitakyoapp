@@ -37,14 +37,7 @@ def create_app():
     app = Flask(__name__)
     
     # --- CONFIGURAÇÃO ESSENCIAL ---
-    app.wsgi_app = ProxyFix(
-    app.wsgi_app,
-    x_for=1,
-    x_proto=1,
-    x_host=1,
-    x_port=1,
-    x_prefix=1
-)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.secret_key = os.environ.get("SECRET_KEY")
 
 
@@ -89,16 +82,19 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        print(f"--- USER LOADER ACIONADO ---")
-        print(f"1. Tentando carregar usuário com ID: {user_id}")
-        print(f"2. Conteúdo da sessão atual: {dict(session)}")
+        print(f"\n--- USER LOADER ACIONADO (Request para página protegida) ---")
+        print(f"Request Scheme: {request.scheme}")
+        print(f"Request is_secure: {request.is_secure}")
+        print(f"Cabeçalho 'Cookie' recebido: {request.headers.get('Cookie')}")
+        print(f"Conteúdo da sessão atual (lido do cookie): {dict(session)}")
+        print(f"Tentando carregar usuário com ID: {user_id}")
         
         user = user_service.get_user_by_id(user_id) if user_service else None
         
         if user:
-            print(f"3. Usuário {user_id} encontrado e carregado na sessão.")
+            print(f"==> Usuário {user_id} encontrado e carregado na sessão.")
         else:
-            print(f"!!! Usuário com ID {user_id} NÃO encontrado no banco de dados.")
+            print(f"==> !!! Usuário com ID {user_id} NÃO encontrado no banco de dados.")
             
         return user
 
