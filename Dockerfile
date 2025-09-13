@@ -1,3 +1,4 @@
+# Forçando a atualização do cache do build - 13/09/2025
 # Use a imagem oficial do Python como base.
 FROM python:3.11-slim
 
