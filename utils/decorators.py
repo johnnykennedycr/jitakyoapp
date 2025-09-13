@@ -43,7 +43,7 @@ def student_required(f):
     def decorated_function(*args, **kwargs):
         print("\n--- DECORATOR @student_required ACIONADO ---")
 
-        # Verificação combinada para robustez
+        
         if not current_user.is_authenticated or current_user.role != 'student':
             print(f"!!! ACESSO NEGADO !!!")
             print(f"--> Usuário autenticado? {current_user.is_authenticated}")
