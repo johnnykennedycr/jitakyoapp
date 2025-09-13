@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, session
+from flask import Flask, render_template, request, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
 from firebase_admin import firestore
@@ -97,6 +97,22 @@ def create_app():
             print(f"==> !!! Usuário com ID {user_id} NÃO encontrado no banco de dados.")
             
         return user
+    
+    @app.after_request
+    def log_response_info(response):
+        # Só nos importam as requisições de páginas, não de arquivos estáticos
+        if request.path.startswith('/static'):
+            return response
+
+        print("\n--- HOOK @after_request ---")
+        print(f"Path da Requisição: {request.path}")
+        print(f"Status da Resposta: {response.status}")
+        print("Cabeçalhos da Resposta (o que o Flask está enviando):")
+        # Imprime os cabeçalhos de forma legível
+        for header, value in response.headers:
+            print(f"  {header}: {value}")
+        print("--- FIM DO HOOK ---\n")
+        return response
 
     # Registra o context processor dentro da factory
     @app.context_processor
