@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, session, url_for, flash
 from flask_login import login_user, logout_user, current_user, login_required
+from werkzeug.security import check_password_hash
 
 user_service = None
 auth_bp = Blueprint('auth', __name__)
@@ -11,41 +12,39 @@ def init_auth_bp(us):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Processa o login do usuário."""
-    
-    # Se o usuário já está logado, redireciona para o painel apropriado.
+    # Se o usuário já estiver logado, redireciona para o dashboard certo
     if current_user.is_authenticated:
-        if current_user.role in ['admin', 'super_admin']:
+        if current_user.role == 'admin':
             return redirect(url_for('admin.dashboard'))
-        elif current_user.role == 'student':
-            return redirect(url_for('student.dashboard'))
         elif current_user.role == 'teacher':
             return redirect(url_for('teacher.dashboard'))
+        return redirect(url_for('student.dashboard'))
 
-    # Se a requisição for um POST, tenta autenticar.
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        
-        print("--- AUTHENTICATION ATTEMPT START ---")
-        user = user_service.authenticate(email, password)
-        
-        if user:
-            print(f"1. Autenticação BEM-SUCEDIDA para o usuário: {user.id}")
-            login_user(user, remember=True) # Assumindo que você tem um 'lembrar-me'
-            
-            # Use session.update() para forçar a escrita imediata da sessão antes do log
-            session.update({}) 
-            print(f"2. Sessão Flask criada. Conteúdo da sessão: {dict(session)}")
-            
-            print("3. Redirecionando para o dashboard...")
-            return redirect(url_for('student.dashboard')) # Ou o blueprint correto do dashboard
-        else:
-            print("!!! Autenticação FALHOU. Senha incorreta ou usuário não encontrado.")
-            flash('Email ou senha inválidos.', 'error')
-            return redirect(url_for('auth.login'))
+        remember = True if request.form.get('remember') else False
 
-    # Se for um GET e o usuário não estiver logado, mostra a página de login.
+        user = user_service.get_user_by_email(email)
+
+        # A verificação agora é feita aqui, em duas etapas, como é o padrão do Flask
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user, remember=remember)
+            
+            # Lógica de redirecionamento após o login bem-sucedido
+            if user.role == 'admin':
+                next_page = url_for('admin.dashboard')
+            elif user.role == 'teacher':
+                next_page = url_for('teacher.dashboard')
+            else: # Assume que é 'student'
+                next_page = url_for('student.dashboard')
+            
+            return redirect(next_page)
+        
+        # Se o usuário não existir ou a senha estiver errada
+        flash('Email ou senha inválidos. Por favor, tente novamente.', 'error')
+        return redirect(url_for('auth.login'))
+
     return render_template('auth/login.html')
 
 
