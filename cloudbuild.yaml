@@ -19,6 +19,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--clear-base-image'
+      - '--port'
+      - '8000'
 
 options:
   logging: CLOUD_LOGGING_ONLY
