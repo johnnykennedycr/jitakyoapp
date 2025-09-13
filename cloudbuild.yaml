@@ -1,22 +1,25 @@
 steps:
-  # 1. Instala as dependências do Python
+  # 1. Este passo de instalação não muda.
   - name: 'python:3.11'
     entrypoint: 'pip'
     args: ['install', '-r', 'requirements.txt', '--user']
 
-  # 2. Executa o deploy no Cloud Run
+  # 2. O passo de deploy agora é mais limpo.
+  #    Ele irá ler o comando de inicialização do seu novo ficheiro Procfile.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'jitakyoapp' # <-- O nome do seu serviço no Cloud Run
+      - 'jitakyoapp'
       - '--source'
       - '.'
       - '--region'
-      - 'southamerica-east1' # <-- A região do seu serviço
+      - 'southamerica-east1'
       - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
+
 options:
   logging: CLOUD_LOGGING_ONLY
+
