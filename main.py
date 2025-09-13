@@ -89,7 +89,18 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        return user_service.get_user_by_id(user_id) if user_service else None
+        print(f"--- USER LOADER ACIONADO ---")
+        print(f"1. Tentando carregar usuário com ID: {user_id}")
+        print(f"2. Conteúdo da sessão atual: {dict(session)}")
+        
+        user = user_service.get_user_by_id(user_id) if user_service else None
+        
+        if user:
+            print(f"3. Usuário {user_id} encontrado e carregado na sessão.")
+        else:
+            print(f"!!! Usuário com ID {user_id} NÃO encontrado no banco de dados.")
+            
+        return user
 
     # Registra o context processor dentro da factory
     @app.context_processor
