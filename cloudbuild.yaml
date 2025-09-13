@@ -18,6 +18,7 @@ steps:
       - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
+      - '--clear-base-image'
 
 options:
   logging: CLOUD_LOGGING_ONLY
