@@ -44,7 +44,7 @@ def create_app():
     app.config.update(
         SERVER_NAME='jitakyoapp.web.app',
         # Permite que o cookie funcione em um cenário de proxy entre domínios.
-        SESSION_COOKIE_SAMESITE='None',
+        SESSION_COOKIE_SAMESITE='Lax',
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
         
