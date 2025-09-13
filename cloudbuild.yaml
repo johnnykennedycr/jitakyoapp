@@ -1,11 +1,10 @@
 steps:
-  # 1. Este passo de instalação não muda.
+  # 1. Instala as dependências de forma global no contêiner.
   - name: 'python:3.11'
     entrypoint: 'pip'
-    args: ['install', '-r', 'requirements.txt', '--user']
+    args: ['install', '-r', 'requirements.txt'] # <-- A flag '--user' foi removida.
 
-  # 2. O passo de deploy agora é mais limpo.
-  #    Ele irá ler o comando de inicialização do seu novo ficheiro Procfile.
+  # 2. O passo de deploy está correto e irá usar o seu Procfile.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
