@@ -21,8 +21,9 @@ class User(UserMixin):
         self.updated_at = updated_at or datetime.now()
 
     @staticmethod
-    def from_dict(source):
+    def from_dict(source, doc_id,):
         return User(
+            id=doc_id,
             name=source.get('name'),
             email=source.get('email'),
             password_hash=source.get('password_hash'),
