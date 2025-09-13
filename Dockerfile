@@ -18,5 +18,4 @@ COPY . .
 # O comando para iniciar a sua aplicação.
 # Esta é a forma mais robusta: use o executável do python para rodar o módulo do gunicorn.
 # Isto garante que o gunicorn será encontrado, independentemente de onde o pip o instalou.
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
-
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 main:app
