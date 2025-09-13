@@ -1,18 +1,21 @@
 steps:
-  # 1. Instala as dependências de forma global no contêiner.
-  - name: 'python:3.11'
-    entrypoint: 'pip'
-    args: ['install', '-r', 'requirements.txt'] # <-- A flag '--user' foi removida.
+  # Passo 1: Constrói a imagem do contêiner usando o nosso Dockerfile.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/jitakyoapp:$COMMIT_SHA', '.']
 
-  # 2. O passo de deploy está correto e irá usar o seu Procfile.
+  # Passo 2: Envia a imagem construída para o Artifact Registry do Google.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/jitakyoapp:$COMMIT_SHA']
+
+  # Passo 3: Faz o deploy da IMAGEM (e não do código fonte) para o Cloud Run.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - 'jitakyoapp'
-      - '--source'
-      - '.'
+      - '--image'
+      - 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/jitakyoapp:$COMMIT_SHA'
       - '--region'
       - 'southamerica-east1'
       - '--allow-unauthenticated'
