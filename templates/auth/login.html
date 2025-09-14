@@ -90,7 +90,7 @@
                 submitButton.textContent = 'Criando sessão...';
 
                 // 2. Envia o token em JSON para o backend
-                return fetch('/api/login-session', {
+                return fetch('/api/create-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ idToken: idToken })
