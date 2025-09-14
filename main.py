@@ -6,6 +6,7 @@ import firebase_admin
 from firebase_admin import firestore
 from flask_mail import Mail
 from flask_login import LoginManager
+from flask_cors import CORS
 
 # --- INICIALIZAÇÃO DAS EXTENSÕES (sem o app) ---
 db = None
@@ -31,7 +32,10 @@ from routes.auth import auth_bp, init_auth_bp
 def create_app():
     """Cria e configura a instância da aplicação Flask (Application Factory Pattern)."""
     global db, user_service
-
+    # --- CONFIGURAÇÃO DO CORS ---
+    # Esta linha é crucial. Ela diz ao backend para aceitar requisições
+    # do seu frontend e para permitir o tráfego de cookies.
+    CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
     load_dotenv()
 
     app = Flask(__name__)
