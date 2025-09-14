@@ -7,7 +7,6 @@
 {% endblock %}
 
 {% block body_content %}
-
 <div class="flex items-center justify-center min-h-screen bg-gray-900">
     <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
         
@@ -53,19 +52,19 @@
 
 <script>
     // --- INICIALIZAÇÃO DO FIREBASE ---
+    // Garanta que este objeto está preenchido com suas chaves corretas
     const firebaseConfig = {
-      apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
-      authDomain: "jitakyoapp.firebaseapp.com",
-      projectId: "jitakyoapp",
-      storageBucket: "jitakyoapp.appspot.com",
-      messagingSenderId: "217073545024",
-      appId: "1:217073545024:web:80e38df3b055ecfaed4a5",
-      measurementId: "G-BD4EHET4QY"
+        apiKey: "SUA_API_KEY",
+        authDomain: "jitakyoapp.firebaseapp.com",
+        projectId: "jitakyoapp",
+        storageBucket: "jitakyoapp.appspot.com",
+        messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+        appId: "SEU_APP_ID"
     };
-
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
+    // --- LÓGICA DE LOGIN COM SESSION COOKIE ---
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
         
@@ -79,18 +78,15 @@
         submitButton.disabled = true;
         flashContainer.innerHTML = '';
 
-        // 1. Autentica com o Firebase
+        // 1. Autentica com o Firebase para obter o idToken
         auth.signInWithEmailAndPassword(email, password)
             .then(userCredential => {
-                console.log("Firebase Auth OK. Obtendo ID Token...");
+                submitButton.textContent = 'Criando sessão...';
                 return userCredential.user.getIdToken();
             })
             .then(idToken => {
-                console.log("ID Token recebido. Criando sessão no backend...");
-                submitButton.textContent = 'Criando sessão...';
-
-                // 2. Envia o token em JSON para o backend
-                return fetch('/api/login-session', {
+                // 2. Envia o idToken para o nosso backend para criar o cookie de sessão
+                return fetch('/api/create-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ idToken: idToken })
@@ -98,16 +94,18 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Falha ao criar sessão no backend.');
+                    // Se o backend retornar um erro (ex: 401), o login falha
+                    throw new Error('Falha ao criar sessão no servidor.');
                 }
                 return response.json();
             })
             .then(data => {
                 if (data.success) {
-                    console.log("Sessão criada. Redirecionando para:", data.redirect_url);
-                    window.location.href = data.redirect_url;
+                    // 3. SUCESSO! O cookie foi criado. Agora podemos ir para o login.
+                    // A rota de login vai nos redirecionar para o dashboard correto.
+                    window.location.href = '/login'; 
                 } else {
-                    throw new Error(data.message || 'Ocorreu um erro desconhecido.');
+                    throw new Error(data.message || 'Erro desconhecido do servidor.');
                 }
             })
             .catch((error) => {
@@ -115,7 +113,7 @@
                 flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">Email ou senha inválidos.</div>`;
                 submitButton.textContent = 'Entrar';
                 submitButton.disabled = false;
-                auth.signOut(); 
+                auth.signOut(); // Desloga do Firebase em caso de erro no nosso backend
             });
     });
 </script>

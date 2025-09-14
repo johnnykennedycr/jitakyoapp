@@ -1,4 +1,4 @@
-# main.py ATUALIZADO E FINALIZADO
+# main.py VERSÃO FINAL
 
 import os
 from dotenv import load_dotenv
@@ -10,7 +10,6 @@ from flask_mail import Mail
 from flask_cors import CORS
 
 # --- IMPORTAÇÕES DE MÓDULOS DO PROJETO ---
-# (As importações dos seus services e routes permanecem)
 from services.user_service import UserService
 from services.teacher_service import TeacherService
 from services.training_class_service import TrainingClassService
@@ -18,28 +17,27 @@ from services.enrollment_service import EnrollmentService
 from services.attendance_service import AttendanceService
 from services.payment_service import PaymentService
 from services.notification_service import NotificationService
-
 from routes.admin import admin_bp, init_admin_bp
 from routes.student import student_bp, init_student_bp
 from routes.teacher import teacher_bp, init_teacher_bp
-from routes.auth import auth_bp, init_auth_bp
-from utils.decorators import init_decorators # <-- NOVA IMPORTAÇÃO
+from routes.auth import auth_bp
+from utils.decorators import init_decorators
 
 def create_app():
-    """Cria e configura a instância da aplicação Flask (Application Factory Pattern)."""
+    """Cria e configura a instância da aplicação Flask."""
     
     app = Flask(__name__)
     
     # --- CONFIGURAÇÃO DA APLICAÇÃO ---
-    
-    # Ordem correta de inicialização dos middlewares
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
     
-    # Carrega as variáveis de ambiente
     load_dotenv()
     app.secret_key = os.environ.get("SECRET_KEY") # Mantido para flash messages
     app.config.update(
+        # AS CONFIGURAÇÕES DE SESSION_COOKIE_* FORAM REMOVIDAS.
+        # O Firebase Admin SDK gerencia o cookie de forma independente.
+        
         # Suas configurações de e-mail e outras permanecem aqui
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
@@ -50,11 +48,8 @@ def create_app():
     )
 
     # --- INICIALIZAÇÃO DE SERVIÇOS E EXTENSÕES ---
-    
-    # Inicializa o Firebase Admin SDK
     try:
         if not firebase_admin._apps:
-            # Em produção (Cloud Run), ele usará as credenciais do ambiente automaticamente
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
             print("Firebase Admin SDK inicializado com as credenciais do ambiente.")
@@ -80,15 +75,10 @@ def create_app():
     notification_service = NotificationService(db, user_service)
     payment_service = PaymentService(db, enrollment_service)
 
-    # --- FIM DO FLASK-LOGIN ---
-    # Todas as linhas relacionadas a 'LoginManager' foram removidas.
-    # A função 'load_user' foi removida.
-
-    # --- INICIALIZAÇÃO DOS DECORADORES ---
-    # Injeta o user_service no módulo de decoradores para que @role_required funcione
+    # Injeta o user_service no módulo de decoradores
     init_decorators(user_service)
 
-    # Hook para previnir cache (boa prática)
+    # (Opcional) Hook para previnir cache
     @app.after_request
     def add_cache_headers(response):
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -96,14 +86,13 @@ def create_app():
         response.headers['Expires'] = '0'
         return response
 
-    # Context processor para branding (permanece igual)
     @app.context_processor
     def inject_branding_settings():
         try:
             settings_doc = db.collection('settings').document('branding').get()
             settings = settings_doc.to_dict() if settings_doc.exists else {}
         except Exception:
-            settings = {} # Evita que a aplicação quebre se o Firestore não estiver disponível
+            settings = {}
         return {
             'academy_name': settings.get('academy_name', 'JitaKyoApp'),
             'academy_logo_path': settings.get('logo_path', 'logo-horizontal.png')
@@ -111,9 +100,8 @@ def create_app():
 
     # --- REGISTRO DOS BLUEPRINTS ---
     with app.app_context():
-        # As funções 'init' injetam as dependências (serviços) em cada blueprint
+        # A inicialização do auth_bp não precisa mais passar o user_service
         init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
-        init_auth_bp(user_service)
         init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
         init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service, notification_service)
 

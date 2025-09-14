@@ -1,49 +1,65 @@
-from flask import Blueprint, request, jsonify, redirect, make_response, render_template, url_for
-import firebase_admin
+from flask import Blueprint, render_template, request, jsonify, make_response, redirect, url_for, flash
 from firebase_admin import auth
 from datetime import timedelta
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+# A função de inicialização e a variável global não são mais necessárias neste arquivo
+auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
 
-# Página de login
-@auth_bp.route("/login", methods=["GET"])
-def login_page():
-    return render_template("auth/login.html")
+@auth_bp.route('/login', methods=['GET'])
+def login():
+    """Apenas renderiza a página de login estática."""
+    return render_template('auth/login.html')
 
-
-# Rota para criar sessão após o Firebase Auth JS
-@auth_bp.route("/api/login-session", methods=["POST"])
-def login_session():
+@auth_bp.route('/api/create-session', methods=['POST'])
+def create_session_cookie():
+    """
+    Recebe o idToken do frontend, verifica sua validade e o troca
+    por um cookie de sessão seguro, HttpOnly.
+    """
     try:
-        data = request.get_json()
-        id_token = data.get("idToken")
-
+        # 1. Pega o idToken enviado pelo corpo da requisição do frontend
+        id_token = request.json.get('idToken')
         if not id_token:
-            return jsonify({"success": False, "message": "Token ausente"}), 400
+            return jsonify({"success": False, "message": "ID Token não fornecido."}), 400
 
-        # Cria session cookie válido por 5 dias
+        # 2. Define o tempo de validade do cookie (ex: 5 dias)
         expires_in = timedelta(days=5)
+        
+        # 3. Usa o Firebase Admin SDK para criar o cookie de sessão
         session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
-
-        response = make_response(jsonify({"success": True, "redirect_url": "/"}))
+        
+        # 4. Cria uma resposta JSON de sucesso
+        response = jsonify({"success": True, "message": "Sessão criada com sucesso."})
+        
+        # 5. Anexa o cookie de sessão à resposta
+        expires = datetime.now() + expires_in
         response.set_cookie(
-            "session",
+            'jitakyo_session',  # O mesmo nome que definimos no main.py
             session_cookie,
-            max_age=expires_in.total_seconds(),
-            httponly=True,
-            secure=True,      # mantenha True em produção (HTTPS obrigatório)
-            samesite="Strict" # ou "Lax" se precisar de compatibilidade
+            expires=expires,
+            httponly=True,  # Impede acesso via JavaScript no frontend
+            secure=True,    # Garante que só seja enviado via HTTPS
+            samesite='Lax'
         )
-
+        
         return response
 
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 400
+        print(f"Erro ao criar o cookie de sessão: {e}")
+        # Retorna um erro que o frontend pode interpretar
+        return jsonify({"success": False, "message": f"Erro de autenticação: {e}"}), 401
 
 
-# Logout → limpa o cookie
-@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route('/logout', methods=['POST'])
 def logout():
-    response = make_response(redirect(url_for("auth.login_page")))
-    response.set_cookie("session", "", expires=0)
+    """
+    Limpa o cookie de sessão do navegador, efetivamente deslogando o usuário.
+    """
+    # Cria uma resposta de redirecionamento
+    response = make_response(redirect(url_for('auth.login')))
+    
+    # Remove o cookie de sessão
+    response.set_cookie('jitakyo_session', '', expires=0)
+    
+    flash("Você foi desconectado com segurança.", "info")
     return response
