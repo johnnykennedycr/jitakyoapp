@@ -63,29 +63,38 @@ def role_required(*roles):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # g.firebase_user foi definido pelo decorador @token_required
             if 'firebase_user' not in g:
-                # Isso não deveria acontecer se os decoradores forem usados na ordem correta
                 return jsonify({'message': 'Erro de configuração: @role_required sem @token_required.'}), 500
 
             user_uid = g.firebase_user['uid']
             
-            # Busca o usuário no Firestore para obter a role atualizada
+            print("\n--- DIAGNÓSTICO DO DECORADOR @role_required ---")
+            print(f"1. UID do token do Firebase: {user_uid}")
+            print(f"2. Roles permitidas para esta rota: {roles}")
+
             user_from_db = user_service.get_user_by_id(user_uid)
             
             if not user_from_db:
+                 print("!!! FALHA: Usuário não foi encontrado no Firestore com o UID acima.")
                  flash('Usuário não encontrado no banco de dados.', 'danger')
                  return redirect(url_for('auth.login'))
 
+            # Acessa a role do objeto User que veio do Firestore
             user_role = user_from_db.role
+            
+            print(f"3. Role encontrada no objeto User do Firestore: '{user_role}'")
+            print(f"4. Tipo da variável 'user_role': {type(user_role)}")
+            
+            check_passes = user_role in roles
+            print(f"5. Resultado da verificação ('{user_role}' in {roles}): {check_passes}")
 
-            if user_role not in roles:
+            if not check_passes:
+                print("!!! ACESSO NEGADO PELA ROLE !!! Redirecionando para /login.")
                 flash('Você não tem permissão para acessar esta página.', 'danger')
-                # Redireciona para um dashboard padrão ou para a página de login
                 return redirect(url_for('auth.login')) 
             
-            # Anexa o objeto de usuário completo do nosso banco de dados ao contexto g
             g.user = user_from_db
+            print("--- ACESSO PERMITIDO. Executando a função da rota. ---")
             
             return f(*args, **kwargs)
         return decorated_function
