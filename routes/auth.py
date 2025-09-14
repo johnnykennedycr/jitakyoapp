@@ -1,6 +1,8 @@
-from flask import Blueprint, render_template, request, jsonify, make_response, redirect, url_for, flash
+from flask import Blueprint, g, render_template, request, jsonify, make_response, redirect, url_for, flash
 from firebase_admin import auth
 from datetime import timedelta, datetime
+
+from utils.decorators import role_required, token_required
 
 # A função de inicialização e a variável global não são mais necessárias neste arquivo
 auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
@@ -11,42 +13,38 @@ def login():
     return render_template('auth/login.html')
 
 @auth_bp.route('/api/create-session', methods=['POST'])
+@token_required # 1. Primeiro, verificamos o token e colocamos o user em g.firebase_user
+@role_required('student', 'teacher', 'receptionist', 'admin', 'super_admin') # 2. Depois, pegamos a role e colocamos em g.user
 def create_session_cookie():
-    """
-    Recebe o idToken do frontend, verifica sua validade e o troca
-    por um cookie de sessão seguro, HttpOnly.
-    """
     try:
-        # 1. Pega o idToken enviado pelo corpo da requisição do frontend
         id_token = request.json.get('idToken')
-        if not id_token:
-            return jsonify({"success": False, "message": "ID Token não fornecido."}), 400
-
-        # 2. Define o tempo de validade do cookie (ex: 5 dias)
         expires_in = timedelta(days=5)
-        
-        # 3. Usa o Firebase Admin SDK para criar o cookie de sessão
         session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
         
-        # 4. Cria uma resposta JSON de sucesso
-        response = jsonify({"success": True, "message": "Sessão criada com sucesso."})
+        # 3. Agora, usamos o g.user (que os decoradores prepararam) para decidir a URL
+        user = g.user
+        if user.role in ['admin', 'super_admin']:
+            redirect_url = url_for('admin.dashboard')
+        elif user.role == 'teacher':
+            redirect_url = url_for('teacher.dashboard')
+        else:
+            redirect_url = url_for('student.dashboard')
+
+        # 4. Retornamos a URL no JSON
+        response = jsonify({"success": True, "redirect_url": redirect_url})
         
-        # 5. Anexa o cookie de sessão à resposta
         expires = datetime.now() + expires_in
         response.set_cookie(
-            'jitakyo_session',  # O mesmo nome que definimos no main.py
+            'jitakyo_session',
             session_cookie,
             expires=expires,
-            httponly=True,  # Impede acesso via JavaScript no frontend
-            secure=True,    # Garante que só seja enviado via HTTPS
+            httponly=True,
+            secure=True,
             samesite='Lax'
         )
-        
         return response
 
     except Exception as e:
-        print(f"Erro ao criar o cookie de sessão: {e}")
-        # Retorna um erro que o frontend pode interpretar
         return jsonify({"success": False, "message": f"Erro de autenticação: {e}"}), 401
 
 
