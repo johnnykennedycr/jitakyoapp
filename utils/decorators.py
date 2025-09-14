@@ -31,22 +31,21 @@ def token_required(f):
     return decorated
 
 
-def role_required(role):
-    def wrapper(f):
+def role_required(*roles):
+    """
+    Decorator que garante que o usuário tenha pelo menos um dos papéis exigidos.
+    Uso: @role_required('admin', 'super_admin')
+    """
+    def decorator(f):
         @wraps(f)
-        def decorated(*args, **kwargs):
-            user = getattr(request, "user", None)
+        def wrapper(*args, **kwargs):
+            user = getattr(g, 'current_user', None)
             if not user:
-                return redirect(url_for("auth.login_page"))
+                return jsonify({'error': 'Usuário não autenticado'}), 401
 
-            # Se você está salvando roles no Firestore, busque aqui.
-            # Exemplo simplificado (role vinda do custom claim):
-            user_role = user.get("role")
-
-            if user_role != role:
-                return redirect(url_for("auth.login_page"))
+            if not hasattr(user, 'role') or user.role not in roles:
+                return jsonify({'error': 'Acesso negado: permissão insuficiente'}), 403
 
             return f(*args, **kwargs)
-
-        return decorated
-    return wrapper
+        return wrapper
+    return decorator

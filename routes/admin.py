@@ -44,17 +44,17 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
 @token_required
 @role_required('admin', 'super_admin', 'receptionist')
 def dashboard():
-    """Esta rota agora apenas serve o template HTML do dashboard."""
-    api_url = url_for('admin.dashboard_data')
+    """Serve apenas o template HTML do dashboard."""
+    api_url = url_for('admin.dashboard_data')  # gera a URL para a API de dados
     return render_template('admin/dashboard.html', dashboard_api_url=api_url)
 
 
-@admin_bp.route('/')
-@admin_bp.route('/dashboard')
+# ROTA DA API QUE ENTREGA OS DADOS DO CALENDÁRIO
+@admin_bp.route('/api/dashboard-data')
 @token_required
 @role_required('admin', 'super_admin', 'receptionist')
 def dashboard_data():
-    """Exibe o dashboard principal com o calendário de treinos da semana."""
+    """Retorna os dados do dashboard em JSON (agenda da semana)."""
     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
     time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
 
@@ -70,6 +70,8 @@ def dashboard_data():
                 if slot.day_of_week in days_order:
                     start_h, start_m = map(int, slot.start_time.split(':'))
                     end_h, end_m = map(int, slot.end_time.split(':'))
+
+                    # Coluna e linha baseadas no dia/hora
                     grid_col = days_order.index(slot.day_of_week) + 2
                     grid_row_start = ((start_h - 5) * 2) + (start_m // 30) + 2
                     duration_slots = ((end_h * 60 + end_m) - (start_h * 60 + start_m)) // 30
@@ -87,13 +89,12 @@ def dashboard_data():
                         })
             except Exception as e:
                 print(f"Erro ao processar horário para a turma {training_class.name}: {e}")
-    data = {
+    
+    return jsonify({
         'days_order': days_order,
         'time_slots': time_slots,
         'scheduled_events': scheduled_events
-    }
-    return jsonify(data)
-
+    })
 # --- Rotas de Gerenciamento de Professores ---
 @admin_bp.route('/teachers')
 @token_required
