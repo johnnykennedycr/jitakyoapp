@@ -32,10 +32,7 @@ from routes.auth import auth_bp, init_auth_bp
 def create_app():
     """Cria e configura a instância da aplicação Flask (Application Factory Pattern)."""
     global db, user_service
-    # --- CONFIGURAÇÃO DO CORS ---
-    # Esta linha é crucial. Ela diz ao backend para aceitar requisições
-    # do seu frontend e para permitir o tráfego de cookies.
-    CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
+   
     load_dotenv()
 
     app = Flask(__name__)
@@ -44,6 +41,10 @@ def create_app():
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.secret_key = os.environ.get("SECRET_KEY")
 
+    # --- CONFIGURAÇÃO DO CORS ---
+    # Esta linha é crucial. Ela diz ao backend para aceitar requisições
+    # do seu frontend e para permitir o tráfego de cookies.
+    CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
 
     app.config.update(
         SERVER_NAME='jitakyoapp.web.app',
