@@ -1,7 +1,7 @@
 from flask import Blueprint, g, render_template, request, jsonify, url_for
 from firebase_admin import auth
 
-from utils.decorators import token_required
+from utils.decorators import role_required, token_required
 
 # O user_service não é mais necessário para a autenticação básica,
 # mas pode ser útil para outras funções, como o registro.
@@ -20,6 +20,7 @@ def login():
 
 @auth_bp.route('/api/login-session', methods=['POST'])
 @token_required
+@role_required('student', 'teacher', 'receptionist', 'admin', 'super_admin')
 def create_login_session():
     """
     Esta rota é chamada pelo frontend DEPOIS que o Firebase Auth confirma o login.
