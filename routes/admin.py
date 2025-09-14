@@ -45,7 +45,8 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
 @role_required('admin', 'super_admin', 'receptionist')
 def dashboard():
     """Esta rota agora apenas serve o template HTML do dashboard."""
-    return render_template('admin/dashboard.html')
+    api_url = url_for('admin.dashboard_data')
+    return render_template('admin/dashboard.html', dashboard_api_url=api_url)
 
 
 @admin_bp.route('/')

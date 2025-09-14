@@ -6,66 +6,77 @@
 <div class="container mx-auto p-6 md:p-10">
     <h1 class="text-3xl font-bold text-gray-100 mb-8">Agenda da Semana</h1>
 
-    <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
-        <div class="relative grid" style="grid-template-columns: auto repeat({{ days_order|length }}, minmax(150px, 1fr)); grid-template-rows: auto repeat({{ time_slots|length }}, minmax(60px, auto));">
-            
-            <div class="sticky top-0 left-0 z-30 bg-white border-b border-r border-gray-200"></div>
-
-            {% for day in days_order %}
-                <div class="sticky top-0 z-20 p-2 text-center font-bold text-gray-700 bg-gray-50 border-b border-gray-200">
-                    {{ day }}
-                </div>
-            {% endfor %}
-
-            {% for slot in time_slots %}
-                <div class="sticky left-0 z-20 px-2 text-right text-xs font-mono text-gray-500 bg-gray-50 border-r border-b border-gray-200 flex items-center justify-end">
-                    <span>{{ slot }}</span>
-                </div>
-                {% for day in days_order %}
-                    <div class="border-r border-b border-gray-200"></div>
-                {% endfor %}
-            {% endfor %}
-
-            {% for event in scheduled_events %}
-                <div class="absolute p-px z-10" style="{{ event.style|safe }}">
-                    <a href="{{ url_for('admin.edit_class', class_id=event.id) }}" 
-                       class="block h-full bg-indigo-100 border border-indigo-300 text-indigo-800 rounded-lg p-2 overflow-hidden flex flex-col justify-center
-                              transform transition-all duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-20">
-                        <p class="font-bold text-sm leading-tight truncate">{{ event.name }}</p>
-                        <p class="text-xs">{{ event.time }}</p>
-                        <p class="text-xs text-indigo-600 truncate">Prof. {{ event.teacher }}</p>
-                    </a>
-                </div>
-            {% endfor %}
-
-        </div>
+    <div id="loading" class="text-center text-white py-10">
+        <p>Carregando agenda...</p>
     </div>
+
+    <div id="calendar-container" class="bg-white rounded-xl shadow-lg overflow-x-auto hidden">
+        </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+
 <script>
+// Roda o script assim que o HTML da página estiver pronto
 document.addEventListener('DOMContentLoaded', async () => {
+    const loadingDiv = document.getElementById('loading');
+    const calendarContainer = document.getElementById('calendar-container');
+
     try {
-        // Usa o fetchWithAuth para buscar os dados do calendário de forma segura
+        // 1. Usa nossa função segura para buscar os dados da API
+        console.log("Buscando dados do dashboard...");
         const response = await fetchWithAuth('/admin/api/dashboard-data');
+        if (!response.ok) {
+            throw new Error(`A requisição falhou com status ${response.status}`);
+        }
         const data = await response.json();
+        console.log("Dados recebidos:", data);
 
-        // Agora, use os 'data' recebidos para construir seu calendário dinamicamente
-        console.log("Dados do calendário recebidos:", data);
+        // 2. Cria a estrutura HTML do calendário dinamicamente
+        let calendarHTML = `
+            <div class="relative grid" style="grid-template-columns: auto repeat(${data.days_order.length}, minmax(150px, 1fr)); grid-template-rows: auto repeat(${data.time_slots.length}, minmax(60px, auto));">
+                
+                <div class="sticky top-0 left-0 z-30 bg-white border-b border-r border-gray-200"></div>
+
+                ${data.days_order.map(day => `
+                    <div class="sticky top-0 z-20 p-2 text-center font-bold text-gray-700 bg-gray-50 border-b border-gray-200">
+                        ${day}
+                    </div>
+                `).join('')}
+
+                ${data.time_slots.map(slot => `
+                    <div class="sticky left-0 z-20 px-2 text-right text-xs font-mono text-gray-500 bg-gray-50 border-r border-b border-gray-200 flex items-center justify-end">
+                        <span>${slot}</span>
+                    </div>
+                    ${data.days_order.map(() => `
+                        <div class="border-r border-b border-gray-200"></div>
+                    `).join('')}
+                `).join('')}
+
+                ${data.scheduled_events.map(event => `
+                    <div class="absolute p-px z-10" style="${event.style}">
+                        <a href="/admin/classes/edit/${event.id}" 
+                           class="block h-full bg-indigo-100 border border-indigo-300 text-indigo-800 rounded-lg p-2 overflow-hidden flex flex-col justify-center
+                                  transform transition-all duration-200 ease-in-out hover:scale-105 hover:shadow-lg hover:z-20">
+                            <p class="font-bold text-sm leading-tight truncate">${event.name}</p>
+                            <p class="text-xs">${event.time}</p>
+                            <p class="text-xs text-indigo-600 truncate">Prof. ${event.teacher}</p>
+                        </a>
+                    </div>
+                `).join('')}
+            </div>
+        `;
         
-        // Exemplo:
-        // const container = document.getElementById('calendar-container');
-        // data.scheduled_events.forEach(event => {
-        //     const eventDiv = document.createElement('div');
-        //     eventDiv.textContent = event.name;
-        //     eventDiv.style.cssText = event.style; // Aplica o estilo de grid
-        //     container.appendChild(eventDiv);
-        // });
+        // 3. Insere o HTML gerado no contêiner do calendário
+        calendarContainer.innerHTML = calendarHTML;
 
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('calendar-container').classList.remove('hidden');
+        // 4. Esconde a mensagem de "Carregando" e mostra o calendário pronto
+        loadingDiv.classList.add('hidden');
+        calendarContainer.classList.remove('hidden');
 
     } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
-        document.getElementById('loading').textContent = 'Falha ao carregar os dados.';
+        loadingDiv.textContent = 'Falha ao carregar os dados. Verifique o console para mais detalhes.';
     }
 });
 </script>
