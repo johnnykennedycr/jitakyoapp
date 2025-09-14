@@ -26,8 +26,8 @@ def init_teacher_bp(us, ts, tcs, es, ns):
     notification_service = ns
 
 @teacher_bp.route('/dashboard')
-@role_required('teacher', 'admin', 'super_admin')
 @token_required
+@role_required('teacher', 'admin', 'super_admin')
 def dashboard():
     """Exibe o dashboard do professor com suas próximas aulas."""
     # O objeto de usuário completo (do nosso Firestore) é acessado via g.user
@@ -67,8 +67,8 @@ def dashboard():
     return render_template('dashboard_teacher.html', upcoming_classes=upcoming_classes)
 
 @teacher_bp.route('/turmas')
-@role_required('teacher', 'admin', 'super_admin')
 @token_required
+@role_required('teacher', 'admin', 'super_admin')
 def list_classes():
     """Exibe a lista de turmas do professor logado."""
     current_user = g.user
@@ -82,8 +82,8 @@ def list_classes():
 
 
 @teacher_bp.route('/notificar', methods=['GET', 'POST'])
-@role_required('teacher', 'admin', 'super_admin')
 @token_required
+@role_required('teacher', 'admin', 'super_admin')
 def notify_class():
     current_user = g.user
     teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
