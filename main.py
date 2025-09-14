@@ -10,8 +10,6 @@ from flask_cors import CORS
 
 # --- INICIALIZAÇÃO DAS EXTENSÕES (sem o app) ---
 db = None
-mail = Mail()
-login_manager = LoginManager()
 user_service = None # Variável global para ser acessada pelo user_loader
 
 # --- IMPORTAÇÕES DE MÓDULOS DO PROJETO ---
@@ -41,17 +39,19 @@ def create_app():
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.secret_key = os.environ.get("SECRET_KEY")
 
+    app.config['SESSION_COOKIE_NAME'] = 'jitakyo_session'
     # --- CONFIGURAÇÃO DO CORS ---
     # Esta linha é crucial. Ela diz ao backend para aceitar requisições
     # do seu frontend e para permitir o tráfego de cookies.
     CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
+    
 
     app.config.update(
         # Permite que o cookie funcione em um cenário de proxy entre domínios.
         SESSION_COOKIE_SAMESITE='Lax',
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_NAME='jitakyo_session',
+        
         
         # Suas outras configurações
         VAPID_PUBLIC_KEY=os.getenv('VAPID_PUBLIC_KEY'),
@@ -70,7 +70,10 @@ def create_app():
         firebase_admin.initialize_app()
     db = firestore.client()
 
-    mail.init_app(app)
+    # CRIA E INICIALIZA AS EXTENSÕES AQUI DENTRO
+    mail = Mail(app)
+    login_manager = LoginManager(app)
+    login_manager.login_view = 'auth.login'
     
     # Inicializa os serviços
     user_service = UserService(db, mail)
