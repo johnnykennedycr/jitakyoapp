@@ -1,3 +1,5 @@
+# utils/decorators.py ATUALIZADO E FINAL
+
 from functools import wraps
 from flask import request, redirect, url_for, g, flash
 from firebase_admin import auth
@@ -10,10 +12,11 @@ def init_decorators(service):
     global user_service
     user_service = service
 
-def session_login_required(f):
+def token_required(f):
     """
-    Novo decorador principal. Verifica o cookie de sessão do Firebase.
+    Decorador principal. Verifica o cookie de sessão do Firebase.
     Se válido, anexa as informações do usuário ao contexto 'g'.
+    (Anteriormente chamado session_login_required)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -47,12 +50,12 @@ def session_login_required(f):
 def role_required(*roles):
     """
     Verifica se o usuário logado tem uma das funções (roles) necessárias.
-    Este decorador DEVE ser usado DEPOIS de @session_login_required.
+    Este decorador DEVE ser usado DEPOIS de @token_required.
     """
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # g.firebase_user foi definido pelo decorador @session_login_required
+            # g.firebase_user foi definido pelo decorador @token_required
             if 'firebase_user' not in g:
                 # Falha de segurança/configuração, redireciona por precaução
                 flash('Erro interno de autenticação.', 'danger')
@@ -69,7 +72,6 @@ def role_required(*roles):
 
             if user_from_db.role not in roles:
                 flash('Você não tem permissão para acessar esta página.', 'danger')
-                # Idealmente, redirecionar para um dashboard padrão ou página inicial
                 return redirect(url_for('auth.login')) 
             
             # Anexa o objeto de usuário completo do nosso banco de dados ao contexto g
