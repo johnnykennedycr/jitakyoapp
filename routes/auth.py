@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, make_response, redirect, url_for, flash
 from firebase_admin import auth
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 # A função de inicialização e a variável global não são mais necessárias neste arquivo
 auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
