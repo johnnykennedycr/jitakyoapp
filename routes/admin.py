@@ -40,8 +40,8 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
 
 @admin_bp.route('/')
 @admin_bp.route('/dashboard')
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def dashboard():
     """Exibe o dashboard principal com o calendário de treinos da semana."""
     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
@@ -86,15 +86,15 @@ def dashboard():
 
 # --- Rotas de Gerenciamento de Professores ---
 @admin_bp.route('/teachers')
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def list_teachers():
     teachers = teacher_service.get_all_teachers()
     return render_template('admin/teachers/list.html', teachers=teachers)
 
 @admin_bp.route('/teachers/add', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def add_teacher():
     if request.method == 'POST':
         user_id = request.form.get('user_id')
@@ -143,8 +143,8 @@ def add_teacher():
     return render_template('admin/teachers/form.html', teacher=None, available_teacher_users=available_teacher_users)
 
 @admin_bp.route('/teachers/edit/<string:teacher_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def edit_teacher(teacher_id):
     teacher = teacher_service.get_teacher_by_id(teacher_id)
     if not teacher:
@@ -210,8 +210,8 @@ def edit_teacher(teacher_id):
     )
 
 @admin_bp.route('/teachers/delete/<string:teacher_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def delete_teacher(teacher_id):
     if teacher_service.delete_teacher(teacher_id):
         flash('Professor deletado com sucesso!', 'success')
@@ -221,16 +221,16 @@ def delete_teacher(teacher_id):
 
 # --- Rotas de Gerenciamento de Turmas ---
 @admin_bp.route('/classes')
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def list_classes():
     classes = training_class_service.get_all_classes()
     teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
     return render_template('admin/training_classes/list.html', classes=classes, teachers_map=teachers_map)
 
 @admin_bp.route('/classes/add', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def add_class():
     teachers = teacher_service.get_all_teachers()
     if request.method == 'POST':
@@ -264,8 +264,8 @@ def add_class():
     return render_template('admin/training_classes/form.html', training_class=None, teachers=teachers)
 
 @admin_bp.route('/classes/edit/<string:class_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def edit_class(class_id):
     training_class = training_class_service.get_class_by_id(class_id)
     if not training_class:
@@ -333,8 +333,8 @@ def edit_class(class_id):
     return render_template('admin/training_classes/form.html', training_class=training_class, teachers=teachers, enrolled_students=enrolled_students, available_students=available_students, available_students_json=available_students_data)
 
 @admin_bp.route('/classes/delete/<string:class_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def delete_class(class_id):
     if training_class_service.delete_class(class_id):
         flash('Turma deletada com sucesso!', 'success')
@@ -345,15 +345,15 @@ def delete_class(class_id):
 
 # --- Rotas de Gerenciamento de Alunos (Usuários com role='student') ---
 @admin_bp.route('/students')
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def list_students():
     students = user_service.get_users_by_role('student')
     return render_template('admin/users/list.html', users=students, role_filter='student')
 
 @admin_bp.route('/students/add', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def add_student():
     classes = training_class_service.get_all_classes()
     if request.method == 'POST':
@@ -381,8 +381,8 @@ def add_student():
     return render_template('admin/users/form.html', user=None, current_role='student', classes=classes)
 
 @admin_bp.route('/students/edit/<string:user_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def edit_student(user_id):
     user = user_service.get_user_by_id(user_id)
     if not user or user.role != 'student':
@@ -402,8 +402,8 @@ def edit_student(user_id):
     return render_template('admin/users/form.html', user=user, current_role='student', classes=all_classes, current_class_ids=current_class_ids)
 
 @admin_bp.route('/students/delete/<string:user_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def delete_student(user_id):
     user = user_service.get_user_by_id(user_id)
     if user and user.role == 'student':
@@ -420,8 +420,8 @@ def delete_student(user_id):
 
 # --- Rotas de Gerenciamento de Matrículas ---
 @admin_bp.route('/enrollments')
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def list_enrollments():
     enrollments = enrollment_service.get_all_enrollments()
     detailed_enrollments = []
@@ -437,8 +437,8 @@ def list_enrollments():
     return render_template('admin/enrollments/list.html', enrollments=detailed_enrollments)
 
 @admin_bp.route('/enrollments/delete/<string:enrollment_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def delete_enrollment(enrollment_id):
     if enrollment_service.delete_enrollment(enrollment_id):
         flash('Matrícula deletada com sucesso!', 'success')
@@ -447,8 +447,8 @@ def delete_enrollment(enrollment_id):
     return redirect(url_for('admin.list_enrollments'))
 
 @admin_bp.route('/enrollments/new/<string:class_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def new_enrollment(class_id):
     training_class = training_class_service.get_class_by_id(class_id)
     if not training_class:
@@ -480,8 +480,8 @@ def new_enrollment(class_id):
 
 # --- ROTAS PARA LISTA DE PRESENÇA ---
 @admin_bp.route('/classes/<string:class_id>/attendance', methods=['GET'])
-@token_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
+@token_required
 def get_attendance_list(class_id):
     training_class = training_class_service.get_class_by_id(class_id)
     if not training_class:
@@ -528,8 +528,8 @@ def get_attendance_list(class_id):
                            scheduled_days_js=scheduled_days_js)
 
 @admin_bp.route('/classes/<string:class_id>/attendance', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
+@token_required
 def save_attendance(class_id):
     try:
         selected_date_str = request.form['date']
@@ -559,8 +559,8 @@ def save_attendance(class_id):
         return redirect(url_for('admin.get_attendance_list', class_id=class_id, date=request.form.get('date')))
 
 @admin_bp.route('/classes/all_calls/<string:class_id>')
-@token_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
+@token_required
 def all_calls(class_id):
     training_class = training_class_service.get_class_by_id(class_id)
     if not training_class:
@@ -640,8 +640,8 @@ def all_calls(class_id):
                            student_summary=list(student_summary_dict.values()))
 
 @admin_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def unenroll_student_from_class(class_id, student_id):
     enrollments_to_delete = enrollment_service.get_enrollments_by_student_and_class(student_id, class_id)
     if enrollments_to_delete:
@@ -655,8 +655,8 @@ def unenroll_student_from_class(class_id, student_id):
 
 # --- Rotas Financeiras ---
 @admin_bp.route('/financial')
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def financial_dashboard():
     """Exibe o painel financeiro principal com dados detalhados."""
     today = date.today()
@@ -703,8 +703,8 @@ def financial_dashboard():
 
 
 @admin_bp.route('/financial/generate_charges', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def generate_monthly_charges_route():
     year = int(request.form.get('year'))
     month = int(request.form.get('month'))
@@ -713,8 +713,8 @@ def generate_monthly_charges_route():
     return redirect(url_for('admin.financial_dashboard'))
 
 @admin_bp.route('/financial/pay/<string:payment_id>', methods=['POST'])
-@token_required
 @role_required('admin', 'super_admin', 'receptionist')
+@token_required
 def mark_payment_as_paid_route(payment_id):
     payment_method = request.form.get('payment_method', 'Não especificado')
     if payment_service.mark_payment_as_paid(payment_id, payment_method):
@@ -724,8 +724,8 @@ def mark_payment_as_paid_route(payment_id):
     return redirect(url_for('admin.financial_dashboard'))
 
 @admin_bp.route('/financial/student/<string:student_id>')
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def student_financial_history(student_id):
     student = user_service.get_user_by_id(student_id)
     if not student:
@@ -752,8 +752,8 @@ def student_financial_history(student_id):
 
 
 @admin_bp.route('/financial/history')
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def payment_history():
     # Pega os filtros da URL
     selected_year = request.args.get('year', default=datetime.now().year, type=int)
@@ -811,8 +811,8 @@ def payment_history():
 
 # --- ROTAS DE GERENCIAMENTO DE USUÁRIOS (UNIFICADO) ---
 @admin_bp.route('/users/add', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def add_user():
     if request.method == 'POST':
         name = request.form['name']
@@ -827,8 +827,8 @@ def add_user():
     return render_template('admin/users/user_form.html', user=None, title="Adicionar Novo Usuário")
 
 @admin_bp.route('/users/edit/<string:user_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def edit_user(user_id):
     user = user_service.get_user_by_id(user_id)
     if not user:
@@ -852,15 +852,15 @@ def edit_user(user_id):
 
 # --- ROTAS DE SUPER ADMIN ---
 @admin_bp.route('/super/users')
-@token_required
 @role_required('super_admin')
+@token_required
 def list_all_users():
     all_users = user_service.get_all_users()
     return render_template('admin/super/list_users.html', users=all_users)
 
 @admin_bp.route('/financial/add_charge', methods=['GET', 'POST'])
-@token_required
 @role_required('admin', 'super_admin')
+@token_required
 def add_manual_charge():
     if request.method == 'POST':
         student_id = request.form.get('student_id')
@@ -900,8 +900,8 @@ def add_manual_charge():
 
 
 @admin_bp.route('/super/users/add', methods=['GET', 'POST'])
-@token_required
 @role_required('super_admin')
+@token_required
 def add_system_user():
     """Exibe e processa o formulário para o Super Admin criar qualquer tipo de usuário."""
     if request.method == 'POST':
@@ -948,8 +948,8 @@ def add_system_user():
     return render_template('admin/super/user_form.html', action="Adicionar", user=None)
 
 @admin_bp.route('/super/users/edit/<string:user_id>', methods=['GET', 'POST'])
-@token_required
 @role_required('super_admin')
+@token_required
 def edit_system_user(user_id):
     user = user_service.get_user_by_id(user_id)
     if not user:
@@ -971,8 +971,8 @@ def edit_system_user(user_id):
     return render_template('admin/super/user_form.html', action="Editar", user=user)
 
 @admin_bp.route('/users/delete/<string:user_id>', methods=['POST'])
-@token_required
 @role_required('super_admin')
+@token_required
 def delete_user(user_id):
     # g.user foi definido pelo decorador @role_required
     if user_id == g.user.id:
@@ -996,8 +996,8 @@ def delete_user(user_id):
     return redirect(url_for('admin.list_all_users'))
 
 @admin_bp.route('/super/settings', methods=['GET', 'POST'])
-@token_required
 @role_required('super_admin')
+@token_required
 def branding_settings():
     if request.method == 'POST':
         academy_name = request.form.get('academy_name')

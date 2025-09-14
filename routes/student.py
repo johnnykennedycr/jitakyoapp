@@ -26,8 +26,8 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard')
-@token_required
 @role_required('student')
+@token_required
 def dashboard():
     # 'g.user' agora contém o objeto de usuário completo, validado pelos decoradores
     current_user = g.user
@@ -71,8 +71,8 @@ def dashboard():
     )
 
 @student_bp.route('/financeiro')
-@token_required
 @role_required('student')
+@token_required
 def financials():
     current_user = g.user
     payments_raw = payment_service.get_payments_by_student(current_user.id)
@@ -87,8 +87,8 @@ def financials():
 
 
 @student_bp.route('/notificacoes')
-@token_required
 @role_required('student')
+@token_required
 def notifications():
     current_user = g.user
     user_notifications = [] # Placeholder para sua lógica de notificações
@@ -96,8 +96,9 @@ def notifications():
 
 
 @student_bp.route('/save-push-subscription', methods=['POST'])
-@token_required
+
 @role_required('student')
+@token_required
 def save_push_subscription():
     """Salva a inscrição de notificação push do usuário no banco de dados."""
     current_user = g.user
