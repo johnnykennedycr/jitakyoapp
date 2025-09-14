@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for
+from flask import Blueprint, g, render_template, request, jsonify, url_for
 from firebase_admin import auth
 
 from utils.decorators import token_required
