@@ -1,7 +1,7 @@
 # routes/admin.py ATUALIZADO COMPLETAMENTE
 
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, current_app, g
 from datetime import datetime, date, time, timedelta 
 from werkzeug.utils import secure_filename
 from firebase_admin import auth
@@ -38,11 +38,21 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
     attendance_service = as_param
     payment_service = ps_param
 
-@admin_bp.route('/')
+
+# ROTA QUE SERVE A PÁGINA "CASCA"
 @admin_bp.route('/dashboard')
 @token_required
 @role_required('admin', 'super_admin', 'receptionist')
 def dashboard():
+    """Esta rota agora apenas serve o template HTML do dashboard."""
+    return render_template('admin/dashboard.html')
+
+
+@admin_bp.route('/')
+@admin_bp.route('/dashboard')
+@token_required
+@role_required('admin', 'super_admin', 'receptionist')
+def dashboard_data():
     """Exibe o dashboard principal com o calendário de treinos da semana."""
     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
     time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
@@ -76,13 +86,12 @@ def dashboard():
                         })
             except Exception as e:
                 print(f"Erro ao processar horário para a turma {training_class.name}: {e}")
-    
-    return render_template(
-        'admin/dashboard.html',
-        days_order=days_order,
-        time_slots=time_slots,
-        scheduled_events=scheduled_events
-    )
+    data = {
+        'days_order': days_order,
+        'time_slots': time_slots,
+        'scheduled_events': scheduled_events
+    }
+    return jsonify(data)
 
 # --- Rotas de Gerenciamento de Professores ---
 @admin_bp.route('/teachers')

@@ -41,4 +41,32 @@
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Usa o fetchWithAuth para buscar os dados do calendário de forma segura
+        const response = await fetchWithAuth('/admin/api/dashboard-data');
+        const data = await response.json();
+
+        // Agora, use os 'data' recebidos para construir seu calendário dinamicamente
+        console.log("Dados do calendário recebidos:", data);
+        
+        // Exemplo:
+        // const container = document.getElementById('calendar-container');
+        // data.scheduled_events.forEach(event => {
+        //     const eventDiv = document.createElement('div');
+        //     eventDiv.textContent = event.name;
+        //     eventDiv.style.cssText = event.style; // Aplica o estilo de grid
+        //     container.appendChild(eventDiv);
+        // });
+
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('calendar-container').classList.remove('hidden');
+
+    } catch (error) {
+        console.error("Erro ao carregar dados do dashboard:", error);
+        document.getElementById('loading').textContent = 'Falha ao carregar os dados.';
+    }
+});
+</script>
 {% endblock %}
