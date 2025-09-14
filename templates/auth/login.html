@@ -49,43 +49,49 @@
 
 <script>
     document.getElementById('login-form').addEventListener('submit', function(event) {
-        // Previne o envio padrão do formulário HTML
         event.preventDefault();
+        console.log("Formulário enviado. Prevenindo o envio padrão.");
 
         const form = event.target;
         const formData = new FormData(form);
-        const flashContainer = document.getElementById('flash-messages');
+        const flashContainer = document.getElementById('flash-messages') || form.parentNode.insertBefore(document.createElement('div'), form);
+        flashContainer.id = 'flash-messages';
 
-        // Mostra um feedback visual para o usuário
-        form.querySelector('button[type="submit"]').textContent = 'Entrando...';
-        form.querySelector('button[type="submit"]').disabled = true;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.textContent = 'Entrando...';
+        submitButton.disabled = true;
         flashContainer.innerHTML = '';
 
+        console.log("Iniciando requisição fetch para:", form.action);
         fetch(form.action, {
             method: 'POST',
             body: formData,
-            // A chave para o cookie funcionar em um cenário de proxy/rewrite
-            credentials: 'include' 
+            credentials: 'include'
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log("Resposta recebida do servidor:", response);
+            if (!response.ok) {
+                console.error("Resposta de rede não foi 'ok'. Status:", response.status);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log("Dados JSON recebidos:", data);
             if (data.success) {
-                // SUCESSO: O backend autenticou e o cookie foi salvo.
-                // Agora o JavaScript faz o redirect.
+                console.log("SUCESSO! Redirecionando para:", data.redirect_url);
                 window.location.href = data.redirect_url;
             } else {
-                // FALHA: Mostra a mensagem de erro do backend
+                console.warn("Falha no login (retorno do servidor):", data.message);
                 flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">${data.message}</div>`;
-                form.querySelector('button[type="submit"]').textContent = 'Entrar';
-                form.querySelector('button[type="submit"]').disabled = false;
+                submitButton.textContent = 'Entrar';
+                submitButton.disabled = false;
             }
         })
         .catch(error => {
-            // Erro de rede ou algo inesperado
-            console.error('Erro:', error);
-            flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">Ocorreu um erro de comunicação. Tente novamente.</div>`;
-            form.querySelector('button[type="submit"]').textContent = 'Entrar';
-            form.querySelector('button[type="submit"]').disabled = false;
+            console.error('ERRO CRÍTICO NO BLOCO FETCH:', error);
+            flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">Ocorreu um erro de comunicação. Verifique o console.</div>`;
+            submitButton.textContent = 'Entrar';
+            submitButton.disabled = false;
         });
     });
 </script>

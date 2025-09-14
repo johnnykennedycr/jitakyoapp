@@ -103,19 +103,10 @@ def create_app():
         return user
     
     @app.after_request
-    def log_response_info(response):
-        # Só nos importam as requisições de páginas, não de arquivos estáticos
-        if request.path.startswith('/static'):
-            return response
-
-        print("\n--- HOOK @after_request ---")
-        print(f"Path da Requisição: {request.path}")
-        print(f"Status da Resposta: {response.status}")
-        print("Cabeçalhos da Resposta (o que o Flask está enviando):")
-        # Imprime os cabeçalhos de forma legível
-        for header, value in response.headers:
-            print(f"  {header}: {value}")
-        print("--- FIM DO HOOK ---\n")
+    def add_cache_headers(response):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
         return response
 
     # Registra o context processor dentro da factory
