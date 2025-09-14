@@ -1,19 +1,16 @@
+# main.py ATUALIZADO E FINALIZADO
+
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 from flask_mail import Mail
-from flask_login import LoginManager
 from flask_cors import CORS
 
-# --- INICIALIZAÇÃO DAS EXTENSÕES (sem o app) ---
-db = None
-user_service = None # Variável global para ser acessada pelo user_loader
-
 # --- IMPORTAÇÕES DE MÓDULOS DO PROJETO ---
-from models.user import User
+# (As importações dos seus services e routes permanecem)
 from services.user_service import UserService
 from services.teacher_service import TeacherService
 from services.training_class_service import TrainingClassService
@@ -21,42 +18,29 @@ from services.enrollment_service import EnrollmentService
 from services.attendance_service import AttendanceService
 from services.payment_service import PaymentService
 from services.notification_service import NotificationService
+
 from routes.admin import admin_bp, init_admin_bp
 from routes.student import student_bp, init_student_bp
 from routes.teacher import teacher_bp, init_teacher_bp
 from routes.auth import auth_bp, init_auth_bp
-
+from utils.decorators import init_decorators # <-- NOVA IMPORTAÇÃO
 
 def create_app():
     """Cria e configura a instância da aplicação Flask (Application Factory Pattern)."""
-    global db, user_service
-   
-    load_dotenv()
-
+    
     app = Flask(__name__)
     
-    # --- CONFIGURAÇÃO ESSENCIAL ---
+    # --- CONFIGURAÇÃO DA APLICAÇÃO ---
+    
+    # Ordem correta de inicialização dos middlewares
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-    app.secret_key = os.environ.get("SECRET_KEY")
-
-    app.config['SESSION_COOKIE_NAME'] = 'jitakyo_session'
-    # --- CONFIGURAÇÃO DO CORS ---
-    # Esta linha é crucial. Ela diz ao backend para aceitar requisições
-    # do seu frontend e para permitir o tráfego de cookies.
     CORS(app, supports_credentials=True, origins=["https://jitakyoapp.web.app"])
     
-
+    # Carrega as variáveis de ambiente
+    load_dotenv()
+    app.secret_key = os.environ.get("SECRET_KEY") # Mantido para flash messages
     app.config.update(
-        # Permite que o cookie funcione em um cenário de proxy entre domínios.
-        SESSION_COOKIE_SAMESITE='Lax',
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        
-        
-        # Suas outras configurações
-        VAPID_PUBLIC_KEY=os.getenv('VAPID_PUBLIC_KEY'),
-        VAPID_PRIVATE_KEY=os.getenv('VAPID_PRIVATE_KEY'),
-        VAPID_ADMIN_EMAIL=os.getenv('VAPID_ADMIN_EMAIL'),
+        # Suas configurações de e-mail e outras permanecem aqui
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
         MAIL_USE_TLS=os.getenv('MAIL_USE_TLS', 'true').lower() in ('true', '1', 't'),
@@ -66,14 +50,26 @@ def create_app():
     )
 
     # --- INICIALIZAÇÃO DE SERVIÇOS E EXTENSÕES ---
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app()
-    db = firestore.client()
+    
+    # Inicializa o Firebase Admin SDK
+    try:
+        if not firebase_admin._apps:
+            # Em produção (Cloud Run), ele usará as credenciais do ambiente automaticamente
+            cred = credentials.ApplicationDefault()
+            firebase_admin.initialize_app(cred)
+            print("Firebase Admin SDK inicializado com as credenciais do ambiente.")
+    except Exception as e:
+        print(f"Falha ao inicializar com credenciais do ambiente, tentando arquivo local: {e}")
+        try:
+            if not firebase_admin._apps:
+                cred = credentials.Certificate("credentials.json")
+                firebase_admin.initialize_app(cred)
+                print("Firebase Admin SDK inicializado com credentials.json.")
+        except Exception as file_error:
+            print(f"Não foi possível inicializar o Firebase Admin: {file_error}")
 
-    # CRIA E INICIALIZA AS EXTENSÕES AQUI DENTRO
+    db = firestore.client()
     mail = Mail(app)
-    login_manager = LoginManager(app)
-    login_manager.login_view = 'auth.login'
     
     # Inicializa os serviços
     user_service = UserService(db, mail)
@@ -84,28 +80,15 @@ def create_app():
     notification_service = NotificationService(db, user_service)
     payment_service = PaymentService(db, enrollment_service)
 
-    # Configura o Flask-Login
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
+    # --- FIM DO FLASK-LOGIN ---
+    # Todas as linhas relacionadas a 'LoginManager' foram removidas.
+    # A função 'load_user' foi removida.
 
-    @login_manager.user_loader
-    def load_user(user_id):
-        print(f"\n--- USER LOADER ACIONADO (Request para página protegida) ---")
-        print(f"Request Scheme: {request.scheme}")
-        print(f"Request is_secure: {request.is_secure}")
-        print(f"Cabeçalho 'Cookie' recebido: {request.headers.get('Cookie')}")
-        print(f"Conteúdo da sessão atual (lido do cookie): {dict(session)}")
-        print(f"Tentando carregar usuário com ID: {user_id}")
-        
-        user = user_service.get_user_by_id(user_id) if user_service else None
-        
-        if user:
-            print(f"==> Usuário {user_id} encontrado e carregado na sessão.")
-        else:
-            print(f"==> !!! Usuário com ID {user_id} NÃO encontrado no banco de dados.")
-            
-        return user
-    
+    # --- INICIALIZAÇÃO DOS DECORADORES ---
+    # Injeta o user_service no módulo de decoradores para que @role_required funcione
+    init_decorators(user_service)
+
+    # Hook para previnir cache (boa prática)
     @app.after_request
     def add_cache_headers(response):
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -113,11 +96,14 @@ def create_app():
         response.headers['Expires'] = '0'
         return response
 
-    # Registra o context processor dentro da factory
+    # Context processor para branding (permanece igual)
     @app.context_processor
     def inject_branding_settings():
-        settings_doc = db.collection('settings').document('branding').get()
-        settings = settings_doc.to_dict() if settings_doc.exists else {}
+        try:
+            settings_doc = db.collection('settings').document('branding').get()
+            settings = settings_doc.to_dict() if settings_doc.exists else {}
+        except Exception:
+            settings = {} # Evita que a aplicação quebre se o Firestore não estiver disponível
         return {
             'academy_name': settings.get('academy_name', 'JitaKyoApp'),
             'academy_logo_path': settings.get('logo_path', 'logo-horizontal.png')
@@ -125,6 +111,7 @@ def create_app():
 
     # --- REGISTRO DOS BLUEPRINTS ---
     with app.app_context():
+        # As funções 'init' injetam as dependências (serviços) em cada blueprint
         init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
         init_auth_bp(user_service)
         init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
@@ -139,4 +126,3 @@ def create_app():
 
 # Cria a instância da aplicação para o Gunicorn
 app = create_app()
-

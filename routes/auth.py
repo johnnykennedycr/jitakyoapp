@@ -1,56 +1,22 @@
-from flask import Blueprint, jsonify, render_template, request, redirect, session, url_for, flash
-from flask_login import login_user, logout_user, current_user, login_required
-from werkzeug.security import check_password_hash
+from flask import Blueprint, render_template, request, jsonify
+from firebase_admin import auth
 
+# O user_service não é mais necessário para a autenticação básica,
+# mas pode ser útil para outras funções, como o registro.
 user_service = None
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
 
-def init_auth_bp(us):
+def init_auth_bp(service):
     """Inicializa o blueprint de autenticação com o serviço de usuário."""
     global user_service
-    user_service = us
+    user_service = service
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['GET'])
 def login():
-    if current_user.is_authenticated:
-        if current_user.role == 'admin':
-            return redirect(url_for('admin.dashboard'))
-        elif current_user.role == 'teacher':
-            return redirect(url_for('teacher.dashboard'))
-        return redirect(url_for('student.dashboard'))
-
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        remember = True if request.form.get('remember') else False
-
-        user = user_service.get_user_by_email(email)
-
-        if user and check_password_hash(user.password_hash, password):
-            session.clear()
-            login_user(user, remember=remember)
-            
-            if user.role == 'admin':
-                next_page = url_for('admin.dashboard')
-            elif user.role == 'teacher':
-                next_page = url_for('teacher.dashboard')
-            else:
-                next_page = url_for('student.dashboard')
-            
-            # MUDANÇA PRINCIPAL: Retornamos um JSON de sucesso
-            return jsonify({"success": True, "redirect_url": next_page}), 200
-        
-        # Em caso de falha, podemos retornar um JSON de erro também
-        return jsonify({"success": False, "message": "Email ou senha inválidos."}), 401
-
+    """
+    Renderiza a página de login.
+    A lógica de autenticação agora é 100% no frontend com o Firebase SDK.
+    O método POST foi removido, pois não é mais usado pelo nosso backend.
+    """
     return render_template('auth/login.html')
-
-
-@auth_bp.route('/logout')
-@login_required
-def logout():
-    """Processa o logout do usuário."""
-    logout_user()
-    flash('Você foi desconectado.', 'info')
-    return redirect(url_for('auth.login'))
 

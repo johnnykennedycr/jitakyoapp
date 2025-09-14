@@ -1,13 +1,12 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required, current_user
-from services import enrollment_service
-from utils.decorators import teacher_required
-from datetime import datetime, date, timedelta
+from flask import Blueprint, flash, redirect, render_template, request, url_for, g
+from utils.decorators import token_required, role_required
+from datetime import datetime
 
 # Variáveis globais para os serviços
 user_service = None
 teacher_service = None
 training_class_service = None
+enrollment_service = None
 notification_service = None
 
 teacher_bp = Blueprint(
@@ -27,10 +26,12 @@ def init_teacher_bp(us, ts, tcs, es, ns):
     notification_service = ns
 
 @teacher_bp.route('/dashboard')
-@login_required
-@teacher_required
+@token_required
+@role_required('teacher', 'admin', 'super_admin')
 def dashboard():
     """Exibe o dashboard do professor com suas próximas aulas."""
+    # O objeto de usuário completo (do nosso Firestore) é acessado via g.user
+    current_user = g.user
     
     # 1. Encontra o perfil de professor vinculado ao usuário logado
     teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
@@ -52,11 +53,10 @@ def dashboard():
                 if training_class.schedule:
                     for slot in training_class.schedule:
                         if slot.day_of_week == current_day_name:
-                            # Para hoje, só considera horários futuros
                             if i == 0 and slot.start_time < datetime.now().strftime('%H:%M'):
                                 continue
                             
-                            if len(upcoming_classes) < 7: # Aumentei o limite para 7 próximas aulas
+                            if len(upcoming_classes) < 7:
                                 upcoming_classes.append({
                                     'day': 'Hoje' if i == 0 else ('Amanhã' if i == 1 else current_day_name),
                                     'name': training_class.name,
@@ -67,24 +67,27 @@ def dashboard():
     return render_template('dashboard_teacher.html', upcoming_classes=upcoming_classes)
 
 @teacher_bp.route('/turmas')
-@login_required
-@teacher_required
+@token_required
+@role_required('teacher', 'admin', 'super_admin')
 def list_classes():
     """Exibe a lista de turmas do professor logado."""
+    current_user = g.user
     teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
+    
+    teacher_classes = []
     if teacher_profile:
         teacher_classes = training_class_service.get_classes_by_teacher(teacher_profile.id)
-    else:
-        teacher_classes = []
     
     return render_template('list_classes.html', classes=teacher_classes)
 
 
 @teacher_bp.route('/notificar', methods=['GET', 'POST'])
-@login_required
-@teacher_required
+@token_required
+@role_required('teacher', 'admin', 'super_admin')
 def notify_class():
+    current_user = g.user
     teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
+    
     if not teacher_profile:
         flash("Perfil de professor não encontrado.", "danger")
         return redirect(url_for('teacher.dashboard'))
@@ -100,11 +103,9 @@ def notify_class():
             flash("Todos os campos são obrigatórios.", "danger")
             return redirect(url_for('teacher.notify_class'))
 
-        # Busca todos os alunos da turma selecionada
         enrollments = enrollment_service.get_enrollments_by_class(class_id)
         student_ids = [e.student_id for e in enrollments]
 
-        # Cria uma notificação para cada aluno usando o serviço
         success = notification_service.create_batch_notifications(
             teacher_id=teacher_profile.id, 
             student_ids=student_ids, 

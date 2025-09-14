@@ -1,9 +1,8 @@
-from flask import Blueprint, jsonify, render_template, request, session
-from flask_login import login_required, current_user
-from utils.decorators import student_required
-from datetime import datetime, date, timedelta
+from flask import Blueprint, jsonify, render_template, request, g
+from utils.decorators import token_required, role_required
+from datetime import datetime
 
-# Estes serviços serão inicializados pelo app.py
+# Estes serviços serão inicializados pelo main.py
 user_service = None
 enrollment_service = None
 training_class_service = None
@@ -14,7 +13,7 @@ student_bp = Blueprint(
     'student', 
     __name__, 
     url_prefix='/aluno',
-    template_folder='../templates/student'
+    template_folder='../../templates/student'
 )
 
 def init_student_bp(us, es, tcs, ts, ps):
@@ -27,9 +26,12 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard')
-@login_required
-@student_required
+@token_required
+@role_required('student')
 def dashboard():
+    # 'g.user' agora contém o objeto de usuário completo, validado pelos decoradores
+    current_user = g.user
+    
     # 1. Busca as matrículas do aluno logado
     enrollments = enrollment_service.get_enrollments_by_student(current_user.id)
     student_class_ids = {e.class_id for e in enrollments}
@@ -39,17 +41,11 @@ def dashboard():
     teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
     
     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
-    time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
-    scheduled_events = [] # Para o calendário completo
-
+    
     # 3. Lógica para encontrar as próximas duas aulas do aluno
     upcoming_classes = []
-    today_weekday_index = datetime.today().weekday() # Segunda é 0, Domingo é 6
-    
-    # Mapeia nosso dia da semana para o índice do Python
-    day_map_to_index = {day: i for i, day in enumerate(days_order)}
+    today_weekday_index = datetime.today().weekday()
 
-    # Procura por aulas nos próximos 7 dias
     for i in range(7):
         current_day_index = (today_weekday_index + i) % 7
         current_day_name = days_order[current_day_index]
@@ -58,7 +54,6 @@ def dashboard():
             if training_class.id in student_class_ids and training_class.schedule:
                 for slot in training_class.schedule:
                     if slot.day_of_week == current_day_name:
-                        # Para a primeira iteração (hoje), só considera horários futuros
                         if i == 0 and slot.start_time < datetime.now().strftime('%H:%M'):
                             continue
                         
@@ -70,27 +65,21 @@ def dashboard():
                                 'teacher': teachers_map.get(training_class.teacher_id, 'N/A')
                             })
     
-    # 4. Preenche a agenda completa para o calendário visual
-    # (Este código pode ser copiado/adaptado do dashboard de admin se necessário)
-    
     return render_template(
         'dashboard_student.html',
-        upcoming_classes=upcoming_classes,
-        # scheduled_events=scheduled_events, # Descomente quando for implementar o calendário completo
-        # days_order=days_order,
-        # time_slots=time_slots
+        upcoming_classes=upcoming_classes
     )
 
 @student_bp.route('/financeiro')
-@login_required
-@student_required
+@token_required
+@role_required('student')
 def financials():
+    current_user = g.user
     payments_raw = payment_service.get_payments_by_student(current_user.id)
     
     detailed_payments = []
     for payment in payments_raw:
         training_class = training_class_service.get_class_by_id(payment.class_id)
-        # Adicionamos o nome da turma diretamente ao objeto para facilitar
         payment.class_name = training_class.name if training_class else 'N/A'
         detailed_payments.append(payment)
 
@@ -98,26 +87,24 @@ def financials():
 
 
 @student_bp.route('/notificacoes')
-@login_required
-@student_required
+@token_required
+@role_required('student')
 def notifications():
-    # Busca as notificações do aluno logado
-    # user_notifications = notification_service.get_notifications_for_student(current_user.id)
-    user_notifications = [] # Placeholder
+    current_user = g.user
+    user_notifications = [] # Placeholder para sua lógica de notificações
     return render_template('notifications.html', notifications=user_notifications)
 
 
-
 @student_bp.route('/save-push-subscription', methods=['POST'])
-@login_required
-@student_required
+@token_required
+@role_required('student')
 def save_push_subscription():
     """Salva a inscrição de notificação push do usuário no banco de dados."""
+    current_user = g.user
     subscription_data = request.get_json()
     if not subscription_data:
         return jsonify({'success': False, 'error': 'No subscription data provided'}), 400
 
-    # Chama o serviço para salvar a inscrição no perfil do usuário
     success = user_service.add_push_subscription(current_user.id, subscription_data)
     
     if success:
