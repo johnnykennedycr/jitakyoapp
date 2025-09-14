@@ -72,7 +72,6 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
 
-    // --- LÓGICA DE LOGIN ---
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
         
@@ -82,36 +81,53 @@
         const flashContainer = document.getElementById('flash-messages');
         const submitButton = form.querySelector('button[type="submit"]');
 
-        submitButton.textContent = 'Entrando...';
+        submitButton.textContent = 'Autenticando...';
         submitButton.disabled = true;
         flashContainer.innerHTML = '';
 
-        // Autentica diretamente com os servidores do Firebase
+        let idToken; // Variável para guardar o token
+
+        // 1. Autentica com o Firebase
         auth.signInWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                // SUCESSO! O usuário está logado no Firebase.
-                console.log("Login com Firebase bem-sucedido:", userCredential.user);
-                
-                // Agora, obtemos o ID Token para usar nas chamadas ao nosso backend Flask
+            .then(userCredential => {
+                console.log("Firebase Auth OK. Obtendo ID Token...");
                 return userCredential.user.getIdToken();
             })
-            .then((idToken) => {
-                // Armazenamos o token no navegador. sessionStorage é apagado quando a aba fecha.
-                // Use localStorage.setItem('firebaseIdToken', idToken) para um login persistente.
-                sessionStorage.setItem('firebaseIdToken', idToken);
-                
-                // Agora que o token está salvo, podemos ir para o dashboard.
-                // O backend vai precisar desse token para nos autorizar.
-                // Nota: A lógica para saber se é /aluno/dashboard ou /admin/dashboard
-                // precisará ser feita no backend ou após buscar os dados do usuário.
-                // Por enquanto, redirecionamos para uma rota genérica ou de aluno.
-                window.location.href = '/aluno/dashboard';
+            .then(token => {
+                idToken = token;
+                console.log("ID Token recebido. Verificando a role com o backend...");
+                submitButton.textContent = 'Verificando permissões...';
+
+                // 2. Envia o token para o nosso backend para obter a URL de redirect
+                return fetch('/api/login-session', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`
+                    }
+                });
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Falha ao verificar a sessão no backend.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    console.log("Backend OK. Redirecionando para:", data.redirect_url);
+                    // 3. Redireciona para a URL que o backend nos deu
+                    window.location.href = data.redirect_url;
+                } else {
+                    throw new Error(data.message || 'Ocorreu um erro desconhecido.');
+                }
             })
             .catch((error) => {
-                console.error("Erro no login com Firebase:", error.message);
+                console.error("Erro no fluxo de login:", error.message);
                 flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">Email ou senha inválidos.</div>`;
                 submitButton.textContent = 'Entrar';
                 submitButton.disabled = false;
+                // Faz logout do Firebase em caso de erro no nosso backend
+                auth.signOut(); 
             });
     });
 </script>

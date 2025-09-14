@@ -1,31 +1,63 @@
-{% extends 'base_student.html' %}
+{% extends 'base.html' %}
 
-{% block student_title %}Minhas Aulas{% endblock %}
+{% block title %}Dashboard do Aluno{% endblock %}
 
-{% block student_content %}
-<div class="container mx-auto p-4 sm:p-6 lg:p-8">
-    
-    <h2 class="text-2xl font-bold text-gray-800 mb-4">Suas Próximas Aulas</h2>
-    {% if upcoming_classes %}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {% for class in upcoming_classes %}
-            <div class="bg-white rounded-lg shadow p-5">
-                <p class="text-sm font-semibold text-indigo-600">{{ class.day }}</p>
-                <h3 class="text-xl font-bold text-gray-900 mt-1">{{ class.name }}</h3>
-                <p class="text-gray-600 mt-2">{{ class.time }}</p>
-                <p class="text-sm text-gray-500">com Prof. {{ class.teacher }}</p>
-            </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p class="text-gray-600">Nenhuma aula agendada para os próximos 7 dias.</p>
-    {% endif %}
+{% block body_content %}
+<div class="container mx-auto p-4">
+    <h1 class="text-2xl font-bold">Bem-vindo, <span id="student-name">...</span>!</h1>
 
-    <div class="mt-12">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Cronograma da Semana</h2>
-        <div class="bg-white rounded-lg shadow p-5 text-center text-gray-500">
-            <p>O calendário completo da academia aparecerá aqui em breve.</p>
-        </div>
+    <div id="loading" class="mt-4">Carregando seus dados...</div>
+
+    <div id="dashboard-content" class="hidden">
+        <h2 class="text-xl mt-4">Suas Próximas Aulas:</h2>
+        <ul id="upcoming-classes-list">
+            </ul>
     </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+
+<script>
+    // Esta função roda assim que a página termina de carregar
+    document.addEventListener('DOMContentLoaded', async () => {
+        const loadingDiv = document.getElementById('loading');
+        const contentDiv = document.getElementById('dashboard-content');
+        const nameSpan = document.getElementById('student-name');
+        const classesList = document.getElementById('upcoming-classes-list');
+
+        try {
+            // Usamos nossa função para buscar os dados do dashboard de forma segura
+            const response = await fetchWithAuth('/api/aluno/dashboard-data');
+            
+            if (!response.ok) {
+                throw new Error('Falha ao buscar dados do dashboard.');
+            }
+
+            const data = await response.json();
+
+            // Agora, preenchemos a página com os dados recebidos
+            nameSpan.textContent = data.student_name;
+            
+            if (data.upcoming_classes && data.upcoming_classes.length > 0) {
+                data.upcoming_classes.forEach(cls => {
+                    const li = document.createElement('li');
+                    li.textContent = `${cls.day} - ${cls.name} (${cls.time}) com ${cls.teacher}`;
+                    classesList.appendChild(li);
+                });
+            } else {
+                classesList.innerHTML = '<li>Nenhuma aula encontrada nos próximos dias.</li>';
+            }
+
+            // Esconde o "Carregando" e mostra o conteúdo
+            loadingDiv.classList.add('hidden');
+            contentDiv.classList.remove('hidden');
+
+        } catch (error) {
+            console.error("Não foi possível carregar o dashboard:", error);
+            // O fetchWithAuth já redireciona se o token for inválido,
+            // mas podemos mostrar uma mensagem de erro aqui também.
+            loadingDiv.textContent = 'Erro ao carregar dados. Tente recarregar a página.';
+        }
+    });
+</script>
 {% endblock %}
