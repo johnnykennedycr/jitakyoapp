@@ -27,6 +27,7 @@ def login():
         user = user_service.get_user_by_email(email)
 
         if user and check_password_hash(user.password_hash, password):
+            session.clear()
             login_user(user, remember=remember)
             
             if user.role == 'admin':
