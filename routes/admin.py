@@ -39,14 +39,16 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
     payment_service = ps_param
 
 
-# ROTA QUE SERVE A PÁGINA "CASCA"
 @admin_bp.route('/dashboard')
-@token_required
-@role_required('admin', 'super_admin', 'receptionist')
+#@token_required  # <-- TEMPORARIAMENTE DESABILITADO
+#@role_required('admin', 'super_admin', 'receptionist') # <-- TEMPORARIAMENTE DESABILITADO
 def dashboard():
-    """Esta rota agora apenas serve o template HTML do dashboard."""
-    api_url = url_for('admin.dashboard_data')
-    return render_template('admin/dashboard.html', dashboard_api_url=api_url)
+    """ ROTA DE TESTE PARA VERIFICAR CABEÇALHOS """
+    print("\n--- DIAGNÓSTICO FINAL: CABEÇALHOS DA REQUISIÇÃO ---")
+    # Imprime todos os cabeçalhos que o Flask está recebendo
+    print(request.headers)
+    print("--- FIM DO DIAGNÓSTICO ---\n")
+    return "<h1>Página de Teste do Dashboard - Segurança Desabilitada</h1>"
 
 
 @admin_bp.route('/')
