@@ -48,7 +48,8 @@ def dashboard():
     # Imprime todos os cabeçalhos que o Flask está recebendo
     print(request.headers)
     print("--- FIM DO DIAGNÓSTICO ---\n")
-    return "<h1>Página de Teste do Dashboard - Segurança Desabilitada</h1>"
+    api_url = url_for('admin.dashboard_data')
+    return render_template('admin/dashboard.html', dashboard_api_url=api_url)
 
 
 @admin_bp.route('/')
