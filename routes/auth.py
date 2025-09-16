@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request, jsonify, make_response, r
 from firebase_admin import auth
 from datetime import datetime, timedelta
 
-# Importamos o user_service global que será inicializado no main.py
-from services.user_service import user_service
+from services import user_service
+
 
 auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
 
