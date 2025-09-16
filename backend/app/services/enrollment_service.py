@@ -1,5 +1,5 @@
 from firebase_admin import firestore
-from models.enrollment import Enrollment
+from app.models.enrollment import Enrollment
 from datetime import datetime
 
 class EnrollmentService:

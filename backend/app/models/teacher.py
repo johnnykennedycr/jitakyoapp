@@ -1,6 +1,6 @@
 # Em models/teacher.py
 from datetime import datetime
-from models.discipline_graduation import DisciplineGraduation
+from app.models.discipline_graduation import DisciplineGraduation
 
 class Teacher:
     def __init__(self, id=None, name=None, contact_info=None, disciplines=None, description=None, user_id=None):

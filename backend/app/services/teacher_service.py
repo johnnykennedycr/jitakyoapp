@@ -1,6 +1,6 @@
 from firebase_admin import firestore
-from models.teacher import Teacher
-from models.discipline_graduation import DisciplineGraduation
+from app.models.teacher import Teacher
+from app.models.discipline_graduation import DisciplineGraduation
 from datetime import datetime
 
 class TeacherService:

@@ -2,7 +2,7 @@ import json
 from firebase_admin import firestore
 from flask import current_app
 from pywebpush import webpush, WebPushException
-from models.notification import Notification
+from app.models.notification import Notification
 from datetime import datetime
 
 class NotificationService:

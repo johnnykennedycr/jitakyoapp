@@ -1,6 +1,6 @@
 from firebase_admin import firestore
-from models.discipline import Discipline # Supondo que você tenha um modelo de Disciplina
-from models.user import User
+from app.models.discipline_graduation import DisciplineGraduation # Supondo que você tenha um modelo de Disciplina
+from app.models.user import User
 
 class DisciplineService:
     """

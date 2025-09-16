@@ -1,5 +1,5 @@
 from firebase_admin import firestore
-from models.training_class import TrainingClass, DayTimeSlot
+from app.models.training_class import TrainingClass, DayTimeSlot
 from datetime import datetime
 
 class TrainingClassService:

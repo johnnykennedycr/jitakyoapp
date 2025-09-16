@@ -1,6 +1,6 @@
 # services/payment_service.py
 from firebase_admin import firestore
-from models.payment import Payment 
+from app.models.payment import Payment 
 from datetime import datetime
 from google.cloud.firestore_v1.base_query import FieldFilter, And
 
