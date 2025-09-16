@@ -34,7 +34,7 @@ def login_required(f):
 def role_required(*roles):
     """
     Verifica se o usuário logado tem uma das funções (roles) necessárias.
-    Este decorador DEVE ser usado DEPOIS de @token_required.
+    Este decorador DEVE ser usado DEPOIS de @login_required.
     """
     def decorator(f):
         @wraps(f)
