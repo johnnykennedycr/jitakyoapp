@@ -20,7 +20,7 @@ from services.notification_service import NotificationService
 from routes.admin import admin_bp, init_admin_bp
 from routes.student import student_bp, init_student_bp
 from routes.teacher import teacher_bp, init_teacher_bp
-from routes.auth import auth_bp
+from routes.auth import auth_bp, init_auth_bp
 from utils.decorators import init_decorators
 
 def create_app():
@@ -106,7 +106,8 @@ def create_app():
         init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
         init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
         init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service, notification_service)
-
+        init_auth_bp(user_service)
+    
         app.register_blueprint(admin_bp)
         app.register_blueprint(student_bp)
         app.register_blueprint(auth_bp)
