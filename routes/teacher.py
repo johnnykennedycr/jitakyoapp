@@ -1,5 +1,5 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for, g
-from utils.decorators import token_required, role_required
+from utils.decorators import login_required, role_required
 from datetime import datetime
 
 # Variáveis globais para os serviços
@@ -26,7 +26,7 @@ def init_teacher_bp(us, ts, tcs, es, ns):
     notification_service = ns
 
 @teacher_bp.route('/dashboard')
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def dashboard():
     """Exibe o dashboard do professor com suas próximas aulas."""
@@ -67,7 +67,7 @@ def dashboard():
     return render_template('dashboard_teacher.html', upcoming_classes=upcoming_classes)
 
 @teacher_bp.route('/turmas')
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def list_classes():
     """Exibe a lista de turmas do professor logado."""
@@ -82,7 +82,7 @@ def list_classes():
 
 
 @teacher_bp.route('/notificar', methods=['GET', 'POST'])
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def notify_class():
     current_user = g.user

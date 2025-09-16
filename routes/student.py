@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, render_template, request, g
-from utils.decorators import token_required, role_required
+from utils.decorators import login_required, role_required
 from datetime import datetime
 
 # Estes serviços serão inicializados pelo main.py
@@ -26,7 +26,7 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard')
-@token_required
+@login_required
 @role_required('student')
 def dashboard():
     # 'g.user' agora contém o objeto de usuário completo, validado pelos decoradores
@@ -71,7 +71,7 @@ def dashboard():
     )
 
 @student_bp.route('/financeiro')
-@token_required
+@login_required
 @role_required('student')
 def financials():
     current_user = g.user
@@ -87,7 +87,7 @@ def financials():
 
 
 @student_bp.route('/notificacoes')
-@token_required
+@login_required
 @role_required('student')
 def notifications():
     current_user = g.user
@@ -96,7 +96,7 @@ def notifications():
 
 
 @student_bp.route('/save-push-subscription', methods=['POST'])
-@token_required
+@login_required
 @role_required('student')
 def save_push_subscription():
     """Salva a inscrição de notificação push do usuário no banco de dados."""
