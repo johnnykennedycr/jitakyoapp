@@ -92,15 +92,15 @@ def financials_data():
     return jsonify(detailed_payments), 200
 
 
-@student_bp.route('/notifications-data')
-@login_required
-@role_required('student')
-def notifications_data():
-    """Fornece as notificações para o aluno."""
-    # current_user = g.user
-    # Sua lógica para buscar notificações aqui...
-    user_notifications = [] # Placeholder
-    return jsonify(user_notifications), 200
+# @student_bp.route('/notifications-data')
+# @login_required
+# @role_required('student')
+# def notifications_data():
+#     """Fornece as notificações para o aluno."""
+#     # current_user = g.user
+#     # Sua lógica para buscar notificações aqui...
+#     user_notifications = [] # Placeholder
+#     return jsonify(user_notifications), 200
 
 
 @student_bp.route('/save-push-subscription', methods=['POST'])

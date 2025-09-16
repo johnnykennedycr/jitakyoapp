@@ -9,7 +9,7 @@ user_service = None
 teacher_service = None
 training_class_service = None
 enrollment_service = None
-notification_service = None
+# notification_service = None
 
 teacher_bp = Blueprint(
     'teacher_api', 
@@ -19,12 +19,12 @@ teacher_bp = Blueprint(
 
 def init_teacher_bp(us, ts, tcs, es, ns):
     """Inicializa o blueprint com os serviços necessários."""
-    global user_service, teacher_service, training_class_service, enrollment_service, notification_service
+    global user_service, teacher_service, training_class_service, enrollment_service
     user_service = us
     teacher_service = ts
     training_class_service = tcs
     enrollment_service = es 
-    notification_service = ns
+
 
 @teacher_bp.route('/dashboard-data')
 @login_required
@@ -83,37 +83,37 @@ def classes_data():
     return jsonify(teacher_classes_data), 200
 
 
-@teacher_bp.route('/notify-class', methods=['POST'])
-@login_required
-@role_required('teacher', 'admin', 'super_admin')
-def notify_class():
-    """Recebe e processa um pedido de notificação para uma turma."""
-    current_user = g.user
-    teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
+# @teacher_bp.route('/notify-class', methods=['POST'])
+# @login_required
+# @role_required('teacher', 'admin', 'super_admin')
+# def notify_class():
+#     """Recebe e processa um pedido de notificação para uma turma."""
+#     current_user = g.user
+#     teacher_profile = teacher_service.get_teacher_by_user_id(current_user.id)
     
-    if not teacher_profile:
-        return jsonify({"success": False, "message": "Perfil de professor não encontrado."}), 404
+#     if not teacher_profile:
+#         return jsonify({"success": False, "message": "Perfil de professor não encontrado."}), 404
 
-    data = request.get_json()
-    class_id = data.get('class_id')
-    title = data.get('title')
-    message = data.get('message')
+#     data = request.get_json()
+#     class_id = data.get('class_id')
+#     title = data.get('title')
+#     message = data.get('message')
 
-    if not all([class_id, title, message]):
-        return jsonify({"success": False, "message": "Todos os campos são obrigatórios."}), 400
+#     if not all([class_id, title, message]):
+#         return jsonify({"success": False, "message": "Todos os campos são obrigatórios."}), 400
 
-    enrollments = enrollment_service.get_enrollments_by_class(class_id)
-    student_ids = [e.student_id for e in enrollments]
+#     enrollments = enrollment_service.get_enrollments_by_class(class_id)
+#     student_ids = [e.student_id for e in enrollments]
 
-    success = notification_service.create_batch_notifications(
-        teacher_id=teacher_profile.id, 
-        student_ids=student_ids, 
-        class_id=class_id, 
-        title=title, 
-        message=message
-    )
+#     success = notification_service.create_batch_notifications(
+#         teacher_id=teacher_profile.id, 
+#         student_ids=student_ids, 
+#         class_id=class_id, 
+#         title=title, 
+#         message=message
+#     )
     
-    if success:
-        return jsonify({"success": True, "message": f'Notificação enviada para {len(student_ids)} aluno(s)!'}), 200
-    else:
-        return jsonify({"success": False, "message": 'Ocorreu um erro ao enviar a notificação.'}), 500
+#     if success:
+#         return jsonify({"success": True, "message": f'Notificação enviada para {len(student_ids)} aluno(s)!'}), 200
+#     else:
+#         return jsonify({"success": False, "message": 'Ocorreu um erro ao enviar a notificação.'}), 500
