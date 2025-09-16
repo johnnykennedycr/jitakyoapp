@@ -17,7 +17,7 @@ teacher_bp = Blueprint(
     url_prefix='/api/teacher'
 )
 
-def init_teacher_bp(us, ts, tcs, es, ns):
+def init_teacher_bp(us, ts, tcs, es):
     """Inicializa o blueprint com os serviços necessários."""
     global user_service, teacher_service, training_class_service, enrollment_service
     user_service = us
