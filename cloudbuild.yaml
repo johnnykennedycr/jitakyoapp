@@ -1,26 +1,30 @@
 options:
   logging: CLOUD_LOGGING_ONLY
+
 steps:
 # Passo 1: Constrói a imagem Docker do backend
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'backend'
   args: [
     'build', 
-    '-t', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA', 
+    '-t', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp/jitakyoapp:$SHORT_SHA', 
     '.'
   ]
+
 # Passo 2: Envia a imagem para o Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA']
+  args: ['push', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp/jitakyoapp:$SHORT_SHA']
+
 # Passo 3: Faz o deploy da imagem no Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'gcloud'
   args: [
     'run', 'deploy', 'jitakyoapp',
-    '--image', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA',
+    '--image', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp/jitakyoapp:$SHORT_SHA',
     '--region', 'southamerica-east1',
     '--platform', 'managed',
     '--allow-unauthenticated'
   ]
+
 images:
-- 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA'
+- 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp/jitakyoapp:$SHORT_SHA'
