@@ -15,7 +15,6 @@ Flask-Mail==0.10.0
 firebase-admin==6.5.0
 
 # --- Ferramentas Auxiliares ---
-# Para carregar variáveis de ambiente de um arquivo .env durante o desenvolvimento local
 python-dotenv==1.0.1
-# Biblioteca padrão para fazer requisições HTTP, caso precise em algum serviço
 requests==2.32.3
+pywebpush==2.0.3
