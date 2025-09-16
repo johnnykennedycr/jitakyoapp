@@ -77,5 +77,7 @@ def create_app():
 
     return app
 
+
+
 # Cria a instância da aplicação que o Gunicorn irá usar
 app = create_app()
