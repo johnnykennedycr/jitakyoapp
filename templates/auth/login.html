@@ -87,7 +87,7 @@
                 if (data.status === "success") {
                     // SUCESSO! O cookie foi criado. Agora simplesmente recarregamos
                     // a página. O backend nos redirecionará para o dashboard correto.
-                    window.location.assign('/'); 
+                    window.location.assign(data.redirect_url); 
                 } else {
                     throw new Error(data.error || 'Erro desconhecido.');
                 }
