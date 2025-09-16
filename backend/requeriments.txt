@@ -1,0 +1,21 @@
+# --- Core da Aplicação e Servidor ---
+# Versões estáveis e compatíveis de Setembro de 2025
+Flask==3.0.3
+Werkzeug==3.0.2
+gunicorn==22.0.0
+
+# --- Extensões do Flask ---
+# Para lidar com as permissões de CORS entre o frontend e o backend
+Flask-Cors==4.0.1
+# Para a funcionalidade de envio de e-mails
+Flask-Mail==0.10.0
+
+# --- Google / Firebase ---
+# O SDK de Administrador para Python, para verificar tokens e interagir com o Firestore
+firebase-admin==6.5.0
+
+# --- Ferramentas Auxiliares ---
+# Para carregar variáveis de ambiente de um arquivo .env durante o desenvolvimento local
+python-dotenv==1.0.1
+# Biblioteca padrão para fazer requisições HTTP, caso precise em algum serviço
+requests==2.32.3
