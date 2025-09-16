@@ -40,62 +40,62 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
 
 
 @admin_bp.route('/dashboard')
-#@token_required  # <-- TEMPORARIAMENTE DESABILITADO
-#@role_required('admin', 'super_admin', 'receptionist') # <-- TEMPORARIAMENTE DESABILITADO
+@token_required  
+@role_required('admin', 'super_admin', 'receptionist') 
 def dashboard():
     """ ROTA DE TESTE PARA VERIFICAR CABEÇALHOS """
     print("\n--- DIAGNÓSTICO FINAL: CABEÇALHOS DA REQUISIÇÃO ---")
     # Imprime todos os cabeçalhos que o Flask está recebendo
     print(request.headers)
     print("--- FIM DO DIAGNÓSTICO ---\n")
-    # api_url = url_for('admin.dashboard_data')
-    return render_template('admin/dashboard.html')
+    api_url = url_for('admin.dashboard_data')
+    return render_template('admin/dashboard.html', dashboard_api_url=api_url)
 
 
-# @admin_bp.route('/')
-# @admin_bp.route('/dashboard')
-# # @token_required
-# # @role_required('admin', 'super_admin', 'receptionist')
-# def dashboard_data():
-#     """Exibe o dashboard principal com o calendário de treinos da semana."""
-#     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-#     time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
+@admin_bp.route('/')
+@admin_bp.route('/dashboard')
+@token_required
+@role_required('admin', 'super_admin', 'receptionist')
+def dashboard_data():
+    """Exibe o dashboard principal com o calendário de treinos da semana."""
+    days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+    time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
 
-#     all_classes = training_class_service.get_all_classes()
-#     teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
-#     scheduled_events = []
+    all_classes = training_class_service.get_all_classes()
+    teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
+    scheduled_events = []
     
-#     for training_class in all_classes:
-#         if not training_class.schedule:
-#             continue
-#         for slot in training_class.schedule:
-#             try:
-#                 if slot.day_of_week in days_order:
-#                     start_h, start_m = map(int, slot.start_time.split(':'))
-#                     end_h, end_m = map(int, slot.end_time.split(':'))
-#                     grid_col = days_order.index(slot.day_of_week) + 2
-#                     grid_row_start = ((start_h - 5) * 2) + (start_m // 30) + 2
-#                     duration_slots = ((end_h * 60 + end_m) - (start_h * 60 + start_m)) // 30
+    for training_class in all_classes:
+        if not training_class.schedule:
+            continue
+        for slot in training_class.schedule:
+            try:
+                if slot.day_of_week in days_order:
+                    start_h, start_m = map(int, slot.start_time.split(':'))
+                    end_h, end_m = map(int, slot.end_time.split(':'))
+                    grid_col = days_order.index(slot.day_of_week) + 2
+                    grid_row_start = ((start_h - 5) * 2) + (start_m // 30) + 2
+                    duration_slots = ((end_h * 60 + end_m) - (start_h * 60 + start_m)) // 30
                     
-#                     if duration_slots > 0:
-#                         scheduled_events.append({
-#                             'id': training_class.id,
-#                             'name': training_class.name,
-#                             'time': f"{slot.start_time} - {slot.end_time}",
-#                             'teacher': teachers_map.get(training_class.teacher_id, 'N/A'),
-#                             'style': (
-#                                 f"grid-column: {grid_col}; "
-#                                 f"grid-row: {grid_row_start} / span {duration_slots};"
-#                             )
-#                         })
-#             except Exception as e:
-#                 print(f"Erro ao processar horário para a turma {training_class.name}: {e}")
-#     data = {
-#         'days_order': days_order,
-#         'time_slots': time_slots,
-#         'scheduled_events': scheduled_events
-#     }
-#     return jsonify(data)
+                    if duration_slots > 0:
+                        scheduled_events.append({
+                            'id': training_class.id,
+                            'name': training_class.name,
+                            'time': f"{slot.start_time} - {slot.end_time}",
+                            'teacher': teachers_map.get(training_class.teacher_id, 'N/A'),
+                            'style': (
+                                f"grid-column: {grid_col}; "
+                                f"grid-row: {grid_row_start} / span {duration_slots};"
+                            )
+                        })
+            except Exception as e:
+                print(f"Erro ao processar horário para a turma {training_class.name}: {e}")
+    data = {
+        'days_order': days_order,
+        'time_slots': time_slots,
+        'scheduled_events': scheduled_events
+    }
+    return jsonify(data)
 
 # --- Rotas de Gerenciamento de Professores ---
 @admin_bp.route('/teachers')
