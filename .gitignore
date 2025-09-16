@@ -1,15 +1,19 @@
-# Arquivos de credenciais e configuração local
-firebase_credentials.json
-config.ini
-.env
-.cod
-test_enrollments.py
-create_admin_user.py
+# Dependências do Node.js
+frontend/node_modules/
+frontend/dist/
 
-# Pasta de ambiente virtual do Python
-venv/
-__pycache__/
+# Ambientes virtuais do Python
+backend/.venv/
+backend/venv/
+backend/env/
 
-# Arquivos do sistema operacional
+# Cache do Python
+backend/__pycache__/
+*.pyc
+
+# Arquivos de configuração de IDEs
+.vscode/
+.idea/
+
+# Outros
 .DS_Store
-Thumbs.db

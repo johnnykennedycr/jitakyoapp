@@ -1,0 +1,18 @@
+# Ignora a própria pasta do Git
+.git/
+
+# Ignora explicitamente as pastas de dependências
+frontend/node_modules/
+backend/.venv/
+backend/venv/
+backend/env/
+
+# Ignora o cache do Python
+backend/__pycache__/
+
+# Ignora arquivos de configuração de IDEs
+.vscode/
+.idea/
+
+# Arquivo de build que é usado apenas pelo Cloud Build
+cloudbuild.yaml
