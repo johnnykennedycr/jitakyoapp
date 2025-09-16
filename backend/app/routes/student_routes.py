@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, g
-from app.utils.decorators import token_required, role_required
+from app.utils.decorators import login_required, role_required
 from datetime import datetime
 
 # Estes serviços serão inicializados pelo main.py
@@ -22,7 +22,7 @@ def init_student_bp(us, es, tcs, ts, ps):
     payment_service = ps
 
 @student_bp.route('/dashboard-data')
-@token_required
+@login_required
 @role_required('student')
 def dashboard_data():
     """Fornece os dados necessários para o dashboard do aluno."""
@@ -71,7 +71,7 @@ def dashboard_data():
 
 
 @student_bp.route('/financials-data')
-@token_required
+@login_required
 @role_required('student')
 def financials_data():
     """Fornece os dados financeiros para o aluno."""
@@ -93,7 +93,7 @@ def financials_data():
 
 
 @student_bp.route('/notifications-data')
-@token_required
+@login_required
 @role_required('student')
 def notifications_data():
     """Fornece as notificações para o aluno."""
@@ -104,7 +104,7 @@ def notifications_data():
 
 
 @student_bp.route('/save-push-subscription', methods=['POST'])
-@token_required
+@login_required
 @role_required('student')
 def save_push_subscription():
     """Salva a inscrição de notificação push do usuário no banco de dados."""

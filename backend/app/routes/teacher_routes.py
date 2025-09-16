@@ -1,7 +1,7 @@
 # backend/app/routes/teacher_routes.py
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for, g, jsonify
-from app.utils.decorators import token_required, role_required
+from app.utils.decorators import login_required, role_required
 from datetime import datetime
 
 # Variáveis globais para os serviços
@@ -27,7 +27,7 @@ def init_teacher_bp(us, ts, tcs, es, ns):
     notification_service = ns
 
 @teacher_bp.route('/dashboard-data')
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def dashboard_data():
     """Fornece os dados para o dashboard do professor."""
@@ -67,7 +67,7 @@ def dashboard_data():
     return jsonify(response_data), 200
 
 @teacher_bp.route('/classes-data')
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def classes_data():
     """Fornece a lista de turmas do professor logado."""
@@ -84,7 +84,7 @@ def classes_data():
 
 
 @teacher_bp.route('/notify-class', methods=['POST'])
-@token_required
+@login_required
 @role_required('teacher', 'admin', 'super_admin')
 def notify_class():
     """Recebe e processa um pedido de notificação para uma turma."""
