@@ -1,19 +1,19 @@
 options:
   logging: CLOUD_LOGGING_ONLY
 steps:
+# Passo 1: Constrói a imagem Docker do backend
+# A linha 'dir' diz ao Cloud Build para primeiro entrar na pasta 'backend'
 - name: 'gcr.io/cloud-builders/docker'
-  dir: 'backend' 
+  dir: 'backend'
   args: [
     'build', 
     '-t', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA', 
     '.'
   ]
-
-# Passo 2: Envia a imagem para o Artifact Registry do Google
+# Passo 2: Envia a imagem para o Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA']
-
-# Passo 3: Faz o deploy da nova imagem no Cloud Run
+# Passo 3: Faz o deploy da imagem no Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'gcloud'
   args: [
@@ -23,7 +23,5 @@ steps:
     '--platform', 'managed',
     '--allow-unauthenticated'
   ]
-
-# Informa ao Cloud Build qual imagem foi criada para referência
 images:
 - 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp-image:$SHORT_SHA'
