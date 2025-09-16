@@ -2,7 +2,6 @@ options:
   logging: CLOUD_LOGGING_ONLY
 steps:
 # Passo 1: Constrói a imagem Docker do backend
-# A linha 'dir' diz ao Cloud Build para primeiro entrar na pasta 'backend'
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'backend'
   args: [
