@@ -55,8 +55,8 @@
         measurementId: "G-8D4CHETJQY"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAnalytics(app);
 
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
