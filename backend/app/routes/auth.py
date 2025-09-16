@@ -1,4 +1,3 @@
-# routes/auth.py (VERSÃO FINAL CORRIGIDA)
 
 from flask import Blueprint, render_template, request, jsonify, make_response, redirect, url_for, flash
 from firebase_admin import auth

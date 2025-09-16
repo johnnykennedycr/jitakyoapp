@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from firebase_admin import firestore, auth
-from models.user import User
+from app.models.user import User
 
 class UserService:
     def __init__(self, db, mail=None):
