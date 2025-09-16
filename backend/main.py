@@ -1,4 +1,5 @@
 import os
+from backend.app.services import teacher_service
 from dotenv import load_dotenv
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -15,8 +16,16 @@ from app.routes.teacher_routes import teacher_bp, init_teacher_bp
 
 # Importa os serviços
 from app.services.user_service import UserService
-# ... importe seus outros serviços aqui ...
-
+from app.services.teacher_service import TeacherService
+from app.services.training_class_service import TrainingClassService
+from app.services.enrollment_service import EnrollmentService
+from app.services.attendance_service import AttendanceService
+from app.services.payment_service import PaymentService
+from app.services.notification_service import NotificationService
+from app.routes.admin_routes import admin_bp, init_admin_bp
+from app.routes.student_routes import student_bp, init_student_bp
+from app.routes.teacher_routes import teacher_bp, init_teacher_bp
+from app.utils.decorators import init_decorators
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
     
@@ -36,7 +45,10 @@ def create_app():
         # Suas configurações de e-mail e outras
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
-        # ... etc ...
+        MAIL_USE_TLS=os.getenv('MAIL_USE_TLS', 'true').lower() in ('true', '1', 't'),
+        MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+        MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
+        MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
     )
 
     # --- Inicialização de Serviços Externos ---
@@ -61,15 +73,19 @@ def create_app():
     # --- Injeção de Dependências ---
     # Inicializa os serviços
     user_service = UserService(db, mail)
-    # teacher_service = TeacherService(db)
-    # ... inicialize seus outros serviços
+    teacher_service = TeacherService(db)
+    training_class_service = TrainingClassService(db)
+    enrollment_service = EnrollmentService(db)
+    attendance_service = AttendanceService(db)
+    notification_service = NotificationService(db, user_service)
+    payment_service = PaymentService(db, enrollment_service)
     
     # --- Registro dos Blueprints (Rotas) ---
     with app.app_context():
         # Injeta os serviços necessários em cada blueprint
-        # init_admin_bp(db, user_service, teacher_service, ...)
-        # init_student_bp(user_service, ...)
-        # init_teacher_bp(user_service, teacher_service, ...)
+        init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+        init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
+        init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service, notification_service)
 
         app.register_blueprint(admin_bp)
         app.register_blueprint(student_bp)
