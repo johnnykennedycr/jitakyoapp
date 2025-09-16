@@ -41,22 +41,29 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script>
-    // --- INICIALIZAÇÃO DO FIREBASE ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
-        authDomain: "jitakyoapp.firebaseapp.com",
-        projectId: "jitakyoapp",
-        storageBucket: "jitakyoapp.firebasestorage.app",
-        messagingSenderId: "217073545024",
-        appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5",
-        measurementId: "G-8D4CHETJQY"
-    };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAnalytics(app);
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
+    authDomain: "jitakyoapp.firebaseapp.com",
+    projectId: "jitakyoapp",
+    storageBucket: "jitakyoapp.firebasestorage.app",
+    messagingSenderId: "217073545024",
+    appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5",
+    measurementId: "G-8D4CHETJQY"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
 
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
