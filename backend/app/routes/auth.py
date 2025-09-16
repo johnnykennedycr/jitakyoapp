@@ -7,6 +7,14 @@ from datetime import datetime, timedelta
 user_service = None
 auth_bp = Blueprint('auth', __name__, template_folder='../../templates')
 
+
+@auth_bp.route('/')
+def index():
+    """Redireciona a rota raiz para a página de login."""
+    # DE: return redirect(url_for('auth.login'))
+    # PARA:
+    return redirect(url_for('auth_api.login'))
+
 def init_auth_bp(service):
     """Esta função 'injeta' a instância do UserService criada no main.py."""
     global user_service
