@@ -43,27 +43,24 @@
 
 
 <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-  import { getAuth } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+    // Importa as funções que você precisa do SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    // ATENÇÃO ÀS MUDANÇAS AQUI:
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
-    authDomain: "jitakyoapp.firebaseapp.com",
-    projectId: "jitakyoapp",
-    storageBucket: "jitakyoapp.firebasestorage.app",
-    messagingSenderId: "217073545024",
-    appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5",
-    measurementId: "G-8D4CHETJQY"
-  };
+    // Sua configuração do Firebase (verifique se a apiKey está 100% correta)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
+      authDomain: "jitakyoapp.firebaseapp.com",
+      projectId: "jitakyoapp",
+      storageBucket: "jitakyoapp.appspot.com",
+      messagingSenderId: "217073545024",
+      appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5"
+    };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+    // Inicializa o Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
@@ -77,7 +74,9 @@
         submitButton.disabled = true;
         flashContainer.innerHTML = '';
 
-        auth.signInWithEmailAndPassword(email, password)
+        // ATENÇÃO À MUDANÇA AQUI:
+        // A chamada agora é a função importada, passando 'auth' como primeiro argumento
+        signInWithEmailAndPassword(auth, email, password)
             .then(userCredential => userCredential.user.getIdToken())
             .then(idToken => {
                 return fetch('/sessionLogin', {
@@ -92,9 +91,7 @@
             })
             .then(data => {
                 if (data.status === "success") {
-                    // SUCESSO! O cookie foi criado. Agora simplesmente recarregamos
-                    // a página. O backend nos redirecionará para o dashboard correto.
-                    window.location.assign(data.redirect_url); 
+                    window.location.assign(data.redirect_url);
                 } else {
                     throw new Error(data.error || 'Erro desconhecido.');
                 }
