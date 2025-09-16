@@ -48,8 +48,8 @@ def dashboard():
     # Imprime todos os cabeçalhos que o Flask está recebendo
     print(request.headers)
     print("--- FIM DO DIAGNÓSTICO ---\n")
-    api_url = url_for('admin.dashboard_data')
-    return render_template('admin/dashboard.html', dashboard_api_url=api_url)
+    # api_url = url_for('admin.dashboard_data')
+    return render_template('admin/dashboard.html')
 
 
 # @admin_bp.route('/')
