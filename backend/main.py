@@ -1,5 +1,4 @@
 import os
-from backend.app.services import teacher_service
 from dotenv import load_dotenv
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
