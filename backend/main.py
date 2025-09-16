@@ -20,7 +20,6 @@ from app.services.training_class_service import TrainingClassService
 from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
-from app.services.notification_service import NotificationService
 from app.routes.admin_routes import admin_bp, init_admin_bp
 from app.routes.student_routes import student_bp, init_student_bp
 from app.routes.teacher_routes import teacher_bp, init_teacher_bp
@@ -76,7 +75,6 @@ def create_app():
     training_class_service = TrainingClassService(db)
     enrollment_service = EnrollmentService(db)
     attendance_service = AttendanceService(db)
-    notification_service = NotificationService(db, user_service)
     payment_service = PaymentService(db, enrollment_service)
     
     # --- Registro dos Blueprints (Rotas) ---
