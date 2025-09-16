@@ -54,8 +54,8 @@ def dashboard():
 
 @admin_bp.route('/')
 @admin_bp.route('/dashboard')
-@token_required
-@role_required('admin', 'super_admin', 'receptionist')
+# @token_required
+# @role_required('admin', 'super_admin', 'receptionist')
 def dashboard_data():
     """Exibe o dashboard principal com o calendário de treinos da semana."""
     days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
