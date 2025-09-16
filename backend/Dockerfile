@@ -15,8 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app /app/app
 # Copiamos o ponto de entrada principal
 COPY main.py .
-# Se você tiver um credentials.json para desenvolvimento local, copie-o também
-COPY credentials.json .
+
 # Expõe a porta que o Gunicorn vai usar. O Cloud Run vai mapear para esta porta.
 EXPOSE 8080
 # Comando para iniciar a aplicação usando Gunicorn (servidor de produção).
