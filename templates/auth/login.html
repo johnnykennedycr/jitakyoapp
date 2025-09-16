@@ -1,46 +1,39 @@
 {% extends 'base.html' %}
-
 {% block title %}Acesso ao Painel{% endblock %}
-
-{% block head_extras %}
-    <script src="https://cdn.tailwindcss.com"></script>
-{% endblock %}
+{% block head_extras %}<script src="https://cdn.tailwindcss.com"></script>{% endblock %}
 
 {% block body_content %}
-
 <div class="flex items-center justify-center min-h-screen bg-gray-900">
     <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
-        
         <div class="flex justify-center">
             <img src="{{ url_for('static', filename='logo-horizontal.png') }}" alt="Logo JitaKyoApp" class="h-20">
         </div>
-        
         <div class="text-center">
             <h2 class="text-3xl font-extrabold text-gray-900">Acesso ao Painel</h2>
             <p class="mt-2 text-sm text-gray-600">Entre com suas credenciais.</p>
         </div>
-
-        <div id="flash-messages"></div>
-
+        <div id="flash-messages">
+             {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="p-4 mb-4 text-sm text-blue-700 bg-blue-100 rounded-lg" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
         <form id="login-form" class="mt-8 space-y-6">
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
                     <label for="email" class="sr-only">E-mail</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required 
-                           class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
-                           placeholder="Endereço de e-mail">
+                    <input id="email" name="email" type="email" autocomplete="email" required class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="Endereço de e-mail">
                 </div>
                 <div>
                     <label for="password" class="sr-only">Senha</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required 
-                           class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
-                           placeholder="Senha">
+                    <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="Senha">
                 </div>
             </div>
-
             <div>
-                <button type="submit" 
-                        class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
+                <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
                     Entrar
                 </button>
             </div>
@@ -50,7 +43,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
 <script>
     // --- INICIALIZAÇÃO DO FIREBASE ---
     const firebaseConfig = {
@@ -68,54 +60,43 @@
 
     document.getElementById('login-form').addEventListener('submit', function(event) {
         event.preventDefault();
-        
         const form = event.target;
         const email = form.querySelector('#email').value;
         const password = form.querySelector('#password').value;
         const flashContainer = document.getElementById('flash-messages');
         const submitButton = form.querySelector('button[type="submit"]');
 
-        submitButton.textContent = 'Autenticando...';
+        submitButton.textContent = 'Entrando...';
         submitButton.disabled = true;
         flashContainer.innerHTML = '';
 
-        // 1. Autentica com o Firebase
         auth.signInWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                console.log("Firebase Auth OK. Obtendo ID Token...");
-                return userCredential.user.getIdToken();
-            })
+            .then(userCredential => userCredential.user.getIdToken())
             .then(idToken => {
-                console.log("ID Token recebido. Criando sessão no backend...");
-                submitButton.textContent = 'Criando sessão...';
-
-                // 2. Envia o token em JSON para o backend
-                return fetch('/api/create-session', {
+                return fetch('/sessionLogin', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idToken: idToken })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({idToken: idToken}),
                 });
             })
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('Falha ao criar sessão no backend.');
-                }
+                if (!response.ok) throw new Error('Falha ao criar sessão no servidor.');
                 return response.json();
             })
             .then(data => {
-                if (data.success) {
-                    console.log("Sessão criada. Redirecionando para:", data.redirect_url);
-                    window.location.href = data.redirect_url;
+                if (data.status === "success") {
+                    // SUCESSO! O cookie foi criado. Agora simplesmente recarregamos
+                    // a página. O backend nos redirecionará para o dashboard correto.
+                    window.location.assign('/'); 
                 } else {
-                    throw new Error(data.message || 'Ocorreu um erro desconhecido.');
+                    throw new Error(data.error || 'Erro desconhecido.');
                 }
             })
-            .catch((error) => {
-                console.error("Erro no fluxo de login:", error.message);
+            .catch(error => {
+                console.error("Erro no fluxo de login:", error);
                 flashContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">Email ou senha inválidos.</div>`;
                 submitButton.textContent = 'Entrar';
                 submitButton.disabled = false;
-                auth.signOut(); 
             });
     });
 </script>

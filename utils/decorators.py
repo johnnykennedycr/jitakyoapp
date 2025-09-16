@@ -12,37 +12,21 @@ def init_decorators(service):
     global user_service
     user_service = service
 
-def token_required(f):
-    """
-    Decorador principal. Verifica o cookie de sessão do Firebase.
-    Se válido, anexa as informações do usuário ao contexto 'g'.
-    (Anteriormente chamado session_login_required)
-    """
+def login_required(f):
+    """Verifica se um cookie de sessão válido do Firebase está presente."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 1. Tenta obter o cookie de sessão da requisição
         session_cookie = request.cookies.get('jitakyo_session')
         if not session_cookie:
-            # Se não houver cookie, o usuário não está logado. Redireciona para o login.
             flash('Por favor, faça o login para acessar esta página.', 'warning')
-            return redirect(url_for('auth.login'))
-
+            return redirect(url_for('auth.login', next=request.url))
         try:
-            # 2. Usa o Firebase Admin SDK para verificar se o cookie é válido e não foi revogado
-            decoded_token = auth.verify_session_cookie(session_cookie, check_revoked=True)
-            
-            # 3. Anexa o usuário decodificado ao contexto da requisição (g)
-            g.firebase_user = decoded_token
-            
+            # Verifica o cookie. Se for válido, o usuário está autenticado.
+            decoded_claims = auth.verify_session_cookie(session_cookie, check_revoked=True)
+            g.user = decoded_claims # Armazena os dados do usuário para a requisição
         except auth.InvalidSessionCookieError:
-            # O cookie é inválido ou expirou. Redireciona para o login.
-            flash('Sua sessão é inválida ou expirou. Por favor, faça o login novamente.', 'danger')
+            flash('Sessão inválida. Por favor, faça o login novamente.', 'danger')
             return redirect(url_for('auth.login'))
-        except Exception as e:
-            print(f"Erro inesperado na verificação do cookie de sessão: {e}")
-            flash('Ocorreu um erro na autenticação. Tente novamente.', 'danger')
-            return redirect(url_for('auth.login'))
-
         return f(*args, **kwargs)
     return decorated_function
 
