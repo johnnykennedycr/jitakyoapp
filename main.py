@@ -51,7 +51,9 @@ def create_app():
     try:
         if not firebase_admin._apps:
             cred = credentials.ApplicationDefault()
-            firebase_admin.initialize_app(cred)
+            firebase_admin.initialize_app(cred, {
+                'projectId': 'jitakyoapp',
+            })
             print("Firebase Admin SDK inicializado com as credenciais do ambiente.")
     except Exception as e:
         print(f"Falha ao inicializar com credenciais do ambiente, tentando arquivo local: {e}")
