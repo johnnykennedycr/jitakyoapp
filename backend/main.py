@@ -82,7 +82,7 @@ def create_app():
         # Injeta os serviços necessários em cada blueprint
         init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
         init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
-        init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service, notification_service)
+        init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service)
 
         app.register_blueprint(admin_bp)
         app.register_blueprint(student_bp)
