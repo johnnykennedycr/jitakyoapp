@@ -1,7 +1,6 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
 steps:
-# Passo 1: Constrói a imagem do contêiner do backend (Flask)
-# O 'dir' diz ao Cloud Build para entrar na pasta 'backend' antes de rodar o comando.
-# Isso garante que o Dockerfile e o requirements.txt sejam encontrados.
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'backend' 
   args: [
