@@ -1,33 +1,46 @@
-// frontend/src/router.js
-
 import Navigo from 'navigo';
-
-// CORREÇÃO APLICADA: Usando o nome da função e o caminho de import corretos.
-import { renderAdminDashboard } from './components/AdminDashboard'; 
+import { renderAdminDashboard } from './components/AdminDashboard.js'; 
 
 const router = new Navigo('/', { strategy: 'ALL' });
 
+// --- Definição das Rotas ---
+
 router.on('/admin/dashboard', () => {
-    // Também é importante garantir que o #main-content exista no DOM antes de usá-lo.
-    // A lógica de renderização do layout principal deve garantir isso.
-    const mainContent = document.getElementById('main-content');
+    // Buscamos o elemento AQUI, dentro do handler
+    const mainContent = document.getElementById('main-content'); // BOM 👍
     if (mainContent) {
-        // Usando a função correta
         renderAdminDashboard(mainContent);
     } else {
         console.error('Elemento #main-content não encontrado no DOM.');
     }
 });
 
-// ... outras rotas ...
-
-router.notFound(() => {
+router.on('/admin/teachers', () => {
     const mainContent = document.getElementById('main-content');
-    if(mainContent) {
-        mainContent.innerHTML = '<h1>Erro 404: Página não encontrada</h1>';
+    if (mainContent) {
+        mainContent.innerHTML = '<h1>Página de Professores (a ser criada)</h1>';
     }
 });
 
+router.on('/admin/students/edit/:id', (match) => {
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        const studentId = match.data.id;
+        mainContent.innerHTML = `<h1>Editando Aluno com ID: ${studentId}</h1>`;
+    }
+});
+
+router.on('/admin', () => {
+    router.navigate('/admin/dashboard');
+});
+
+// Handler para rotas não encontradas
+router.notFound(() => {
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        mainContent.innerHTML = '<h1>Erro 404: Página não encontrada</h1>';
+    }
+});
 
 export function initializeRouter() {
     router.resolve();
