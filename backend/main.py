@@ -77,6 +77,8 @@ def create_app():
     enrollment_service = EnrollmentService(db)
     attendance_service = AttendanceService(db)
     payment_service = PaymentService(db, enrollment_service)
+
+    init_decorators(user_service)
     
     # --- Registro dos Blueprints (Rotas) ---
     with app.app_context():
@@ -90,9 +92,17 @@ def create_app():
         app.register_blueprint(student_bp)
         app.register_blueprint(teacher_bp)
 
+    @app.route('/')
+    def index():
+        return "JitaKyoApp API is running!"
+
     return app
 
 
 
 # Cria a instância da aplicação que o Gunicorn irá usar
 app = create_app()
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port, debug=True)
