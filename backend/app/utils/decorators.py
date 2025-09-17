@@ -19,14 +19,14 @@ def login_required(f):
         session_cookie = request.cookies.get('jitakyo_session')
         if not session_cookie:
             flash('Por favor, faça o login para acessar esta página.', 'warning')
-            return redirect(url_for('auth.login', next=request.url))
+            return redirect(url_for('auth_api.login', next=request.url))
         try:
             # Verifica o cookie. Se for válido, o usuário está autenticado.
             decoded_claims = auth.verify_session_cookie(session_cookie, check_revoked=True)
             g.user = decoded_claims # Armazena os dados do usuário para a requisição
         except auth.InvalidSessionCookieError:
             flash('Sessão inválida. Por favor, faça o login novamente.', 'danger')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('auth_api.login'))
         return f(*args, **kwargs)
     return decorated_function
 
