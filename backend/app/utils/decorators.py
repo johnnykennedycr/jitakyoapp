@@ -11,6 +11,19 @@ def init_decorators(service):
     global user_service
     user_service = service
 
+# backend/app/utils/decorators.py (VERSÃO FINAL)
+
+from functools import wraps
+from flask import request, redirect, url_for, g, flash, jsonify
+from firebase_admin import auth
+
+# user_service é injetado pelo main.py
+user_service = None
+
+def init_decorators(service):
+    global user_service
+    user_service = service
+
 def login_required(f):
     """
     Verifica o cookie de sessão E busca o perfil completo do usuário no Firestore,
@@ -56,6 +69,25 @@ def login_required(f):
 
         return f(*args, **kwargs)
     return decorated_function
+
+
+def role_required(*roles):
+    """
+    Verifica a role do usuário. Assume que g.user já existe.
+    DEVE ser usado DEPOIS de @login_required.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not hasattr(g, 'user') or g.user.role not in roles:
+                if request.path.startswith('/api/'):
+                    return jsonify(error="Permissão negada."), 403
+                flash('Você não tem permissão para acessar esta página.', 'danger')
+                return redirect(url_for('auth_api.login')) 
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 
 def role_required(*roles):

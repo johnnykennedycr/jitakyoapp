@@ -30,7 +30,7 @@ def create_app():
     
     app = Flask(__name__)
     load_dotenv()
-
+    app.config['SESSION_COOKIE_NAME'] = 'jitakyo_session'
     # --- Configuração de Middlewares ---
     # Aplica o ProxyFix para o Flask entender que está atrás de um proxy (HTTPS)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
