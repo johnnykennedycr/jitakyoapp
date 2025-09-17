@@ -1,5 +1,3 @@
-// frontend/src/main.js (VERSÃO FINAL)
-
 import './style.css';
 import { auth } from './lib/firebase.js';
 import { fetchWithAuth } from './lib/api.js';

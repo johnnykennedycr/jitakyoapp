@@ -3,24 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    
-    <link rel="manifest" href="/manifest.json">
-
     <title>JitaKyoApp</title>
+    <style>
+        /* Estilos básicos para o layout */
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            background-color: #f4f7f6;
+        }
 
-    <link rel="stylesheet" href="/src/style.css">
+        .app-layout {
+            display: flex;
+            height: 100vh;
+        }
+
+        #sidebar-container {
+            width: 250px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        #main-content {
+            flex-grow: 1; /* Ocupa o resto do espaço */
+            padding: 40px;
+            overflow-y: auto; /* Adiciona scroll se o conteúdo for grande */
+        }
+        
+        /* Estilos simples para os links do menu (vamos criar isso com JS) */
+        .sidebar-nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar-nav a {
+            display: block;
+            color: #ecf0f1;
+            text-decoration: none;
+            padding: 12px 0;
+            font-size: 1.1em;
+            transition: background-color 0.2s;
+        }
+        .sidebar-nav a:hover {
+            background-color: #34495e;
+        }
+    </style>
 </head>
-<body class="bg-gray-900">
-
-    <div id="app">
-        <div class="flex items-center justify-center min-h-screen">
-            <p class="text-white text-xl">Carregando JitaKyoApp...</p>
+<body>
+    <div id="app-container">
         </div>
-    </div>
 
+    <template id="layout-template">
+        <div class="app-layout">
+            <aside id="sidebar-container"></aside>
+            <main id="main-content">
+                </main>
+        </div>
+    </template>
+    
     <script type="module" src="/src/main.js"></script>
-
 </body>
 </html>
