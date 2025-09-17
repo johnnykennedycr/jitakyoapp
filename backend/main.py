@@ -8,6 +8,7 @@ from flask_mail import Mail
 from flask_cors import CORS
 
 # Importa os blueprints e as funções de inicialização
+from app.routes.user_routes import user_bp 
 from app.routes.admin_routes import admin_bp, init_admin_bp
 from app.routes.student_routes import student_bp, init_student_bp
 from app.routes.teacher_routes import teacher_bp, init_teacher_bp
@@ -84,6 +85,7 @@ def create_app():
         init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
         init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service)
 
+        app.register_blueprint(user_bp) 
         app.register_blueprint(admin_bp)
         app.register_blueprint(student_bp)
         app.register_blueprint(teacher_bp)
