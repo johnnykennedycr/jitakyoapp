@@ -41,19 +41,27 @@ class User:
         )
 
     def to_dict(self):
-        """Converte o objeto User em um dicionário para salvar no Firestore."""
-        # Não salvamos mais o password_hash
-        return {
+        """
+        Converte o objeto User em um dicionário para salvar no Firestore e
+        para ser enviado como JSON, com datas no formato string.
+        """
+        user_dict = {
+            "id": self.id, # Adicionado para conveniência no frontend
             "name": self.name,
             "email": self.email,
             "role": self.role,
-            "date_of_birth": self.date_of_birth,
             "phone": self.phone,
             "enrolled_disciplines": self.enrolled_disciplines,
             "guardians": self.guardians,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at
+            "age": self.age, # Adicionada a idade para o frontend
+            
+            # Converte datas para string no padrão ISO, se não forem nulas
+            "date_of_birth": self.date_of_birth.isoformat() if self.date_of_birth else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
+        return user_dict
+
 
     def calculate_age(self):
         """Calcula a idade com base na data de nascimento."""
