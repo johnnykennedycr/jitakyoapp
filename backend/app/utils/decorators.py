@@ -39,9 +39,14 @@ def login_required(f):
 
 
 def role_required(*roles):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not hasattr(g, 'user') or g.user.role not in roles:
-            return jsonify(error="Permissão negada para este recurso."), 403
-        return f(*args, **kwargs)
-    return decorated_function
+    def decorator(f):
+        @wraps(f) # <--- Esta linha deve estar AQUI DENTRO
+        def decorated_function(*args, **kwargs):
+            if not hasattr(g, 'user') or g.user.role not in roles:
+                
+                return jsonify(error="Permissão negada para este recurso."), 403
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
