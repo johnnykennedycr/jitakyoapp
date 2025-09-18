@@ -7,6 +7,9 @@ backend/.venv/
 backend/venv/
 backend/env/
 
+# Ignorar arquivos de ambiente do frontend
+frontend/.env
+
 # Cache do Python
 backend/__pycache__/
 *.pyc
