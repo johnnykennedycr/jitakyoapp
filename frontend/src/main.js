@@ -1,37 +1,23 @@
-import './style.css';
-import { auth } from './lib/firebase.js';
-import { fetchWithAuth } from './lib/api.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./config/firebaseConfig.js";
+import { renderLogin } from "./components/Login.js";
+import { renderAuthenticatedApp } from "./auth/authContext.js";
 
-import { renderLogin } from './components/Login.js';
-import { renderAdminDashboard } from './components/AdminDashboard.js';
-// Importe seus outros dashboards aqui quando criá-los
+// O contêiner principal da nossa aplicação
+const appContainer = document.getElementById('app-container');
 
-const appContainer = document.getElementById('app');
-
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Usuário logado no Firebase.
-        appContainer.innerHTML = `<p class="text-white">Autenticado. Verificando perfil...</p>`;
-        try {
-            // Busca o perfil no nosso backend para obter a 'role'
-            const response = await fetchWithAuth('/api/users/me');
-            const userData = await response.json();
-            
-            // Roteamento baseado na 'role'
-            if (userData.role === 'admin' || userData.role === 'super_admin') {
-                renderAdminDashboard(appContainer, userData);
-            } else if (userData.role === 'teacher') {
-                // renderTeacherDashboard(appContainer, userData);
-            } else {
-                // renderStudentDashboard(appContainer, userData);
-            }
-        } catch (error) {
-            console.error("Erro ao buscar perfil, deslogando:", error);
-            auth.signOut(); // Se não conseguir pegar o perfil, força o logout
+// Verificação de segurança: garante que o contêiner existe antes de continuar.
+if (!appContainer) {
+    console.error("Erro crítico: O elemento #app-container não foi encontrado no DOM.");
+} else {
+    // onAuthStateChanged é o nosso "porteiro". Ele direciona o fluxo inicial.
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // Usuário está logado. Delega TODA a lógica para o authContext.
+            renderAuthenticatedApp(user, appContainer);
+        } else {
+            // Usuário está deslogado. Mostra a tela de login.
+            renderLogin(appContainer);
         }
-    } else {
-        // Usuário deslogado.
-        renderLogin(appContainer);
-    }
-});
+    });
+}
