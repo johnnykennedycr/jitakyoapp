@@ -1,6 +1,6 @@
 # .github/workflows/deploy-frontend.yml
 
-name: Deploy Frontend to Firebase Hosting
+name: Generate Tailwind Config Files
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  build_and_deploy:
+  create-config-files:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -22,21 +22,15 @@ jobs:
       - name: Install Frontend Dependencies
         run: cd frontend && npm ci
 
-      - name: Create .env file
-        run: |
-          cd frontend
-          echo VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" >> .env
-          echo VITE_FIREBASE_AUTH_DOMAIN="${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> .env
-          echo VITE_FIREBASE_PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> .env
-          echo VITE_FIREBASE_STORAGE_BUCKET="${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> .env
-          echo VITE_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
-          echo VITE_FIREBASE_APP_ID="${{ secrets.VITE_FIREBASE_APP_ID }}" >> .env
-          echo VITE_FIREBASE_MEASUREMENT_ID="${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}" >> .env
+      # Passo que gera os arquivos de configuração
+      - name: Generate Tailwind Config Files
+        run: cd frontend && npx tailwindcss init -p
 
-      - name: Build Frontend Application
-        run: cd frontend && npm run build
-
-      - name: Deploy to Firebase Hosting
-        run: |
-          npm install -g firebase-tools
-          firebase deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --project jitakyoapp
+      # Passo que empacota os arquivos gerados para que possamos baixá-los
+      - name: Upload Config Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-files
+          path: |
+            frontend/tailwind.config.js
+            frontend/postcss.config.js
