@@ -22,11 +22,10 @@ jobs:
       - name: Install Frontend Dependencies
         run: cd frontend && npm ci
 
-      # Passo que gera os arquivos de configuração
+      # FORMA FINAL: Executando o script do Tailwind diretamente com Node
       - name: Generate Tailwind Config Files
-        run: cd frontend && npx tailwindcss init -p
+        run: cd frontend && node ./node_modules/tailwindcss/lib/cli.js init -p
 
-      # Passo que empacota os arquivos gerados para que possamos baixá-los
       - name: Upload Config Artifacts
         uses: actions/upload-artifact@v4
         with:
