@@ -3,6 +3,7 @@ import { auth } from "./config/firebaseConfig.js";
 import { renderLogin } from "./components/Login.js";
 import { renderAuthenticatedApp } from "./auth/authContext.js";
 
+
 // O contêiner principal da nossa aplicação
 const appContainer = document.getElementById('app-container');
 

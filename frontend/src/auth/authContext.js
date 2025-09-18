@@ -1,5 +1,5 @@
 import { auth } from "../config/firebaseConfig.js";
-import { fetchWithAuth } from "../api/api.js";
+import { fetchWithAuth } from "../lib/api.js";
 import { createSidebar } from "../components/Sidebar.js";
 import { initializeRouter, default as router } from "../router.js";
 import { renderLogin } from "../components/Login.js";
