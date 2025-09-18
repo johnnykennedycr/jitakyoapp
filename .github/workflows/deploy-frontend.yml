@@ -1,6 +1,6 @@
 # .github/workflows/deploy-frontend.yml
 
-name: Generate Tailwind Config Files
+name: Diagnose Build Environment
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  create-config-files:
+  diagnose-environment:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -22,14 +22,6 @@ jobs:
       - name: Install Frontend Dependencies
         run: cd frontend && npm ci
 
-      # FORMA FINAL: Executando o script do Tailwind diretamente com Node
-      - name: Generate Tailwind Config Files
-        run: cd frontend && node ./node_modules/tailwindcss/lib/cli.js init -p
-
-      - name: Upload Config Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: config-files
-          path: |
-            frontend/tailwind.config.js
-            frontend/postcss.config.js
+      # PASSO DE DIAGNÓSTICO: Lista todos os arquivos e pastas recursivamente
+      - name: List Files in Frontend Directory
+        run: ls -R frontend
