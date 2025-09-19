@@ -22,7 +22,7 @@ from app.services.training_class_service import TrainingClassService
 from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
-# from app.services.notification_service import NotificationService # Adicionado serviço que faltava
+
 
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
