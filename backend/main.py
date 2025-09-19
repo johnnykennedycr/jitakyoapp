@@ -37,20 +37,14 @@ def create_app():
     # Aplica o CORS para permitir que o frontend se comunique com a API
     CORS(app)
 
-    # --- Inicialização do Firebase Admin SDK ---
+    # --- INICIALIZAÇÃO DO FIREBASE ADMIN SDK ---
     try:
         if not firebase_admin._apps:
-            if os.getenv('GAE_ENV', '').startswith('standard'):
-                cred = credentials.ApplicationDefault()
-                print("Firebase Admin SDK inicializado com as credenciais do ambiente.")
-            else:
-                service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-                if not service_account_path:
-                    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS não definida.")
-                cred = credentials.Certificate(service_account_path)
-                print(f"Firebase Admin SDK inicializado com o arquivo: {service_account_path}")
-            
+            # Em um ambiente Google Cloud (como Cloud Run), ApplicationDefault()
+            # automaticamente encontra as credenciais de serviço corretas.
+            cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
+            print("Firebase Admin SDK inicializado com sucesso.")
     except Exception as e:
         print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
