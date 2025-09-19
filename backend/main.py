@@ -22,7 +22,7 @@ from app.services.training_class_service import TrainingClassService
 from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
-from app.services.notification_service import NotificationService # Adicionado serviço que faltava
+# from app.services.notification_service import NotificationService # Adicionado serviço que faltava
 
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
@@ -65,14 +65,14 @@ def create_app():
     enrollment_service = EnrollmentService(db)
     attendance_service = AttendanceService(db)
     payment_service = PaymentService(db)
-    notification_service = NotificationService(db, user_service)
+    # notification_service = NotificationService(db, user_service)
 
     # Injeta as dependências nos módulos que precisam delas
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service)
-    init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service, notification_service)
-    init_student_bp(user_service, enrollment_service, attendance_service, payment_service, notification_service)
+    init_admin_bp(user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+    init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
+    init_student_bp(user_service, enrollment_service, attendance_service, payment_service)
 
     # --- Registro dos Blueprints (Rotas) ---
     app.register_blueprint(user_api_bp) 
