@@ -15,7 +15,7 @@ from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
 
-admin_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
+admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
 # A inicialização de serviços permanece a mesma
 user_service = None
@@ -37,7 +37,7 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
     payment_service = ps_param
 
 
-@admin_bp.route('/dashboard-data')
+@admin_api_bp.route('/dashboard-data')
 @login_required 
 @role_required('admin', 'super_admin', 'receptionist') 
 def dashboard_data():
@@ -85,7 +85,7 @@ def dashboard_data():
 
 # --- Rotas de Gerenciamento de Professores ---
 
-@admin_bp.route('/teachers', methods=['GET'])
+@admin_api_bp.route('/teachers', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
 def list_teachers():
@@ -98,7 +98,7 @@ def list_teachers():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/teachers', methods=['POST'])
+@admin_api_bp.route('/teachers', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def add_teacher():
@@ -129,7 +129,7 @@ def add_teacher():
         return jsonify(error=str(e)), 500
 
 
-@admin_bp.route('/teachers/<string:teacher_id>', methods=['PUT'])
+@admin_api_bp.route('/teachers/<string:teacher_id>', methods=['PUT'])
 @login_required
 @role_required('admin', 'super_admin')
 def edit_teacher(teacher_id):
@@ -146,7 +146,7 @@ def edit_teacher(teacher_id):
         return jsonify(error=str(e)), 500
 
 
-@admin_bp.route('/teachers/<string:teacher_id>', methods=['DELETE'])
+@admin_api_bp.route('/teachers/<string:teacher_id>', methods=['DELETE'])
 @login_required
 @role_required('admin', 'super_admin')
 def delete_teacher(teacher_id):
@@ -161,7 +161,7 @@ def delete_teacher(teacher_id):
 
 # --- Rotas de Gerenciamento de Turmas ---
 
-@admin_bp.route('/classes', methods=['GET'])
+@admin_api_bp.route('/classes', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def list_classes():
@@ -180,7 +180,7 @@ def list_classes():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/classes', methods=['POST'])
+@admin_api_bp.route('/classes', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def add_class():
@@ -203,7 +203,7 @@ def add_class():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/classes/<string:class_id>', methods=['GET'])
+@admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def get_class_details(class_id):
@@ -233,7 +233,7 @@ def get_class_details(class_id):
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/classes/<string:class_id>', methods=['PUT'])
+@admin_api_bp.route('/classes/<string:class_id>', methods=['PUT'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def edit_class(class_id):
@@ -247,7 +247,7 @@ def edit_class(class_id):
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/classes/<string:class_id>', methods=['DELETE'])
+@admin_api_bp.route('/classes/<string:class_id>', methods=['DELETE'])
 @login_required
 @role_required('admin', 'super_admin')
 def delete_class(class_id):
@@ -262,7 +262,7 @@ def delete_class(class_id):
 
 # --- Rotas de Gerenciamento de Alunos (Usuários com role='student') ---
 
-@admin_bp.route('/students', methods=['GET'])
+@admin_api_bp.route('/students', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def list_students():
@@ -276,7 +276,7 @@ def list_students():
 # A rota de ADICIONAR aluno é complexa, pois envolve criar o usuário no Firebase Auth
 # e no Firestore. Ela deve ficar em uma rota de 'users' mais genérica.
 
-@admin_bp.route('/students/<string:user_id>', methods=['PUT'])
+@admin_api_bp.route('/students/<string:user_id>', methods=['PUT'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def edit_student(user_id):
@@ -318,7 +318,7 @@ def edit_student(user_id):
 
 # --- Rotas de Gerenciamento de Matrículas ---
 
-@admin_bp.route('/enrollments', methods=['GET'])
+@admin_api_bp.route('/enrollments', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def list_enrollments():
@@ -339,7 +339,7 @@ def list_enrollments():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/enrollments', methods=['POST'])
+@admin_api_bp.route('/enrollments', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def new_enrollment():
@@ -362,7 +362,7 @@ def new_enrollment():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/enrollments/<string:enrollment_id>', methods=['DELETE'])
+@admin_api_bp.route('/enrollments/<string:enrollment_id>', methods=['DELETE'])
 @login_required
 @role_required('admin', 'super_admin')
 def delete_enrollment(enrollment_id):
@@ -377,7 +377,7 @@ def delete_enrollment(enrollment_id):
 
 # --- ROTAS PARA LISTA DE PRESENÇA (API) ---
 
-@admin_bp.route('/classes/<string:class_id>/attendance', methods=['GET'])
+@admin_api_bp.route('/classes/<string:class_id>/attendance', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
 def get_attendance_list(class_id):
@@ -416,7 +416,7 @@ def get_attendance_list(class_id):
         return jsonify(error=str(e)), 500
 
 
-@admin_bp.route('/classes/<string:class_id>/attendance', methods=['POST'])
+@admin_api_bp.route('/classes/<string:class_id>/attendance', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
 def save_attendance(class_id):
@@ -440,7 +440,7 @@ def save_attendance(class_id):
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/classes/<string:class_id>/attendance-summary')
+@admin_api_bp.route('/classes/<string:class_id>/attendance-summary')
 @login_required
 @role_required('admin', 'super_admin', 'teacher', 'receptionist')
 def get_attendance_summary(class_id):
@@ -466,7 +466,7 @@ def get_attendance_summary(class_id):
         return jsonify(error=str(e)), 500
 
 
-@admin_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
+@admin_api_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def unenroll_student_from_class(class_id, student_id):
@@ -486,7 +486,7 @@ def unenroll_student_from_class(class_id, student_id):
 
 # --- Rotas Financeiras (API) ---
 
-@admin_bp.route('/financial/dashboard-data')
+@admin_api_bp.route('/financial/dashboard-data')
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def financial_dashboard_data():
@@ -524,7 +524,7 @@ def financial_dashboard_data():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/financial/generate-charges', methods=['POST'])
+@admin_api_bp.route('/financial/generate-charges', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def generate_monthly_charges_route():
@@ -538,7 +538,7 @@ def generate_monthly_charges_route():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/financial/pay/<string:payment_id>', methods=['POST'])
+@admin_api_bp.route('/financial/pay/<string:payment_id>', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def mark_payment_as_paid_route(payment_id):
@@ -557,7 +557,7 @@ def mark_payment_as_paid_route(payment_id):
 
 # --- ROTAS DE GERENCIAMENTO DE USUÁRIOS (API) ---
 
-@admin_bp.route('/users', methods=['GET'])
+@admin_api_bp.route('/users', methods=['GET'])
 @login_required
 @role_required('super_admin') # Apenas Super Admin pode listar todos os usuários
 def list_all_users():
@@ -568,7 +568,7 @@ def list_all_users():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/users', methods=['POST'])
+@admin_api_bp.route('/users', methods=['POST'])
 @login_required
 @role_required('super_admin') # Apenas Super Admin pode criar novos usuários
 def add_user():
@@ -601,7 +601,7 @@ def add_user():
     except Exception as e:
         return jsonify(error=str(e)), 400 # 400 para erros como 'email já existe'
 
-@admin_bp.route('/users/<string:user_id>', methods=['PUT'])
+@admin_api_bp.route('/users/<string:user_id>', methods=['PUT'])
 @login_required
 @role_required('super_admin')
 def edit_user(user_id):
@@ -623,7 +623,7 @@ def edit_user(user_id):
         return jsonify(error=str(e)), 500
 
 
-@admin_bp.route('/users/<string:user_id>', methods=['DELETE'])
+@admin_api_bp.route('/users/<string:user_id>', methods=['DELETE'])
 @login_required
 @role_required('super_admin')
 def delete_user(user_id):
@@ -650,7 +650,7 @@ def delete_user(user_id):
 
 # --- Rota de Configurações (API) ---
 
-@admin_bp.route('/settings/branding', methods=['GET'])
+@admin_api_bp.route('/settings/branding', methods=['GET'])
 @login_required
 @role_required('super_admin')
 def get_branding_settings():
@@ -662,7 +662,7 @@ def get_branding_settings():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-@admin_bp.route('/settings/branding', methods=['POST'])
+@admin_api_bp.route('/settings/branding', methods=['POST'])
 @login_required
 @role_required('super_admin')
 def update_branding_settings():

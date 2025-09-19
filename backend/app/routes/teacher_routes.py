@@ -11,7 +11,7 @@ training_class_service = None
 enrollment_service = None
 # notification_service = None
 
-teacher_bp = Blueprint(
+teacher_api_bp = Blueprint(
     'teacher_api', 
     __name__, 
     url_prefix='/api/teacher'
@@ -26,7 +26,7 @@ def init_teacher_bp(us, ts, tcs, es):
     enrollment_service = es 
 
 
-@teacher_bp.route('/dashboard-data')
+@teacher_api_bp.route('/dashboard-data')
 @login_required
 @role_required('teacher', 'admin', 'super_admin')
 def dashboard_data():
@@ -66,7 +66,7 @@ def dashboard_data():
     }
     return jsonify(response_data), 200
 
-@teacher_bp.route('/classes-data')
+@teacher_api_bp.route('/classes-data')
 @login_required
 @role_required('teacher', 'admin', 'super_admin')
 def classes_data():

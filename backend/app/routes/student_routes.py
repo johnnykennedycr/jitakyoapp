@@ -10,7 +10,7 @@ teacher_service = None
 payment_service = None
 
 # Renomeamos para student_bp para clareza e adicionamos /api ao prefixo
-student_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
+student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
 def init_student_bp(us, es, tcs, ts, ps):
     """Inicializa o blueprint do aluno com os serviços."""
@@ -21,7 +21,7 @@ def init_student_bp(us, es, tcs, ts, ps):
     teacher_service = ts
     payment_service = ps
 
-@student_bp.route('/dashboard-data')
+@student_api_api_bp.route('/dashboard-data')
 @login_required
 @role_required('student')
 def dashboard_data():
@@ -70,7 +70,7 @@ def dashboard_data():
         return jsonify({"error": "Ocorreu um erro interno ao processar sua solicitação."}), 500
 
 
-@student_bp.route('/financials-data')
+@student_api_api_bp.route('/financials-data')
 @login_required
 @role_required('student')
 def financials_data():
@@ -92,7 +92,7 @@ def financials_data():
     return jsonify(detailed_payments), 200
 
 
-# @student_bp.route('/notifications-data')
+# @student_api_api_bp.route('/notifications-data')
 # @login_required
 # @role_required('student')
 # def notifications_data():
@@ -103,7 +103,7 @@ def financials_data():
 #     return jsonify(user_notifications), 200
 
 
-@student_bp.route('/save-push-subscription', methods=['POST'])
+@student_api_bp.route('/save-push-subscription', methods=['POST'])
 @login_required
 @role_required('student')
 def save_push_subscription():
