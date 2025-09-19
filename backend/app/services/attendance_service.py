@@ -11,11 +11,12 @@ class Attendance:
     """
     Representa um registro de presença.
     """
-    def __init__(self, id, class_id, attendance_date, students):
+    def __init__(self, id, class_id, attendance_date, students, db):
         self.id = id
         self.class_id = class_id
         self.attendance_date = attendance_date
         self.students = students
+        self.db = db
     
     def __repr__(self):
         """Representação string para debug e logs."""

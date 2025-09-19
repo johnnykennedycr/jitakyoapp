@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, firestore
 from flask_cors import CORS
 
 # Importa os blueprints e as funções de inicialização
@@ -54,8 +54,7 @@ def create_app():
     except Exception as e:
         print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
-    from app.models import db
-    db.init_app()
+    db = firestore.client()
     
     # --- Injeção de Dependências ---
     # Inicializa os serviços
