@@ -21,7 +21,7 @@ def init_student_bp(us, es, tcs, ts, ps):
     teacher_service = ts
     payment_service = ps
 
-@student_api_api_bp.route('/dashboard-data')
+@student_api_bp.route('/dashboard-data')
 @login_required
 @role_required('student')
 def dashboard_data():
@@ -70,7 +70,7 @@ def dashboard_data():
         return jsonify({"error": "Ocorreu um erro interno ao processar sua solicitação."}), 500
 
 
-@student_api_api_bp.route('/financials-data')
+@student_api_bp.route('/financials-data')
 @login_required
 @role_required('student')
 def financials_data():
