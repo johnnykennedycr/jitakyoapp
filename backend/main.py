@@ -55,7 +55,7 @@ def create_app():
         print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
     from app.models import db
-    db.init_firestore()
+    db.init_app()
     
     # --- Injeção de Dependências ---
     # Inicializa os serviços
