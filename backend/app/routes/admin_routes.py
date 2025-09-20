@@ -88,7 +88,36 @@ def test_route():
     """Uma rota de teste para verificar se o blueprint está funcionando."""
     return jsonify(message="Rota de teste do admin_api_bp funcionando!"), 200
 
+
+# --- Rota para buscar usuários que podem ser professores ---
+@admin_api_bp.route('/available-users', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_available_users():
+    """API para listar usuários com a role 'student'."""
+    try:
+        # Reutilizamos o user_service que já temos injetado
+        students = user_service.get_users_by_role('student')
+        students_data = [user.to_dict() for user in students]
+        return jsonify(students_data), 200
+    except Exception as e:
+        print(f"Erro em get_available_users: {e}")
+        return jsonify(error=str(e)), 500
 # --- Rotas de Gerenciamento de Professores ---
+
+@admin_api_bp.route('/teachers/<string:teacher_id>', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_teacher(teacher_id):
+    """API para buscar um professor específico por seu ID."""
+    try:
+        teacher = teacher_service.get_teacher_by_id(teacher_id)
+        if teacher:
+            return jsonify(teacher.to_dict()), 200
+        else:
+            return jsonify(error="Professor não encontrado."), 404
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 @admin_api_bp.route('/teachers/', methods=['GET'])
 @login_required
