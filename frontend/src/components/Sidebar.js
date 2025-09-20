@@ -23,12 +23,13 @@ const navLinks = [
  * @param {object} user - O objeto do usuário logado, contendo a propriedade 'role'.
  * @returns {string} - O HTML do menu lateral.
  */
-export function createSidebar(user) {
+export function createSidebar() {
+    const user = getUserProfile(); // Busca o usuário do nosso estado global
+
     if (!user || !user.role) {
-        return ''; // Retorna vazio se não houver usuário ou perfil
+        return ''; 
     }
 
-    // Filtra os links para mostrar apenas aqueles que o perfil do usuário permite
     const accessibleLinks = navLinks.filter(link => link.roles.includes(user.role));
 
     return `
@@ -36,14 +37,16 @@ export function createSidebar(user) {
             <h3>Olá, ${user.name}!</h3>
             <hr>
             <ul>
-                ${accessibleLinks.map(link => `
-                    <li>
-                        <a href="${link.href}" data-navigo>${link.text}</a>
-                    </li>
-                `).join('')}
+                ${accessibleLinks.map(link => {
+                    // Adiciona o ID do botão de logout
+                    const idAttr = link.id ? `id="${link.id}"` : '';
+                    return `
+                        <li>
+                            <a href="${link.href}" ${idAttr} data-navigo>${link.text}</a>
+                        </li>
+                    `
+                }).join('')}
             </ul>
-            <hr>
-            <button id="logout-button">Sair</button>
         </nav>
     `;
 }

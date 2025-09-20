@@ -3,7 +3,18 @@ import { fetchWithAuth } from '../lib/api.js';
 
 // A função aceita o container e os dados do usuário que já buscamos no main.js
 export async function renderAdminDashboard(container, userData) {
-    
+    const user = getUserProfile(); // Pega o usuário do estado global
+
+    if (!user) {
+        targetElement.innerHTML = `<h1 class="text-red-500">Erro: Usuário não encontrado.</h1>`;
+        return;
+    }
+
+    targetElement.innerHTML = `
+        <h1 class="text-3xl font-bold">Dashboard</h1>
+        <p class="mt-2">Bem-vindo(a) de volta, ${user.name}!</p>
+        `;
+
     // 1. Renderiza a "casca" do dashboard imediatamente
     container.innerHTML = `
         <div class="bg-gray-800 text-white min-h-screen">
