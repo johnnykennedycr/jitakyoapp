@@ -97,11 +97,12 @@ def list_teachers():
     """API para listar todos os professores."""
     try:
         teachers = teacher_service.get_all_teachers()
-        # Converte a lista de objetos para uma lista de dicionários
-        teachers_data = [t.to_dict() for t in teachers] 
+        teachers_data = [t.to_dict() for t in teachers]
         return jsonify(teachers_data), 200
     except Exception as e:
+        print(f"Erro em list_teachers: {e}")
         return jsonify(error=str(e)), 500
+
 
 @admin_api_bp.route('/teachers', methods=['POST'])
 @login_required
