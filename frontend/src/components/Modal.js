@@ -8,7 +8,7 @@ const modalHtml = `
   </div>
 `;
 
-// Adiciona o modal ao corpo do documento uma única vez
+// Adiciona o modal ao corpo do documento uma única vez para evitar duplicatas
 if (!document.getElementById('app-modal')) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
@@ -20,10 +20,9 @@ const closeButton = document.getElementById('modal-close-btn');
 
 const hideModal = () => {
     modalElement.classList.add('hidden');
-    modalTitle.textContent = '';
-    // Limpa os listeners para evitar execuções múltiplas
-    const newModalBody = modalBody.cloneNode(false);
-    modalBody.parentNode.replaceChild(newModalBody, modalBody);
+    // A forma mais segura de limpar: remove todo o conteúdo do corpo do modal.
+    // Isso também remove quaisquer event listeners que estavam atrelados a ele.
+    modalBody.innerHTML = '';
 };
 
 closeButton.addEventListener('click', hideModal);
@@ -35,8 +34,9 @@ modalElement.addEventListener('click', (e) => {
 
 export function showModal(title, contentHtml) {
     modalTitle.textContent = title;
-    document.getElementById('modal-body').innerHTML = contentHtml; // Pega a referência mais recente
+    modalBody.innerHTML = contentHtml;
     modalElement.classList.remove('hidden');
 }
 
 export { hideModal };
+
