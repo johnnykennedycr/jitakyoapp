@@ -65,7 +65,7 @@ def create_app():
     init_user_bp(user_service)
     init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service)
-    init_student_bp(user_service, training_class_service, teacher_service, payment_service)
+    init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
 
     # --- Registro dos Blueprints (Rotas) ---
     app.register_blueprint(user_api_bp) 
