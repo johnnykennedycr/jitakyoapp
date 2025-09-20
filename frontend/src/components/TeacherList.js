@@ -14,7 +14,7 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE DELETAR (COM MODAL E LOADING) ---
+// --- LÓGICA DE DELETAR (COM ATUALIZAÇÃO OTIMISTA DA UI) ---
 function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
     showModal(
         `Confirmar Exclusão`,
@@ -28,12 +28,24 @@ function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
     document.getElementById('cancel-delete-btn').onclick = () => hideModal();
     document.getElementById('confirm-delete-btn').onclick = async () => {
         hideModal();
+
+        // 1. Atualização Otimista: Remove o professor da UI imediatamente com uma animação.
+        const rowToDelete = targetElement.querySelector(`button[data-teacher-id="${teacherId}"]`)?.closest('tr');
+        if (rowToDelete) {
+            rowToDelete.style.transition = 'opacity 0.5s ease';
+            rowToDelete.style.opacity = '0';
+            setTimeout(() => rowToDelete.remove(), 500);
+        }
+
+        // 2. Processo em Segundo Plano: Mostra o loading e faz a chamada real à API.
         showLoading();
         try {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
-            await renderTeacherList(targetElement);
+            // Se a exclusão for bem-sucedida, não precisamos fazer nada, a UI já está correta.
         } catch (error) {
             console.error('Erro ao deletar professor:', error);
+            // Se der erro, renderiza a lista novamente para trazer o professor de volta.
+            await renderTeacherList(targetElement);
         } finally {
             hideLoading();
         }
