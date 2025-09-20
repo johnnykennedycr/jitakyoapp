@@ -5,12 +5,8 @@ import { fetchWithAuth } from "../lib/api.js";
 import { createSidebar } from "../components/Sidebar.js";
 import { initializeRouter, default as router } from "../router.js";
 import { renderLogin } from "../components/Login.js";
-
-// 1. Criamos um "estado" global para o perfil do usuário
-let currentUserProfile = null;
-
-// 2. Criamos uma função "getter" para que outros arquivos possam acessar o perfil
-export const getUserProfile = () => currentUserProfile;
+// Importa o SETTER do nosso novo arquivo de estado
+import { setUserProfile } from "./userState.js";
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -21,20 +17,21 @@ export async function renderAuthenticatedApp(user, container) {
             throw new Error("Perfil do usuário ou 'role' não encontrado.");
         }
         
-        // 3. Armazenamos o perfil no nosso "estado" global
-        currentUserProfile = userProfile;
+        // Usa o SETTER para armazenar o perfil no estado central
+        setUserProfile(userProfile);
 
-        // O resto da sua função continua...
+        // O resto da sua função continua igual...
         const layoutTemplate = document.getElementById('layout-template');
         container.innerHTML = '';
         container.appendChild(layoutTemplate.content.cloneNode(true));
         
-        // 4. A função createSidebar agora não precisa mais de argumentos!
         const sidebarHTML = createSidebar(); 
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
 
+        // O listener do botão de logout agora precisa ser adicionado aqui,
+        // pois o botão é criado junto com o sidebar
         document.getElementById('logout-button').addEventListener('click', () => {
-            currentUserProfile = null; // Limpa o perfil ao deslogar
+            setUserProfile(null); // Limpa o perfil ao deslogar
             auth.signOut();
         });
 

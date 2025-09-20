@@ -6,6 +6,8 @@ const navLinks = [
     { text: 'Turmas', href: '/admin/classes', roles: ['admin', 'super_admin', 'receptionist'] },
     { text: 'Financeiro', href: '/admin/financial', roles: ['admin', 'super_admin', 'receptionist'] },
     { text: 'Gerenciar Usuários', href: '/admin/users', roles: ['super_admin'] },
+    { text: 'Sair', href: '#', roles: ['admin', 'super_admin', 'teacher', 'student'], id: 'logout-button' }
+
     
     // Links para Professores
     { text: 'Meu Dashboard', href: '/teacher/dashboard', roles: ['teacher'] },
@@ -24,11 +26,9 @@ const navLinks = [
  * @returns {string} - O HTML do menu lateral.
  */
 export function createSidebar() {
-    const user = getUserProfile(); // Busca o usuário do nosso estado global
+    const user = getUserProfile(); // Busca o usuário do nosso estado central
 
-    if (!user || !user.role) {
-        return ''; 
-    }
+    if (!user || !user.role) return '';
 
     const accessibleLinks = navLinks.filter(link => link.roles.includes(user.role));
 
@@ -38,7 +38,6 @@ export function createSidebar() {
             <hr>
             <ul>
                 ${accessibleLinks.map(link => {
-                    // Adiciona o ID do botão de logout
                     const idAttr = link.id ? `id="${link.id}"` : '';
                     return `
                         <li>
