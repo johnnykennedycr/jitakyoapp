@@ -10,6 +10,7 @@ from flask_cors import CORS
 
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
+    
     app = Flask(__name__)
     load_dotenv()
     
@@ -27,7 +28,7 @@ def create_app():
 
     db = firestore.client()
     
-    # --- Importações e Inicializações dentro da Fábrica ---
+    # --- Importação e Inicialização de Serviços ---
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
@@ -37,8 +38,12 @@ def create_app():
     
     user_service = UserService(db)
     teacher_service = TeacherService(db)
-    # ... inicialize outros serviços se necessário ...
-
+    training_class_service = TrainingClassService(db)
+    enrollment_service = EnrollmentService(db)
+    attendance_service = AttendanceService(db)
+    payment_service = PaymentService(db)
+    
+    # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     # ... importe outros blueprints ...
@@ -46,8 +51,9 @@ def create_app():
 
     init_decorators(user_service)
     init_user_bp(user_service)
-    # Passe todos os serviços que o admin_bp precisa
-    init_admin_bp(db, user_service, teacher_service) 
+
+    # AQUI ESTÁ A CORREÇÃO: Passando todos os serviços necessários
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service) 
     
     app.register_blueprint(user_api_bp)
     app.register_blueprint(admin_api_bp)
@@ -58,7 +64,6 @@ def create_app():
         return "JitaKyoApp API is running!"
 
     return app
-
 app = create_app()
 
 if __name__ == '__main__':
