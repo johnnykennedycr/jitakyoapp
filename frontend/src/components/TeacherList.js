@@ -13,15 +13,23 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE DELETAR ---
-async function handleDeleteProfessorClick(teacherId, targetElement) {
+// --- LÓGICA DE DELETAR (COM FEEDBACK VISUAL) ---
+async function handleDeleteProfessorClick(teacherId, targetElement, deleteButton) {
     if (confirm('Tem certeza que deseja deletar este professor? A role do usuário será revertida para "student".')) {
+        // Desabilita o botão para evitar cliques múltiplos
+        deleteButton.disabled = true;
+        deleteButton.textContent = 'Deletando...';
+
         try {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
-            renderTeacherList(targetElement);
+            // A lista será atualizada e o botão não existirá mais
+            renderTeacherList(targetElement); 
         } catch (error) {
             console.error('Erro ao deletar professor:', error);
             alert('Falha ao deletar professor.');
+            // Reabilita o botão em caso de erro para que o usuário possa tentar novamente
+            deleteButton.disabled = false;
+            deleteButton.textContent = 'Deletar';
         }
     }
 }
@@ -104,6 +112,10 @@ async function handleAddProfessorClick(targetElement) {
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Salvando...';
+
     const disciplines = [];
     form.querySelectorAll('.discipline-entry').forEach(entry => {
         const disciplineName = entry.querySelector('[name="discipline_name"]').value;
@@ -126,7 +138,12 @@ async function handleFormSubmit(e, targetElement) {
             await fetchWithAuth('/api/admin/teachers', { method: 'POST', body: JSON.stringify(teacherData) });
             hideModal();
             renderTeacherList(targetElement);
-        } catch (error) { console.error(error); alert('Falha ao criar professor.'); }
+        } catch (error) { 
+            console.error(error); 
+            alert('Falha ao criar professor.');
+            submitButton.disabled = false;
+            submitButton.textContent = 'Salvar Professor';
+        }
 
     } else if (form.id === 'edit-teacher-form') {
         const teacherId = form.dataset.teacherId;
@@ -139,9 +156,15 @@ async function handleFormSubmit(e, targetElement) {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'PUT', body: JSON.stringify(updatedData) });
             hideModal();
             renderTeacherList(targetElement);
-        } catch (error) { console.error(error); alert('Falha ao atualizar professor.'); }
+        } catch (error) { 
+            console.error(error); 
+            alert('Falha ao atualizar professor.');
+            submitButton.disabled = false;
+            submitButton.textContent = 'Salvar Alterações';
+        }
     }
 }
+
 
 // --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderTeacherList(targetElement) {
@@ -157,16 +180,18 @@ export async function renderTeacherList(targetElement) {
 
     // Listener de eventos principal para a página (botões da tabela e Adicionar)
     targetElement.addEventListener('click', (e) => {
-        const action = e.target.dataset.action;
-        const teacherId = e.target.dataset.teacherId;
+        const button = e.target;
+        const action = button.dataset.action;
+        const teacherId = button.dataset.teacherId;
+        
         if (action === 'add') handleAddProfessorClick(targetElement);
         if (action === 'edit' && teacherId) handleEditProfessorClick(teacherId, targetElement);
-        if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, targetElement);
+        if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, targetElement, button);
     });
     
     // Listeners de eventos para os modais (formulários e botões dinâmicos)
     const modalBody = document.getElementById('modal-body');
-    modalBody.onclick = (e) => { // Usando onclick para registrar o evento
+    modalBody.onclick = (e) => {
         const action = e.target.dataset.action;
         const targetId = e.target.dataset.target;
         if (action === 'add-discipline') {
@@ -176,9 +201,8 @@ export async function renderTeacherList(targetElement) {
             document.getElementById(targetId)?.remove();
         }
     };
-    modalBody.onsubmit = (e) => handleFormSubmit(e, targetElement); // Registra o submit
+    modalBody.onsubmit = (e) => handleFormSubmit(e, targetElement);
     
-    // Busca e renderiza a tabela de professores
     try {
         const response = await fetchWithAuth('/api/admin/teachers/');
         const teachers = await response.json();
@@ -218,3 +242,4 @@ export async function renderTeacherList(targetElement) {
         targetElement.querySelector('#teacher-table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os professores.</p>`;
     }
 }
+
