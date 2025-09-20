@@ -63,7 +63,7 @@ def create_app():
     # Injeta as dependências nos módulos que precisam delas
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
     init_student_bp(user_service, enrollment_service, attendance_service, payment_service)
 
