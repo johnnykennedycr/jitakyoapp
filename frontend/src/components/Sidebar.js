@@ -1,3 +1,4 @@
+import { getUserProfile } from "../auth/userState.js";
 // Definição de todos os links possíveis e quais perfis podem vê-los
 const navLinks = [
     { text: 'Dashboard', href: '/admin/dashboard', roles: ['admin', 'super_admin', 'receptionist'] },

@@ -1,5 +1,6 @@
 import { auth } from '../lib/firebase.js';
 import { fetchWithAuth } from '../lib/api.js';
+import { getUserProfile } from "../auth/userState.js";
 
 // A função aceita o container e os dados do usuário que já buscamos no main.js
 export async function renderAdminDashboard(container, userData) {
