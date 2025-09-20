@@ -31,7 +31,7 @@ function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
         showLoading();
         try {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
-            await renderTeacherList(targetElement); // Atualiza a lista
+            await renderTeacherList(targetElement);
         } catch (error) {
             console.error('Erro ao deletar professor:', error);
         } finally {
@@ -140,11 +140,38 @@ async function handleFormSubmit(e, targetElement) {
     hideModal();
     showLoading();
     const form = e.target;
-    // ... (resto da lógica de submit) ...
+    
+    const disciplines = [];
+    form.querySelectorAll('.discipline-entry').forEach(entry => {
+        const disciplineName = entry.querySelector('[name="discipline_name"]').value;
+        const graduation = entry.querySelector('[name="graduation"]').value;
+        if(disciplineName && graduation) {
+            disciplines.push({ discipline_name: disciplineName, graduation: graduation });
+        }
+    });
+
     try {
-        // ... (código da chamada fetch) ...
-    } catch(e) {
-        // ...
+        if (form.id === 'add-teacher-form') {
+            const selectedOption = form.elements.user_id.options[form.elements.user_id.selectedIndex];
+            const teacherData = {
+                user_id: form.elements.user_id.value,
+                name: selectedOption.dataset.name,
+                contact_info: { phone: form.elements.phone.value },
+                description: form.elements.description.value,
+                disciplines: disciplines
+            };
+            await fetchWithAuth('/api/admin/teachers', { method: 'POST', body: JSON.stringify(teacherData) });
+        } else if (form.id === 'edit-teacher-form') {
+            const teacherId = form.dataset.teacherId;
+            const updatedData = {
+                contact_info: { phone: form.elements.phone.value },
+                description: form.elements.description.value,
+                disciplines: disciplines
+            };
+            await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'PUT', body: JSON.stringify(updatedData) });
+        }
+    } catch (error) {
+        console.error("Erro ao salvar dados do professor:", error);
     } finally {
         await renderTeacherList(targetElement);
         hideLoading();
@@ -170,14 +197,31 @@ export async function renderTeacherList(targetElement) {
         const response = await fetchWithAuth('/api/admin/teachers/');
         const teachers = await response.json();
         const tableContainer = targetElement.querySelector('#teacher-table-container');
-        if (teachers.length === 0) { tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>'; return; }
+        if (teachers.length === 0) {
+            tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>';
+            hideLoading();
+            return;
+        }
         tableContainer.innerHTML = `
             <table class="min-w-full bg-white rounded-md shadow">
-                <!-- ... (cabeçalho da tabela) ... -->
+                <thead class="bg-gray-200">
+                    <tr>
+                        <th class="py-3 px-4 text-left">Nome</th>
+                        <th class="py-3 px-4 text-left">Telefone</th>
+                        <th class="py-3 px-4 text-left">Modalidades / Graduações</th>
+                        <th class="py-3 px-4 text-left">Ações</th>
+                    </tr>
+                </thead>
                 <tbody>
                     ${teachers.map(teacher => `
                         <tr class="border-b">
-                            <!-- ... (células da tabela) ... -->
+                            <td class="py-3 px-4 align-top">${teacher.name || 'N/A'}</td>
+                            <td class="py-3 px-4 align-top">${teacher.contact_info?.phone || 'N/A'}</td>
+                            <td class="py-3 px-4 align-top">
+                                ${ (Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0)
+                                    ? teacher.disciplines.map(d => `<div><strong>${d.discipline_name}:</strong> ${d.graduation}</div>`).join('')
+                                    : 'Nenhuma' }
+                            </td>
                             <td class="py-3 px-4 align-top">
                                 <button data-action="edit" data-teacher-id="${teacher.id}" class="text-indigo-600 hover:underline mr-4">Editar</button>
                                 <button data-action="delete" data-teacher-id="${teacher.id}" data-teacher-name="${teacher.name}" class="text-red-600 hover:underline">Deletar</button>
