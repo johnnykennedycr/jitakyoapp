@@ -3,7 +3,6 @@ import { showModal, hideModal } from './Modal.js';
 
 // --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE DISCIPLINA ---
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
-    // Cria um ID único para cada par de campos para o 'remover' funcionar
     const fieldId = `discipline-${Date.now()}-${Math.random()}`;
     return `
         <div class="discipline-entry flex items-center gap-2 mb-2" id="${fieldId}">
@@ -14,31 +13,40 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE EDITAR (AGORA COM DISCIPLINAS) ---
+// --- LÓGICA DE DELETAR ---
+async function handleDeleteProfessorClick(teacherId, targetElement) {
+    if (confirm('Tem certeza que deseja deletar este professor? A role do usuário será revertida para "student".')) {
+        try {
+            await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
+            renderTeacherList(targetElement);
+        } catch (error) {
+            console.error('Erro ao deletar professor:', error);
+            alert('Falha ao deletar professor.');
+        }
+    }
+}
+
+// --- LÓGICA DE EDITAR ---
 async function handleEditProfessorClick(teacherId, targetElement) {
     showModal('Editar Professor', '<p>Carregando dados...</p>');
     try {
         const response = await fetchWithAuth(`/api/admin/teachers/${teacherId}`);
         const teacher = await response.json();
-
-        // Gera os campos para as disciplinas existentes
-        const existingDisciplinesHtml = teacher.disciplines.map(createDisciplineFieldHtml).join('');
-
+        const existingDisciplinesHtml = (teacher.disciplines || []).map(createDisciplineFieldHtml).join('');
         const formHtml = `
-            <form id="edit-teacher-form">
-                <p class="mb-4 text-sm text-gray-600">Editando o perfil de <strong>${teacher.name}</strong>.</p>
+            <form id="edit-teacher-form" data-teacher-id="${teacherId}">
                 <div class="mb-4">
-                    <label for="contact-phone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                    <input type="text" id="contact-phone" name="phone" value="${teacher.contact_info?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
+                    <label class="block text-sm font-medium text-gray-700">Telefone</label>
+                    <input type="text" name="phone" value="${teacher.contact_info?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
                 <div class="mb-4">
-                    <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
-                    <textarea id="description" name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md">${teacher.description || ''}</textarea>
+                    <label class="block text-sm font-medium text-gray-700">Descrição</label>
+                    <textarea name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md">${teacher.description || ''}</textarea>
                 </div>
                 <hr class="my-4">
                 <div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Modalidades e Graduações</h4>
-                    <button type="button" id="add-discipline-btn" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600">Adicionar</button>
+                    <button type="button" data-action="add-discipline" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600">Adicionar</button>
                 </div>
                 <div id="disciplines-container">${existingDisciplinesHtml}</div>
                 <div class="text-right mt-6">
@@ -46,79 +54,137 @@ async function handleEditProfessorClick(teacherId, targetElement) {
                 </div>
             </form>
         `;
-        showModal('Editar Professor', formHtml);
-        
-        // Listener para o botão 'Adicionar Modalidade'
-        document.getElementById('add-discipline-btn').addEventListener('click', () => {
-            document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
-        });
-
-        // Listener para submeter o formulário de edição
-        document.getElementById('edit-teacher-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const form = e.target;
-            
-            // Coleta os dados das disciplinas dinâmicas
-            const disciplines = [];
-            document.querySelectorAll('.discipline-entry').forEach(entry => {
-                disciplines.push({
-                    discipline_name: entry.querySelector('[name="discipline_name"]').value,
-                    graduation: entry.querySelector('[name="graduation"]').value,
-                });
-            });
-
-            const updatedData = {
-                contact_info: { phone: form.elements.phone.value },
-                description: form.elements.description.value,
-                disciplines: disciplines
-            };
-
-            // Lógica de envio PUT
-            try {
-                await fetchWithAuth(`/api/admin/teachers/${teacherId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(updatedData)
-                });
-                hideModal();
-                renderTeacherList(targetElement);
-            } catch (error) { alert('Falha ao atualizar professor.'); }
-        });
-
-    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
+        showModal(`Editando ${teacher.name}`, formHtml);
+    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados do professor.</p>'); }
 }
 
-
-// --- LÓGICA DE ADICIONAR (AGORA COM DISCIPLINAS) ---
+// --- LÓGICA DE ADICIONAR ---
 async function handleAddProfessorClick(targetElement) {
-    // ... (código para buscar availableUsers e criar o formHtml principal) ...
-    // ... A lógica de submissão do formulário de ADIÇÃO também precisará ser
-    // atualizada para coletar as disciplinas, similar à função de EDIÇÃO acima.
+    showModal('Adicionar Professor', '<p>Buscando usuários...</p>');
+    try {
+        const response = await fetchWithAuth('/api/admin/available-users');
+        const availableUsers = await response.json();
+        if (availableUsers.length === 0) {
+            showModal('Adicionar Professor', '<p>Nenhum usuário disponível para ser promovido a professor.</p>');
+            return;
+        }
+        const formHtml = `
+            <form id="add-teacher-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Usuário a ser promovido</label>
+                    <select name="user_id" class="mt-1 block w-full p-2 border rounded-md" required>
+                        <option value="">Selecione um usuário</option>
+                        ${availableUsers.map(user => `<option value="${user.id}" data-name="${user.name}">${user.name} (${user.email})</option>`).join('')}
+                    </select>
+                </div>
+                 <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Telefone</label>
+                    <input type="text" name="phone" class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Descrição</label>
+                    <textarea name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
+                </div>
+                <hr class="my-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-lg font-medium">Modalidades e Graduações</h4>
+                    <button type="button" data-action="add-discipline" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm hover:bg-green-600">Adicionar</button>
+                </div>
+                <div id="disciplines-container"></div>
+                <div class="text-right mt-6">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Salvar Professor</button>
+                </div>
+            </form>
+        `;
+        showModal('Adicionar Novo Professor', formHtml);
+    } catch (error) { showModal('Erro', '<p>Não foi possível carregar a lista de usuários.</p>'); }
 }
 
+// --- LÓGICA DE SUBMISSÃO DOS FORMULÁRIOS ---
+async function handleFormSubmit(e, targetElement) {
+    e.preventDefault();
+    const form = e.target;
+    const disciplines = [];
+    form.querySelectorAll('.discipline-entry').forEach(entry => {
+        const disciplineName = entry.querySelector('[name="discipline_name"]').value;
+        const graduation = entry.querySelector('[name="graduation"]').value;
+        if(disciplineName && graduation) {
+            disciplines.push({ discipline_name: disciplineName, graduation: graduation });
+        }
+    });
 
-// --- RENDERIZAÇÃO PRINCIPAL (COM A COLUNA DE VOLTA) ---
+    if (form.id === 'add-teacher-form') {
+        const selectedOption = form.elements.user_id.options[form.elements.user_id.selectedIndex];
+        const teacherData = {
+            user_id: form.elements.user_id.value,
+            name: selectedOption.dataset.name,
+            contact_info: { phone: form.elements.phone.value },
+            description: form.elements.description.value,
+            disciplines: disciplines
+        };
+        try {
+            await fetchWithAuth('/api/admin/teachers', { method: 'POST', body: JSON.stringify(teacherData) });
+            hideModal();
+            renderTeacherList(targetElement);
+        } catch (error) { console.error(error); alert('Falha ao criar professor.'); }
+
+    } else if (form.id === 'edit-teacher-form') {
+        const teacherId = form.dataset.teacherId;
+        const updatedData = {
+            contact_info: { phone: form.elements.phone.value },
+            description: form.elements.description.value,
+            disciplines: disciplines
+        };
+        try {
+            await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'PUT', body: JSON.stringify(updatedData) });
+            hideModal();
+            renderTeacherList(targetElement);
+        } catch (error) { console.error(error); alert('Falha ao atualizar professor.'); }
+    }
+}
+
+// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderTeacherList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold">Gerenciamento de Professores</h1>
-            <button id="add-teacher-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
                 Adicionar Professor
             </button>
         </div>
         <div id="teacher-table-container"><p>Carregando professores...</p></div>
     `;
 
+    // Listener de eventos principal para a página (botões da tabela e Adicionar)
+    targetElement.addEventListener('click', (e) => {
+        const action = e.target.dataset.action;
+        const teacherId = e.target.dataset.teacherId;
+        if (action === 'add') handleAddProfessorClick(targetElement);
+        if (action === 'edit' && teacherId) handleEditProfessorClick(teacherId, targetElement);
+        if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, targetElement);
+    });
+    
+    // Listeners de eventos para os modais (formulários e botões dinâmicos)
+    const modalBody = document.getElementById('modal-body');
+    modalBody.onclick = (e) => { // Usando onclick para registrar o evento
+        const action = e.target.dataset.action;
+        const targetId = e.target.dataset.target;
+        if (action === 'add-discipline') {
+            document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
+        }
+        if (action === 'remove-discipline' && targetId) {
+            document.getElementById(targetId)?.remove();
+        }
+    };
+    modalBody.onsubmit = (e) => handleFormSubmit(e, targetElement); // Registra o submit
+    
+    // Busca e renderiza a tabela de professores
     try {
         const response = await fetchWithAuth('/api/admin/teachers/');
         const teachers = await response.json();
         const tableContainer = targetElement.querySelector('#teacher-table-container');
-        
-        if (teachers.length === 0) {
-            tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>';
-            return;
-        }
-
-        const tableHtml = `
+        if (teachers.length === 0) { tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>'; return; }
+        tableContainer.innerHTML = `
             <table class="min-w-full bg-white rounded-md shadow">
                 <thead class="bg-gray-200">
                     <tr>
@@ -134,7 +200,7 @@ export async function renderTeacherList(targetElement) {
                             <td class="py-3 px-4 align-top">${teacher.name || 'N/A'}</td>
                             <td class="py-3 px-4 align-top">${teacher.contact_info?.phone || 'N/A'}</td>
                             <td class="py-3 px-4 align-top">
-                                ${ Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0
+                                ${ (Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0)
                                     ? teacher.disciplines.map(d => `<div><strong>${d.discipline_name}:</strong> ${d.graduation}</div>`).join('')
                                     : 'Nenhuma' }
                             </td>
@@ -147,23 +213,6 @@ export async function renderTeacherList(targetElement) {
                 </tbody>
             </table>
         `;
-        tableContainer.innerHTML = tableHtml;
-
-        // --- LISTENERS DE EVENTOS (AGORA COM REMOVER) ---
-        targetElement.addEventListener('click', (e) => {
-            const action = e.target.dataset.action;
-            const targetId = e.target.dataset.target;
-            const teacherId = e.target.dataset.teacherId;
-
-            if (action === 'add-professor') handleAddProfessorClick(targetElement);
-            if (action === 'edit' && teacherId) handleEditProfessorClick(teacherId, targetElement);
-            if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, targetElement); // Necessita da função handleDelete
-            if (action === 'remove-discipline' && targetId) document.getElementById(targetId)?.remove();
-        });
-        
-        // Substituindo o listener antigo por delegação
-        targetElement.querySelector('#add-teacher-btn').setAttribute('data-action', 'add-professor');
-
     } catch (error) {
         console.error("Erro ao buscar professores:", error);
         targetElement.querySelector('#teacher-table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os professores.</p>`;
