@@ -24,7 +24,8 @@ class TeacherService:
             user_ref = self.users_collection.document(user_id)
             if not user_ref.get().exists:
                 raise ValueError(f"Usuário com ID {user_id} não encontrado.")
-            user_ref.update({'role': 'teacher', 'updated_at': datetime.now(firestore. আচ্ছা)})
+            # Atualiza a role e o timestamp do usuário
+            user_ref.update({'role': 'teacher', 'updated_at': datetime.now()})
 
             disciplines_objects = [DisciplineGraduation(**d) for d in disciplines_data] if disciplines_data else []
             teacher_data = Teacher(
@@ -33,8 +34,9 @@ class TeacherService:
             ).to_dict()
             
             del teacher_data['id']
-            teacher_data['created_at'] = datetime.now(firestore. আচ্ছা)
-            teacher_data['updated_at'] = datetime.now(firestore. আচ্ছা)
+            # CORRIGIDO: Usa datetime.now() sem argumentos
+            teacher_data['created_at'] = datetime.now()
+            teacher_data['updated_at'] = datetime.now()
             
             doc_ref = self.teachers_collection.document()
             doc_ref.set(teacher_data)
@@ -49,9 +51,8 @@ class TeacherService:
         Atualiza dados de um professor existente.
         """
         try:
-            # Apenas adicionamos o timestamp de atualização.
-            # O Firestore aceita o array de dicionários de 'disciplines' diretamente.
-            update_data['updated_at'] = datetime.now(firestore. اچھا)
+            # CORRIGIDO: Usa datetime.now() sem argumentos
+            update_data['updated_at'] = datetime.now()
             
             self.teachers_collection.document(teacher_id).update(update_data)
             print(f"Professor com ID '{teacher_id}' atualizado.")
@@ -98,3 +99,4 @@ class TeacherService:
         except Exception as e:
             print(f"Erro ao buscar professor por user_id '{user_id}': {e}")
             return None
+
