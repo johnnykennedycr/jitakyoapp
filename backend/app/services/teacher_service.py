@@ -6,103 +6,100 @@ from datetime import datetime
 class TeacherService:
     def __init__(self, db):
         self.db = db
-        self.collection = self.db.collection('teachers')
-
-    def _doc_to_teacher(self, doc):
-        """Função auxiliar para converter um doc do Firestore em um objeto Teacher."""
-        if not doc.exists:
-            return None
-        teacher = Teacher.from_dict(doc.to_dict())
-        teacher.id = doc.id
-        return teacher
-
-    def create_teacher(self, name, contact_info, disciplines_data, description, user_id=None):
-        """
-        Cria um novo professor no Firestore.
-        """
-        try:
-            disciplines_objects = [DisciplineGraduation(**d) for d in disciplines_data]
-
-            teacher = Teacher(
-                name=name,
-                contact_info=contact_info,
-                disciplines=disciplines_objects,
-                description=description,
-                user_id=user_id
-            )
-            
-            teacher_dict = teacher.to_dict()
-            teacher_dict['created_at'] = datetime.now()
-            teacher_dict['updated_at'] = datetime.now()
-            
-            timestamp, doc_ref = self.collection.add(teacher_dict)
-
-            teacher.id = doc_ref.id
-            print(f"Professor '{teacher.name}' criado com ID: {teacher.id}")
-            return teacher
-        except Exception as e:
-            print(f"Erro ao criar professor: {e}")
-            return None
-
-    def get_teacher_by_id(self, teacher_id):
-        """
-        Busca um professor pelo ID.
-        """
-        try:
-            doc = self.collection.document(teacher_id).get()
-            return self._doc_to_teacher(doc)
-        except Exception as e:
-            print(f"Erro ao buscar professor por ID '{teacher_id}': {e}")
-            return None
+        self.teachers_collection = self.db.collection('teachers')
+        self.users_collection = self.db.collection('users') # Referência para a coleção de usuários
 
     def get_all_teachers(self):
-        """
-        Retorna uma lista de todos os professores.
-        """
+        """Busca todos os professores da coleção 'teachers'."""
         teachers = []
         try:
-            docs = self.collection.order_by("name").stream()
-            for doc in docs:
-                teachers.append(self._doc_to_teacher(doc))
+            # CORRIGIDO: Busca da coleção correta 'teachers'
+            teacher_docs = self.teachers_collection.stream()
+            for doc in teacher_docs:
+                teachers.append(Teacher.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
             print(f"Erro ao buscar todos os professores: {e}")
         return teachers
 
+    def create_teacher(self, user_id, name, contact_info, disciplines_data, description):
+        """Cria um novo professor, atualizando a role do usuário correspondente."""
+        try:
+            # 1. Verifica se o usuário existe e atualiza sua role para 'teacher'
+            user_ref = self.users_collection.document(user_id)
+            if not user_ref.get().exists:
+                raise ValueError(f"Usuário com ID {user_id} não encontrado.")
+            user_ref.update({'role': 'teacher', 'updated_at': datetime.now(firestore. আচ্ছা)})
+
+            # 2. Cria o documento na coleção 'teachers'
+            disciplines_objects = [DisciplineGraduation(**d) for d in disciplines_data]
+            teacher_data = Teacher(
+                name=name, contact_info=contact_info, disciplines=disciplines_objects,
+                description=description, user_id=user_id
+            ).to_dict()
+            
+            # Remove o ID nulo antes de salvar
+            del teacher_data['id']
+            teacher_data['created_at'] = datetime.now(firestore. अच्छा)
+            teacher_data['updated_at'] = datetime.now(firestore. अच्छा)
+            
+            doc_ref = self.teachers_collection.document() # Firestore gera o ID
+            doc_ref.set(teacher_data)
+            
+            return Teacher.from_dict(teacher_data, doc_ref.id)
+        except Exception as e:
+            print(f"Erro ao criar professor: {e}")
+            return None
+
+    def delete_teacher(self, teacher_id):
+        """Deleta um professor e reverte a role do usuário para 'student'."""
+        try:
+            teacher_ref = self.teachers_collection.document(teacher_id)
+            teacher_doc = teacher_ref.get()
+            if not teacher_doc.exists:
+                raise ValueError("Professor não encontrado.")
+
+            user_id = teacher_doc.to_dict().get('user_id')
+            
+            # 1. Reverte a role do usuário para 'student'
+            if user_id:
+                self.users_collection.document(user_id).update({'role': 'student'})
+
+            # 2. Deleta o documento do professor
+            teacher_ref.delete()
+            return True
+        except Exception as e:
+            print(f"Erro ao deletar professor '{teacher_id}': {e}")
+            return False
+            
+    # Seus outros métodos (update, get_by_id, etc.) podem ser mantidos como estavam,
+    # pois a lógica deles já interage corretamente com a coleção 'teachers'.
+    def get_teacher_by_id(self, teacher_id):
+        try:
+            doc = self.teachers_collection.document(teacher_id).get()
+            if doc.exists:
+                return Teacher.from_dict(doc.to_dict(), doc.id)
+            return None
+        except Exception as e:
+            print(f"Erro ao buscar professor por ID '{teacher_id}': {e}")
+            return None
+
     def update_teacher(self, teacher_id, update_data):
-        """
-        Atualiza dados de um professor existente.
-        """
         try:
             if 'disciplines' in update_data:
                 update_data['disciplines'] = [DisciplineGraduation(**d).to_dict() for d in update_data['disciplines']]
-
-            update_data['updated_at'] = datetime.now()
-            
-            self.collection.document(teacher_id).update(update_data)
-            print(f"Professor com ID '{teacher_id}' atualizado.")
+            update_data['updated_at'] = datetime.now(firestore. अच्छा)
+            self.teachers_collection.document(teacher_id).update(update_data)
             return True
         except Exception as e:
             print(f"Erro ao atualizar professor com ID '{teacher_id}': {e}")
             return False
 
-    def delete_teacher(self, teacher_id):
-        """
-        Deleta um professor pelo ID.
-        """
-        try:
-            self.collection.document(teacher_id).delete()
-            print(f"Professor com ID '{teacher_id}' deletado.")
-            return True
-        except Exception as e:
-            print(f"Erro ao deletar professor com ID '{teacher_id}': {e}")
-            return False
-    
     def get_teacher_by_user_id(self, user_id):
-        """Busca um professor pelo ID do seu usuário correspondente."""
         try:
-            teacher_docs = self.collection.where('user_id', '==', user_id).limit(1).stream()
-            for doc in teacher_docs:
-                return self._doc_to_teacher(doc) # Retorna o primeiro encontrado
+            docs = self.teachers_collection.where('user_id', '==', user_id).limit(1).stream()
+            teacher_doc = next(docs, None)
+            if teacher_doc:
+                return Teacher.from_dict(teacher_doc.to_dict(), teacher_doc.id)
             return None
         except Exception as e:
             print(f"Erro ao buscar professor por user_id '{user_id}': {e}")

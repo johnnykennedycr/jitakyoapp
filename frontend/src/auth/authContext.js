@@ -5,6 +5,7 @@ import { renderLogin } from "../components/Login.js";
 import { setUserProfile } from "./userState.js";
 import router from "../router.js";
 import { renderAdminDashboard } from "../components/AdminDashboard.js";
+import { renderTeacherList } from "../components/TeacherList.js";
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -35,6 +36,10 @@ export async function renderAuthenticatedApp(user, container) {
         router.on('/admin/dashboard', () => {
             renderAdminDashboard(mainContent, userProfile);
         }).resolve(); // Configura e resolve a rota atual
+        
+        router.on('/admin/teachers', () => {
+            renderTeacherList(mainContent);
+        });
 
         const homeRoute = {
             admin: '/admin/dashboard',
