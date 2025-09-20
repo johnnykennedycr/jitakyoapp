@@ -1,5 +1,6 @@
 import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
+import { showLoading, hideLoading } from './LoadingSpinner.js'; // Importa o novo spinner
 
 // --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE DISCIPLINA ---
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
@@ -13,30 +14,41 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE DELETAR (COM FEEDBACK VISUAL) ---
-async function handleDeleteProfessorClick(teacherId, targetElement, deleteButton) {
-    if (confirm('Tem certeza que deseja deletar este professor? A role do usuário será revertida para "student".')) {
-        // Desabilita o botão para evitar cliques múltiplos
-        deleteButton.disabled = true;
-        deleteButton.textContent = 'Deletando...';
-
-        try {
-            await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
-            // A lista será atualizada e o botão não existirá mais
-            renderTeacherList(targetElement); 
-        } catch (error) {
-            console.error('Erro ao deletar professor:', error);
-            alert('Falha ao deletar professor.');
-            // Reabilita o botão em caso de erro para que o usuário possa tentar novamente
-            deleteButton.disabled = false;
-            deleteButton.textContent = 'Deletar';
+// --- LÓGICA DE DELETAR (AGORA COM MODAL E LOADING) ---
+async function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
+    // Usa o modal para confirmação em vez do 'confirm'
+    showModal(
+        `Confirmar Exclusão`,
+        `<p>Tem certeza que deseja deletar o professor <strong>${teacherName}</strong>? A role do usuário será revertida para "student".</p>
+         <div class="text-right mt-6">
+            <button data-action="cancel-delete" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-400">Cancelar</button>
+            <button data-action="confirm-delete" data-teacher-id="${teacherId}" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Confirmar Exclusão</button>
+         </div>`
+    );
+    
+    // Adiciona um listener para os botões do modal de confirmação
+    document.getElementById('modal-body').onclick = async (e) => {
+        const action = e.target.dataset.action;
+        if (action === 'cancel-delete') {
+            hideModal();
+        } else if (action === 'confirm-delete') {
+            hideModal();
+            showLoading(); // Mostra o loading
+            try {
+                await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
+                renderTeacherList(targetElement); // Atualiza a lista
+            } catch (error) {
+                console.error('Erro ao deletar professor:', error);
+            } finally {
+                hideLoading(); // Esconde o loading, mesmo se der erro
+            }
         }
-    }
+    };
 }
 
 // --- LÓGICA DE EDITAR ---
 async function handleEditProfessorClick(teacherId, targetElement) {
-    showModal('Editar Professor', '<p>Carregando dados...</p>');
+    showLoading();
     try {
         const response = await fetchWithAuth(`/api/admin/teachers/${teacherId}`);
         const teacher = await response.json();
@@ -64,11 +76,12 @@ async function handleEditProfessorClick(teacherId, targetElement) {
         `;
         showModal(`Editando ${teacher.name}`, formHtml);
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados do professor.</p>'); }
+    finally { hideLoading(); }
 }
 
 // --- LÓGICA DE ADICIONAR ---
 async function handleAddProfessorClick(targetElement) {
-    showModal('Adicionar Professor', '<p>Buscando usuários...</p>');
+    showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/available-users');
         const availableUsers = await response.json();
@@ -106,16 +119,16 @@ async function handleAddProfessorClick(targetElement) {
         `;
         showModal('Adicionar Novo Professor', formHtml);
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar a lista de usuários.</p>'); }
+    finally { hideLoading(); }
 }
 
 // --- LÓGICA DE SUBMISSÃO DOS FORMULÁRIOS ---
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
-    const form = e.target;
-    const submitButton = form.querySelector('button[type="submit"]');
-    submitButton.disabled = true;
-    submitButton.textContent = 'Salvando...';
+    hideModal();
+    showLoading();
 
+    const form = e.target;
     const disciplines = [];
     form.querySelectorAll('.discipline-entry').forEach(entry => {
         const disciplineName = entry.querySelector('[name="discipline_name"]').value;
@@ -136,14 +149,7 @@ async function handleFormSubmit(e, targetElement) {
         };
         try {
             await fetchWithAuth('/api/admin/teachers', { method: 'POST', body: JSON.stringify(teacherData) });
-            hideModal();
-            renderTeacherList(targetElement);
-        } catch (error) { 
-            console.error(error); 
-            alert('Falha ao criar professor.');
-            submitButton.disabled = false;
-            submitButton.textContent = 'Salvar Professor';
-        }
+        } catch (error) { console.error(error); }
 
     } else if (form.id === 'edit-teacher-form') {
         const teacherId = form.dataset.teacherId;
@@ -154,15 +160,11 @@ async function handleFormSubmit(e, targetElement) {
         };
         try {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'PUT', body: JSON.stringify(updatedData) });
-            hideModal();
-            renderTeacherList(targetElement);
-        } catch (error) { 
-            console.error(error); 
-            alert('Falha ao atualizar professor.');
-            submitButton.disabled = false;
-            submitButton.textContent = 'Salvar Alterações';
-        }
+        } catch (error) { console.error(error); }
     }
+    
+    await renderTeacherList(targetElement); // Sempre atualiza a lista no final
+    hideLoading();
 }
 
 
@@ -183,13 +185,13 @@ export async function renderTeacherList(targetElement) {
         const button = e.target;
         const action = button.dataset.action;
         const teacherId = button.dataset.teacherId;
+        const teacherName = button.closest('tr')?.querySelector('td:first-child')?.textContent;
         
         if (action === 'add') handleAddProfessorClick(targetElement);
         if (action === 'edit' && teacherId) handleEditProfessorClick(teacherId, targetElement);
-        if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, targetElement, button);
+        if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, teacherName, targetElement);
     });
     
-    // Listeners de eventos para os modais (formulários e botões dinâmicos)
     const modalBody = document.getElementById('modal-body');
     modalBody.onclick = (e) => {
         const action = e.target.dataset.action;
@@ -203,6 +205,7 @@ export async function renderTeacherList(targetElement) {
     };
     modalBody.onsubmit = (e) => handleFormSubmit(e, targetElement);
     
+    showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/teachers/');
         const teachers = await response.json();
@@ -240,6 +243,8 @@ export async function renderTeacherList(targetElement) {
     } catch (error) {
         console.error("Erro ao buscar professores:", error);
         targetElement.querySelector('#teacher-table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os professores.</p>`;
+    } finally {
+        hideLoading();
     }
 }
 
