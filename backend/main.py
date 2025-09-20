@@ -76,6 +76,9 @@ def create_app():
     @app.route('/')
     def index():
         return "JitaKyoApp API is running!"
+    
+    with app.app_context():
+        print(app.url_map)
 
     return app
 

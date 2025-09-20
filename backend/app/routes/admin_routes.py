@@ -83,6 +83,11 @@ def dashboard_data():
         return jsonify(error=str(e)), 500
 
 
+@admin_api_bp.route('/test', methods=['GET'])
+def test_route():
+    """Uma rota de teste para verificar se o blueprint está funcionando."""
+    return jsonify(message="Rota de teste do admin_api_bp funcionando!"), 200
+
 # --- Rotas de Gerenciamento de Professores ---
 
 @admin_api_bp.route('/teachers', methods=['GET'])
