@@ -1,12 +1,9 @@
-// frontend/src/auth/authContext.js
-
 import { auth } from "../config/firebaseConfig.js";
 import { fetchWithAuth } from "../lib/api.js";
 import { createSidebar } from "../components/Sidebar.js";
 import { renderLogin } from "../components/Login.js";
-import { setUserProfile, getUserProfile } from "./userState.js";
-
-// Importe os componentes de página que o roteador irá controlar
+import { setUserProfile } from "./userState.js";
+import router from "../router.js";
 import { renderAdminDashboard } from "../components/AdminDashboard.js";
 
 export async function renderAuthenticatedApp(user, container) {
@@ -34,23 +31,10 @@ export async function renderAuthenticatedApp(user, container) {
             auth.signOut();
         });
 
-        // --- NOVA LÓGICA DE ROTEAMENTO ---
-        const router = new Navigo('/');
-
+        // Configuração das rotas AQUI
         router.on('/admin/dashboard', () => {
-            // Passa os dados do usuário DIRETAMENTE para a função de renderização
-            renderAdminDashboard(mainContent, getUserProfile());
-        });
-
-        router.on('/admin/teachers', () => {
-            mainContent.innerHTML = '<h1>Página de Professores</h1>';
-        });
-        
-        router.notFound(() => {
-            mainContent.innerHTML = '<h1>Erro 404: Página não encontrada</h1>';
-        });
-
-        router.resolve(); // Inicia o roteador
+            renderAdminDashboard(mainContent, userProfile);
+        }).resolve(); // Configura e resolve a rota atual
 
         const homeRoute = {
             admin: '/admin/dashboard',
