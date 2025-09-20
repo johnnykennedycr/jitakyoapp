@@ -4,64 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JitaKyoApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Estilos básicos para o layout */
-        body {
+        html, body {
+            height: 100%;
             margin: 0;
-            font-family: sans-serif;
-            background-color: #f4f7f6;
-        }
-
-        .app-layout {
-            display: flex;
-            height: 100vh;
-        }
-
-        #sidebar-container {
-            width: 250px;
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        }
-        
-        #main-content {
-            flex-grow: 1; /* Ocupa o resto do espaço */
-            padding: 40px;
-            overflow-y: auto; /* Adiciona scroll se o conteúdo for grande */
-        }
-        
-        /* Estilos simples para os links do menu (vamos criar isso com JS) */
-        .sidebar-nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .sidebar-nav a {
-            display: block;
-            color: #ecf0f1;
-            text-decoration: none;
-            padding: 12px 0;
-            font-size: 1.1em;
-            transition: background-color 0.2s;
-        }
-        .sidebar-nav a:hover {
-            background-color: #34495e;
+            font-family: Inter, sans-serif;
+            background-color: #f1f5f9;
         }
     </style>
 </head>
-<body>
-    <div id="app-container">
-        </div>
+<body class="h-full">
+    <!-- O contêiner principal que o main.js está procurando -->
+    <div id="app-container" class="h-full">
+        <!-- O conteúdo (Login ou App Autenticado) será renderizado aqui -->
+    </div>
 
+    <!-- 
+      Este template contém a estrutura da página DEPOIS do login.
+      Ele agora usa classes do Tailwind para ser responsivo.
+    -->
     <template id="layout-template">
-        <div class="app-layout">
-            <aside id="sidebar-container"></aside>
-            <main id="main-content">
-                </main>
+        <div class="app-layout flex flex-col md:flex-row h-full">
+            <!-- Em telas médias ou maiores, o conteúdo principal vem primeiro na ordem visual -->
+            <main id="main-content" class="flex-grow p-4 md:p-8 overflow-y-auto order-1 md:order-2">
+                <!-- O conteúdo da página será carregado aqui -->
+            </main>
+            <!-- A sidebar é o segundo item, mas a ordem muda com base no tamanho da tela -->
+            <aside id="sidebar-container" class="order-2 md:order-1">
+                <!-- A sidebar será renderizada aqui -->
+            </aside>
         </div>
     </template>
     
+    <!-- O script principal da sua aplicação -->
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
