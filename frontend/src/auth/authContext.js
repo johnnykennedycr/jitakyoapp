@@ -1,9 +1,13 @@
+// frontend/src/auth/authContext.js
+
 import { auth } from "../config/firebaseConfig.js";
 import { fetchWithAuth } from "../lib/api.js";
 import { createSidebar } from "../components/Sidebar.js";
-import { initializeRouter, default as router } from "../router.js";
 import { renderLogin } from "../components/Login.js";
-import { setUserProfile } from "./userState.js";
+import { setUserProfile, getUserProfile } from "./userState.js";
+
+// Importe os componentes de página que o roteador irá controlar
+import { renderAdminDashboard } from "../components/AdminDashboard.js";
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -22,18 +26,32 @@ export async function renderAuthenticatedApp(user, container) {
         
         const sidebarHTML = createSidebar(); 
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
+        const mainContent = document.getElementById('main-content');
 
-        const logoutButton = document.getElementById('logout-button');
-        if (logoutButton) {
-            logoutButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                setUserProfile(null);
-                auth.signOut();
-            });
-        }
+        document.getElementById('logout-button').addEventListener('click', (e) => {
+            e.preventDefault();
+            setUserProfile(null);
+            auth.signOut();
+        });
 
-        initializeRouter();
+        // --- NOVA LÓGICA DE ROTEAMENTO ---
+        const router = new Navigo('/');
+
+        router.on('/admin/dashboard', () => {
+            // Passa os dados do usuário DIRETAMENTE para a função de renderização
+            renderAdminDashboard(mainContent, getUserProfile());
+        });
+
+        router.on('/admin/teachers', () => {
+            mainContent.innerHTML = '<h1>Página de Professores</h1>';
+        });
         
+        router.notFound(() => {
+            mainContent.innerHTML = '<h1>Erro 404: Página não encontrada</h1>';
+        });
+
+        router.resolve(); // Inicia o roteador
+
         const homeRoute = {
             admin: '/admin/dashboard',
             super_admin: '/admin/dashboard',

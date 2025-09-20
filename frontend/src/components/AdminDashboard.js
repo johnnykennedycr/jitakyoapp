@@ -1,21 +1,21 @@
 import { auth } from '../lib/firebase.js';
 import { fetchWithAuth } from '../lib/api.js';
-import { getUserProfile } from "../auth/userState.js";
 
-// A função aceita o container e os dados do usuário que já buscamos no main.js
-export async function renderAdminDashboard(container, userData) {
-    const user = getUserProfile(); // Pega o usuário do estado global
-
+/**
+ * Renderiza o dashboard com base nos dados do usuário fornecidos.
+ * @param {HTMLElement} targetElement - O elemento onde o conteúdo será inserido.
+ * @param {object} user - O objeto de perfil do usuário.
+ */
+export function renderAdminDashboard(targetElement, user) {
     if (!user) {
-        targetElement.innerHTML = `<h1 class="text-red-500">Erro: Usuário não encontrado.</h1>`;
+        targetElement.innerHTML = `<h1 class="text-red-500">Erro: Perfil de usuário não fornecido.</h1>`;
         return;
     }
 
     targetElement.innerHTML = `
         <h1 class="text-3xl font-bold">Dashboard</h1>
-        <p class="mt-2">Bem-vindo(a) de volta, ${user.name}!</p>
-        `;
-
+        <p class="mt-2 text-gray-600">Bem-vindo(a) de volta, ${user.name}!</p>
+    `;
     // 1. Renderiza a "casca" do dashboard imediatamente
     container.innerHTML = `
         <div class="bg-gray-800 text-white min-h-screen">
