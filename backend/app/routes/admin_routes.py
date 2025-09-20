@@ -138,6 +138,7 @@ def edit_teacher(teacher_id):
         data = request.get_json()
         # Sua lógica de validação e atualização vai aqui
         # ...
+        
         if teacher_service.update_teacher(teacher_id, data):
             return jsonify(success=True), 200
         else:
