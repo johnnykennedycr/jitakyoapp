@@ -1,5 +1,3 @@
-// frontend/src/components/TeacherList.js
-
 import { fetchWithAuth } from '../lib/api.js';
 
 export async function renderTeacherList(targetElement) {
@@ -30,18 +28,32 @@ export async function renderTeacherList(targetElement) {
                 <thead class="bg-gray-200">
                     <tr>
                         <th class="py-3 px-4 text-left">Nome</th>
-                        <th class="py-3 px-4 text-left">Email</th>
                         <th class="py-3 px-4 text-left">Telefone</th>
+                        <th class="py-3 px-4 text-left">Modalidades / Graduações</th>
                         <th class="py-3 px-4 text-left">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${teachers.map(teacher => `
                         <tr class="border-b">
-                            <td class="py-3 px-4">${teacher.name || 'N/A'}</td>
-                            <td class="py-3 px-4">${teacher.email || 'N/A'}</td>
-                            <td class="py-3 px-4">${teacher.phone || 'N/A'}</td>
-                            <td class="py-3 px-4">
+                            <td class="py-3 px-4 align-top">${teacher.name || 'N/A'}</td>
+                            <td class="py-3 px-4 align-top">
+                                ${teacher.contact_info?.phone || 'N/A'}
+                            </td>
+                            <td class="py-3 px-4 align-top">
+                                ${
+                                    // Verifica se 'disciplines' existe e é um array com itens
+                                    Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0
+                                    ? teacher.disciplines.map(d => `
+                                        <div>
+                                            <strong>${d.discipline_name || 'Modalidade'}:</strong>
+                                            <span>${d.graduation || 'N/A'}</span>
+                                        </div>
+                                    `).join('')
+                                    : 'Nenhuma'
+                                }
+                            </td>
+                            <td class="py-3 px-4 align-top">
                                 <button class="text-indigo-600 hover:underline mr-4">Editar</button>
                                 <button class="text-red-600 hover:underline">Deletar</button>
                             </td>
