@@ -9,7 +9,7 @@ user_service = None
 teacher_service = None
 training_class_service = None
 enrollment_service = None
-# notification_service = None
+
 
 teacher_api_bp = Blueprint(
     'teacher_api', 
