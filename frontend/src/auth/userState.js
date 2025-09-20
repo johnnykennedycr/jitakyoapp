@@ -1,5 +1,3 @@
-// frontend/src/auth/userState.js
-
 let currentUserProfile = null;
 
 /**
