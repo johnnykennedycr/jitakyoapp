@@ -1,3 +1,4 @@
+import './style.css';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./config/firebaseConfig.js";
 import { renderLogin } from "./components/Login.js";
