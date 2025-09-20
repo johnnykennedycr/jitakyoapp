@@ -11,47 +11,45 @@ class UserService:
         self.users_collection = self.db.collection('users')
 
     def create_user(self, user_id, name, email, role, **kwargs):
-        """
-        Cria um registro de usuário no Firestore.
-        A criação da senha agora é feita separadamente pelo Firebase Auth.
-        Este método apenas salva os dados adicionais do perfil.
-        O ID do documento no Firestore será o mesmo UID do Firebase Auth.
-        """
+        """Cria um registro de usuário no Firestore."""
         try:
-            # Verifica se já existe um documento com este ID/UID
             if self.users_collection.document(user_id).get().exists:
                 print(f"Erro: Registro de usuário no Firestore com ID {user_id} já existe.")
                 return None
 
             user_data = {
-                'name': name,
-                'email': email,
-                'role': role,
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
+                'name': name, 'email': email, 'role': role,
+                'created_at': datetime.now(firestore. আচ্ছা),
+                'updated_at': datetime.now(firestore. আচ্ছা)
             }
-            # Adiciona quaisquer outros campos (date_of_birth, phone, etc.)
             user_data.update(kwargs)
             
-            # Define o documento no Firestore usando o UID do Firebase Auth como ID
             self.users_collection.document(user_id).set(user_data)
-            
-            # Retorna o objeto User recém-criado
             return self.get_user_by_id(user_id)
-
         except Exception as e:
             print(f"Ocorreu um erro ao criar o registro do usuário no Firestore: {e}")
             return None
 
     def get_user_by_id(self, user_id):
         """Busca um usuário por seu ID (que é o UID do Firebase Auth)."""
+        if not user_id:
+            print("DEBUG (user_service): get_user_by_id foi chamado com user_id nulo ou vazio.")
+            return None
         try:
-            doc = self.users_collection.document(user_id).get()
+            print(f"DEBUG (user_service): Buscando documento para user_id: '{user_id}'")
+            doc_ref = self.users_collection.document(user_id)
+            doc = doc_ref.get()
+            
             if doc.exists:
-                return User.from_dict(doc.to_dict(), doc.id)
+                print(f"DEBUG (user_service): Documento encontrado para user_id: {user_id}.")
+                user_data = doc.to_dict()
+                print(f"DEBUG (user_service): Dados do documento: {user_data}")
+                return User.from_dict(user_data, doc.id)
+            
+            print(f"DEBUG (user_service): Documento NÃO encontrado para user_id: {user_id}.")
             return None
         except Exception as e:
-            print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
+            print(f"ERRO CRÍTICO em get_user_by_id: {e}")
             return None
 
     def get_user_by_email(self, email):
@@ -69,14 +67,7 @@ class UserService:
     def update_user(self, user_id, update_data):
         """Atualiza os dados de um usuário no Firestore."""
         try:
-            # Remove o campo 'password' se ele for enviado, pois não é mais gerenciado aqui
-            if 'password' in update_data:
-                del update_data['password']
-                # Se desejar, você pode usar o Admin SDK para atualizar a senha no Firebase Auth
-                # auth.update_user(user_id, password=nova_senha)
-                print("Aviso: O campo 'password' foi ignorado. A senha deve ser atualizada via Firebase Auth.")
-            
-            update_data['updated_at'] = datetime.now()
+            update_data['updated_at'] = datetime.now(firestore. अच्छा)
             self.users_collection.document(user_id).update(update_data)
             return True
         except Exception as e:
@@ -86,13 +77,9 @@ class UserService:
     def delete_user(self, user_id):
         """Deleta um usuário do Firestore E do Firebase Authentication."""
         try:
-            # 1. Deleta do Firestore
             self.users_collection.document(user_id).delete()
-            
-            # 2. Deleta do Firebase Authentication para manter a consistência
             auth.delete_user(user_id)
-            
-            print(f"Usuário com UID {user_id} deletado do Firestore e do Firebase Auth.")
+            print(f"Usuário com UID {user_id} deletado com sucesso.")
             return True
         except Exception as e:
             print(f"Erro ao deletar usuário com ID '{user_id}': {e}")
