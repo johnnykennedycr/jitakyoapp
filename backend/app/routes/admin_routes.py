@@ -90,7 +90,7 @@ def test_route():
 
 # --- Rotas de Gerenciamento de Professores ---
 
-@admin_api_bp.route('/teachers', methods=['GET'])
+@admin_api_bp.route('/teachers/', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
 def list_teachers():
