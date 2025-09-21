@@ -233,8 +233,8 @@ export async function renderClassList(targetElement) {
                         <div>
                             <h3 class="text-xl font-bold">${c.name}</h3>
                             <p class="text-gray-600">${c.discipline}</p>
-                            <p class="text-sm mt-2">Capacidade: ${c.capacity} alunos</p>
-                            <p class="text-sm mt-2">Mensalidade: R$${c.default_monthly_fee} alunos</p>
+                            <p class="text-sm mt-2"><strong>Capacidade:</strong> ${c.capacity} alunos</p>
+                            <p class="text-sm mt-2"><strong>Mensalidade:</strong> R$${c.default_monthly_fee}</p>
                             <div class="mt-2">
                                 ${c.schedule.map(s => `
                                     <p class="text-sm text-gray-800"><strong>${s.day_of_week}:</strong> ${s.start_time} - ${s.end_time}</p>
