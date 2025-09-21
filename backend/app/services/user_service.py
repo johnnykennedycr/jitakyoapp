@@ -1,9 +1,6 @@
 from datetime import datetime
 from firebase_admin import firestore, auth
 from app.models.user import User
-import secrets
-import string
-from flask_mail import Message
 
 class UserService:
     def __init__(self, db, enrollment_service, mail):
@@ -13,10 +10,7 @@ class UserService:
         self.users_collection = self.db.collection('users')
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
-        """
-        Cria um novo usuário, gera uma senha temporária, envia por e-mail,
-        e opcionalmente o matricula em turmas.
-        """
+        # ... (código existente, sem alterações)
         try:
             # 1. Gera uma senha segura temporária
             alphabet = string.ascii_letters + string.digits
@@ -71,22 +65,35 @@ class UserService:
             print(f"Erro ao criar usuário com matrículas: {e}")
             raise e # Lança a exceção para a rota poder tratá-la
 
-    # ... O restante do seu user_service.py permanece o mesmo ...
+
     def update_user(self, user_id, update_data):
+        """Atualiza os dados de um usuário no Firestore e, opcionalmente, a senha no Firebase Auth."""
         try:
+            # 1. Verifica se uma nova senha foi fornecida e a remove dos dados a serem salvos no DB
+            new_password = update_data.pop('password', None)
+            if new_password and new_password.strip(): # Garante que não é uma string vazia
+                # 2. Usa o Admin SDK para atualizar a senha no Firebase Authentication
+                auth.update_user(user_id, password=new_password)
+                print(f"Senha do usuário '{user_id}' atualizada no Firebase Auth.")
+
+            # 3. Converte a data de nascimento, se presente
             if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str) and update_data['date_of_birth']:
                  try:
                     update_data['date_of_birth'] = datetime.strptime(update_data['date_of_birth'], '%Y-%m-%d')
                  except (ValueError, TypeError):
                     update_data['date_of_birth'] = None
+
+            # 4. Atualiza o timestamp e os outros dados no Firestore
             update_data['updated_at'] = datetime.now()
             self.users_collection.document(user_id).update(update_data)
+            print(f"Dados do usuário '{user_id}' atualizados no Firestore.")
             return True
         except Exception as e:
             print(f"Erro ao atualizar usuário '{user_id}': {e}")
-            return False
+            raise e # Lança a exceção para que a rota possa tratá-la
             
     def get_user_by_id(self, user_id):
+        # ... (código existente, sem alterações)
         try:
             doc = self.users_collection.document(user_id).get()
             if doc.exists:
@@ -97,6 +104,7 @@ class UserService:
             return None
 
     def get_users_by_role(self, role):
+        # ... (código existente, sem alterações)
         users = []
         try:
             docs = self.users_collection.where('role', '==', role).stream()
@@ -107,6 +115,7 @@ class UserService:
         return users
 
     def delete_user(self, user_id):
+        # ... (código existente, sem alterações)
         try:
             enrollments = self.enrollment_service.get_enrollments_by_student_id(user_id)
             for enrollment in enrollments:

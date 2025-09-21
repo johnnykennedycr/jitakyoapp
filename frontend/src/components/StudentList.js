@@ -38,13 +38,16 @@ async function openStudentForm(targetElement, studentId = null) {
         const availableClassesForEnrollment = allClasses.filter(c => !enrolledClassIds.has(c.id));
 
         const nameAndEmailHtml = studentId ? `
-            <p class="mb-2">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>` 
+            <p class="mb-2">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">Nova Senha</label>
+                <input type="password" name="password" placeholder="Deixe em branco para não alterar" class="p-2 border rounded-md w-full">
+            </div>` 
             : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" placeholder="Nome Completo do Aluno" class="p-2 border rounded-md w-full" required></div>
                 <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" placeholder="Email do Aluno" class="p-2 border rounded-md w-full" required></div>
             </div>
-            // O CAMPO DE SENHA FOI REMOVIDO DAQUI
         `;
 
         const enrollmentSectionHtml = studentId ? `
@@ -98,6 +101,7 @@ async function openStudentForm(targetElement, studentId = null) {
         `;
         showModal(title, formHtml);
         
+        // ... (código dos event listeners, sem alterações)
         const modalBody = document.getElementById('modal-body');
         modalBody.onclick = async (e) => {
             const button = e.target;
@@ -170,15 +174,19 @@ async function handleFormSubmit(e, targetElement) {
         };
 
         let response;
-        if (studentId) {
+        if (studentId) { // MODO DE EDIÇÃO
+            // Pega o valor da nova senha
+            const newPassword = form.elements.password.value;
+            if (newPassword && newPassword.trim() !== '') {
+                userData.password = newPassword;
+            }
+
             response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
                 method: 'PUT', body: JSON.stringify(userData)
             });
-        } else {
+        } else { // MODO DE CRIAÇÃO
             userData.name = form.elements.name.value;
             userData.email = form.elements.email.value;
-            // A SENHA NÃO É MAIS ENVIADA DAQUI
-            // userData.password = form.elements.password.value;
 
             const enrollmentsData = [];
             form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
@@ -208,6 +216,7 @@ async function handleFormSubmit(e, targetElement) {
 }
 
 async function handleDeleteStudentClick(studentId, studentName, targetElement) {
+    // ... (código existente, sem alterações)
     showModal(
         `Confirmar Exclusão`,
         `<p>Tem certeza que deseja deletar o aluno <strong>${studentName}</strong>? Esta ação é irreversível.</p>
@@ -225,6 +234,7 @@ async function handleDeleteStudentClick(studentId, studentName, targetElement) {
 }
 
 export async function renderStudentList(targetElement) {
+    // ... (código existente, sem alterações)
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
