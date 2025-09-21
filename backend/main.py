@@ -29,6 +29,7 @@ def create_app():
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
+    # Importamos os serviços aqui para que eles estejam disponíveis para as rotas
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
@@ -44,6 +45,7 @@ def create_app():
     payment_service = PaymentService(db)
     
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
+    # Importamos os blueprints AQUI, dentro da função create_app, para evitar ciclos
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
