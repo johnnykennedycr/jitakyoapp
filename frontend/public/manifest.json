@@ -22,14 +22,14 @@
   "screenshots": [
     {
       "src": "/assets/screenshots/mobile.png",
-      "sizes": "540x1170",
+      "sizes": "502x712",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Gerenciamento de Turmas"
     },
     {
       "src": "/assets/screenshots/desktop.png",
-      "sizes": "1280x800",
+      "sizes": "1597x741",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Painel de Gerenciamento"
