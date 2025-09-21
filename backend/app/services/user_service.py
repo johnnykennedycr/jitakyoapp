@@ -1,126 +1,132 @@
-from datetime import datetime
-from firebase_admin import firestore, auth
-from app.models.user import User
 import string
 import secrets
+from datetime import datetime
+from firebase_admin import auth, firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
+
+from app.models.user import User
 
 class UserService:
-    def __init__(self, db, enrollment_service, mail=None):
+    def __init__(self, db, enrollment_service, mail_service=None):
         self.db = db
-        self.mail = mail
+        self.mail_service = mail_service
         self.enrollment_service = enrollment_service
         self.users_collection = self.db.collection('users')
 
-    def get_user_by_id(self, user_id):
-        """Busca um usuário por seu ID (que é o UID do Firebase Auth)."""
-        if not user_id:
-            return None
-        try:
-            doc_ref = self.users_collection.document(user_id)
-            doc = doc_ref.get()
-            if doc.exists:
-                return User.from_dict(doc.to_dict(), doc.id)
-            return None
-        except Exception as e:
-            print(f"ERRO CRÍTICO em get_user_by_id: {e}")
-            return None
-
-    def get_users_by_role(self, role):
-        """Retorna uma lista de usuários com uma função (role) específica."""
-        users = []
-        try:
-            docs = self.users_collection.where('role', '==', role).stream()
-            for doc in docs:
-                users.append(User.from_dict(doc.to_dict(), doc.id))
-        except Exception as e:
-            print(f"Erro ao buscar usuários por role '{role}': {e}")
-        return users
+    def _generate_password(self, length=10):
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for i in range(length))
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
-        """Cria um usuário no Auth, seu perfil no Firestore e suas matrículas."""
+        email = user_data.get('email')
         try:
-            # 1. Gerar senha segura
-            alphabet = string.ascii_letters + string.digits
-            password = ''.join(secrets.choice(alphabet) for i in range(10))
+            # Verifica se o e-mail já está em uso no Firebase Auth
+            auth.get_user_by_email(email)
+            raise ValueError(f"O e-mail {email} já está em uso.")
+        except auth.UserNotFoundError:
+            # O e-mail não existe, podemos continuar
+            pass
 
-            # 2. Criar usuário no Firebase Authentication
-            auth_user = auth.create_user(
-                email=user_data['email'],
-                password=password,
-                display_name=user_data['name']
-            )
-
-            # 3. Preparar e criar usuário no Firestore
-            firestore_data = user_data.copy()
-            firestore_data['role'] = 'student'
-            firestore_data['created_at'] = datetime.now()
-            firestore_data['updated_at'] = datetime.now()
+        password = self._generate_password()
+        
+        try:
+            # 1. Cria o usuário no Firebase Authentication
+            auth_user = auth.create_user(email=email, password=password)
             
-            # Converte a string de data de nascimento para um objeto datetime, se existir
-            if 'date_of_birth' in firestore_data and firestore_data['date_of_birth']:
-                try:
-                    firestore_data['date_of_birth'] = datetime.strptime(firestore_data['date_of_birth'], '%Y-%m-%d')
-                except (ValueError, TypeError):
-                    print(f"Aviso: Formato de data inválido para {firestore_data['date_of_birth']}. Deixando como nulo.")
-                    firestore_data['date_of_birth'] = None
-
-            self.users_collection.document(auth_user.uid).set(firestore_data)
+            # 2. Prepara e cria o usuário no Firestore
+            user_data['role'] = 'student'
+            if 'password' in user_data:
+                del user_data['password']
             
-            # 4. Criar matrículas, se houver
+            new_user = self.create_user(auth_user.uid, **user_data)
+
+            # 3. Cria as matrículas, se houver
             if enrollments_data:
-                for enrollment_data in enrollments_data:
-                    enrollment_data['student_id'] = auth_user.uid
-                    self.enrollment_service.create_enrollment(enrollment_data)
+                for enrollment_info in enrollments_data:
+                    enrollment_info['student_id'] = auth_user.uid
+                    self.enrollment_service.create_enrollment(enrollment_info)
+            
+            # 4. Envia o e-mail com a senha
+            if self.mail_service:
+                try:
+                    self.mail_service.send_mail(
+                        to=email,
+                        subject='Bem-vindo ao JitaKyoApp!',
+                        body=f"Olá {user_data['name']},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password}\n\nRecomendamos que você a altere após o primeiro login."
+                    )
+                except Exception as mail_error:
+                    print(f"AVISO: Usuário {email} criado, mas o e-mail de boas-vindas falhou: {mail_error}")
 
-            # 5. Enviar e-mail com a senha (se o serviço de mail estiver configurado)
-            if self.mail:
-                # Adapte a mensagem e o template de e-mail conforme necessário
-                # self.mail.send_message(...)
-                print(f"INFO: E-mail de boas-vindas para {user_data['email']} com a senha {password} seria enviado aqui.")
-
-            return self.get_user_by_id(auth_user.uid)
-
-        except auth.EmailAlreadyExistsError:
-            raise ValueError(f"O e-mail {user_data.get('email')} já está em uso.")
+            return new_user
         except Exception as e:
             print(f"Erro ao criar usuário com matrículas: {e}")
-            # Se a criação no Auth funcionou mas o Firestore falhou, deleta o usuário do Auth
-            if 'auth_user' in locals() and auth_user:
-                auth.delete_user(auth_user.uid)
-                print(f"Usuário {auth_user.uid} removido do Auth devido a erro subsequente.")
-            raise e # Re-lança a exceção para ser capturada pela rota
+            raise e
+
+    def create_user(self, user_id, **user_data):
+        # ... (código existente)
+        if self.users_collection.document(user_id).get().exists:
+            return None
+        
+        user_data['created_at'] = datetime.now()
+        user_data['updated_at'] = datetime.now()
+        
+        if 'date_of_birth' in user_data and isinstance(user_data['date_of_birth'], str):
+            user_data['date_of_birth'] = datetime.fromisoformat(user_data['date_of_birth'])
+
+        self.users_collection.document(user_id).set(user_data)
+        return self.get_user_by_id(user_id)
 
     def update_user(self, user_id, update_data):
-        """Atualiza os dados de um usuário no Firestore e, opcionalmente, no Auth."""
+        # ... (código existente) ...
         try:
-            # Se uma nova senha for fornecida, atualiza no Firebase Auth
             if 'password' in update_data and update_data['password']:
                 auth.update_user(user_id, password=update_data['password'])
-                del update_data['password'] # Remove para não salvar o hash no Firestore
-            
-            # Converte a string de data de nascimento para um objeto datetime
-            if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str):
-                 update_data['date_of_birth'] = datetime.strptime(update_data['date_of_birth'], '%Y-%m-%d')
+                del update_data['password']
 
+            if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str):
+                update_data['date_of_birth'] = datetime.fromisoformat(update_data['date_of_birth'])
+            
             update_data['updated_at'] = datetime.now()
             self.users_collection.document(user_id).update(update_data)
             return True
         except Exception as e:
             print(f"Erro ao atualizar usuário '{user_id}': {e}")
             return False
-
-    def delete_user(self, user_id):
-        """Deleta um usuário do Firestore e do Firebase Authentication."""
-        try:
-            # Também precisa deletar matrículas associadas
-            enrollments_to_delete = self.enrollment_service.get_enrollments_by_student_id(user_id)
-            for enrollment in enrollments_to_delete:
-                self.enrollment_service.delete_enrollment(enrollment.id)
             
+    def get_user_by_id(self, user_id):
+        # ... (código existente)
+        doc = self.users_collection.document(user_id).get()
+        if doc.exists:
+            return User.from_dict(doc.to_dict(), doc.id)
+        return None
+        
+    def get_users_by_role(self, role):
+        # ... (código existente)
+        users = []
+        docs = self.users_collection.where(filter=FieldFilter('role', '==', role)).stream()
+        for doc in docs:
+            users.append(User.from_dict(doc.to_dict(), doc.id))
+        return users
+
+    def search_students_by_name(self, search_term):
+        """Busca por usuários com a role 'student' cujo nome corresponda ao termo de busca."""
+        students = self.get_users_by_role('student')
+        if not search_term:
+            return students
+        
+        # Filtra em memória (case-insensitive)
+        search_term_lower = search_term.lower()
+        return [s for s in students if search_term_lower in s.name.lower()]
+        
+    def delete_user(self, user_id):
+        # ... (código existente)
+        try:
+            # Deleta matrículas primeiro
+            self.enrollment_service.delete_enrollments_by_student_id(user_id)
             self.users_collection.document(user_id).delete()
             auth.delete_user(user_id)
-            print(f"Usuário com UID {user_id} e suas matrículas foram deletados com sucesso.")
             return True
         except Exception as e:
-            print(f"Erro ao deletar usuário com ID '{user_id}': {e}")
+            print(f"Erro ao deletar usuário {user_id}: {e}")
             return False
+

@@ -30,12 +30,10 @@ async function openClassForm(targetElement, classId = null) {
             classId ? fetchWithAuth(`/api/admin/classes/${classId}`) : Promise.resolve(null),
             fetchWithAuth('/api/admin/teachers/')
         ]);
-
         const trainingClass = classRes ? await classRes.json() : null;
         const teachers = await teachersRes.json();
         const title = classId ? `Editando ${trainingClass.name}` : 'Adicionar Nova Turma';
         const scheduleHtml = (trainingClass?.schedule || []).map(createScheduleFieldHtml).join('');
-
         const formHtml = `
             <form id="class-form" data-class-id="${classId || ''}">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -107,37 +105,52 @@ async function handleDeleteClick(classId, className, targetElement) {
 }
 
 async function openEnrollStudentModal(targetElement, classId, className) {
-    showLoading();
-    try {
-        // CORREÇÃO: Chama a nova rota correta
-        const response = await fetchWithAuth(`/api/admin/classes/${classId}/un-enrolled-students`);
-        if (!response.ok) throw new Error('Falha ao buscar alunos.');
-        const students = await response.json();
-        
-        const modalBodyHtml = students.length > 0 ? `
-            <form id="enroll-student-form" data-class-id="${classId}">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium">Selecione o Aluno</label>
-                    <select name="student_id" class="p-2 border rounded-md w-full" required>
-                        <option value="">Selecione um aluno</option>
-                        ${students.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
-                    </select>
-                </div>
-                 <div class="mb-4">
-                    <label class="block text-sm font-medium">Desconto (R$)</label>
-                    <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
-                </div>
-                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
-            </form>
-        ` : `<p>Todos os alunos já estão matriculados nesta turma.</p>`;
-        
-        showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
+    const modalBodyHtml = `
+        <form id="enroll-student-form" data-class-id="${classId}">
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Buscar Aluno por Nome</label>
+                <input type="text" id="student-search-input" placeholder="Digite para buscar..." class="p-2 border rounded-md w-full">
+                <div id="student-search-results" class="mt-2 border rounded-md max-h-40 overflow-y-auto"></div>
+                <input type="hidden" name="student_id">
+            </div>
+             <div class="mb-4">
+                <label class="block text-sm font-medium">Desconto (R$)</label>
+                <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
+            </div>
+            <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
+        </form>
+    `;
+    showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
 
-    } catch(error) { 
-        console.error("Erro no openEnrollStudentModal:", error);
-        showModal('Erro', '<p>Não foi possível carregar os alunos.</p>'); 
-    }
-    finally { hideLoading(); }
+    const searchInput = document.getElementById('student-search-input');
+    const searchResults = document.getElementById('student-search-results');
+    const studentIdInput = document.querySelector('[name="student_id"]');
+    let debounceTimer;
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            const searchTerm = searchInput.value;
+            if (searchTerm.length < 2) {
+                searchResults.innerHTML = '';
+                return;
+            }
+            const response = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
+            const students = await response.json();
+            searchResults.innerHTML = students.length > 0 ?
+                students.map(s => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-student-id="${s.id}" data-student-name="${s.name}">${s.name}</div>`).join('') :
+                `<div class="p-2 text-gray-500">Nenhum aluno encontrado.</div>`;
+        }, 300);
+    });
+
+    searchResults.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.dataset.studentId) {
+            studentIdInput.value = target.dataset.studentId;
+            searchInput.value = target.dataset.studentName;
+            searchResults.innerHTML = '';
+        }
+    });
 }
 
 export async function renderClassList(targetElement) {

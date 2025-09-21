@@ -258,6 +258,19 @@ def delete_class(class_id):
 
 # --- Rotas de Gerenciamento de Alunos ---
 
+@admin_api_bp.route('/students/search', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def search_students():
+    """Busca alunos por um termo no nome."""
+    try:
+        search_term = request.args.get('name', '')
+        students = user_service.search_students_by_name(search_term)
+        return jsonify([s.to_dict() for s in students]), 200
+    except Exception as e:
+        print(f"Erro em search_students: {e}")
+        return jsonify(error=str(e)), 500
+
 @admin_api_bp.route('/students/', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
