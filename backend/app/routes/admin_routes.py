@@ -264,7 +264,6 @@ def delete_class(class_id):
 def list_students():
     """API para listar todos os alunos (usuários com role 'student')."""
     try:
-        # CORREÇÃO: Usando o método correto 'get_users_by_role'
         students = user_service.get_users_by_role('student')
         students_data = [student.to_dict() for student in students]
         return jsonify(students_data), 200
@@ -275,64 +274,36 @@ def list_students():
 @admin_api_bp.route('/students', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
-def add_student():
-    """API para criar um novo usuário com a role 'student'."""
-    try:
-        data = request.get_json()
-        required_fields = ['name', 'email', 'password']
-        if not all(field in data for field in required_fields):
-            return jsonify(error="Campos 'name', 'email', e 'password' são obrigatórios."), 400
-
-        # Cria o usuário no Firebase Authentication
-        auth_user = auth.create_user(email=data['email'], password=data['password'])
-        
-        # Prepara os dados para o Firestore
-        firestore_data = data.copy()
-        firestore_data['role'] = 'student' # Garante a role
-        del firestore_data['password'] # Remove a senha antes de salvar no DB
-        
-        new_student = user_service.create_user(auth_user.uid, **firestore_data)
-        
-        if new_student:
-            return jsonify(new_student.to_dict()), 201
-        else:
-            return jsonify(error="Não foi possível criar o registro do aluno no Firestore."), 500
-    except Exception as e:
-        print(f"Erro em add_student: {e}")
-        return jsonify(error=str(e)), 500
-    
-@admin_api_bp.route('/students', methods=['POST'])
-@login_required
-@role_required('admin', 'super_admin')
 def add_student_with_enrollments():
     """Cria um novo aluno e opcionalmente o matricula em turmas."""
-    data = request.get_json()
-    user_data = data.get('user_data', {})
-    enrollments_data = data.get('enrollments_data', [])
-    
-    if not user_data.get('email') or not user_data.get('password'):
-        return jsonify(error="Email e senha são obrigatórios."), 400
+    try:
+        data = request.get_json()
+        user_data = data.get('user_data', {})
+        enrollments_data = data.get('enrollments_data', [])
+        
+        if not user_data.get('email') or not user_data.get('name'):
+            return jsonify(error="Nome e email são obrigatórios."), 400
 
-    new_user = user_service.create_user_with_enrollments(user_data, enrollments_data)
-    if new_user:
-        return jsonify(new_user.to_dict()), 201
-    else:
-        return jsonify(error="Falha ao criar usuário e matrículas."), 500
-
+        new_user = user_service.create_user_with_enrollments(user_data, enrollments_data)
+        if new_user:
+            return jsonify(new_user.to_dict()), 201
+        else:
+            raise Exception("Falha ao criar usuário no serviço.")
+            
+    except Exception as e:
+        print(f"Erro em add_student_with_enrollments: {e}")
+        # Retorna a mensagem de erro específica do serviço, se houver
+        return jsonify(error=str(e)), 400
 
 @admin_api_bp.route('/students/<string:student_id>', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
 def get_student(student_id):
     """API para buscar um aluno específico."""
-    try:
-        student = user_service.get_user_by_id(student_id)
-        if student and student.role == 'student':
-            return jsonify(student.to_dict()), 200
-        return jsonify(error="Aluno não encontrado."), 404
-    except Exception as e:
-        print(f"Erro em get_student: {e}")
-        return jsonify(error=str(e)), 500
+    student = user_service.get_user_by_id(student_id)
+    if student and student.role == 'student':
+        return jsonify(student.to_dict()), 200
+    return jsonify(error="Aluno não encontrado."), 404
 
 @admin_api_bp.route('/students/<string:student_id>', methods=['PUT'])
 @login_required
@@ -353,13 +324,10 @@ def update_student(student_id):
 @role_required('admin', 'super_admin')
 def delete_student(student_id):
     """API para deletar um aluno."""
-    try:
-        if user_service.delete_user(student_id):
-            return jsonify(success=True), 200
-        return jsonify(error="Aluno não encontrado."), 404
-    except Exception as e:
-        print(f"Erro em delete_student: {e}")
-        return jsonify(error=str(e)), 500
+    if user_service.delete_user(student_id):
+        return jsonify(success=True), 200
+    return jsonify(error="Aluno não encontrado."), 404
+
 
 
 
