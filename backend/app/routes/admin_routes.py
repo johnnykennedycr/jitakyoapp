@@ -386,6 +386,20 @@ def delete_enrollment(enrollment_id):
         return jsonify(error="Falha ao deletar matrícula."), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
+    
+@admin_api_bp.route('/classes/<string:class_id>/un-enrolled-students', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_un_enrolled_students(class_id):
+    """Retorna alunos que NÃO estão matriculados em uma turma específica."""
+    try:
+        all_students = user_service.get_users_by_role('student')
+        enrolled_students_ids = enrollment_service.get_student_ids_by_class_id(class_id)
+        un_enrolled = [s.to_dict() for s in all_students if s.id not in enrolled_students_ids]
+        return jsonify(un_enrolled), 200
+    except Exception as e:
+        print(f"Erro em get_un_enrolled_students: {e}")
+        return jsonify(error=str(e)), 500
 
 # --- ROTAS PARA LISTA DE PRESENÇA (API) ---
 

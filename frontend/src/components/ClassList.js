@@ -2,20 +2,19 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// As funções auxiliares e de formulário permanecem as mesmas
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
 function createScheduleFieldHtml(slot = { day_of_week: '', start_time: '', end_time: '' }) {
     const fieldId = `schedule-${Date.now()}-${Math.random()}`;
     return `
         <div class="dynamic-entry grid grid-cols-1 md:grid-cols-4 gap-2 mb-2 p-2 border rounded" id="${fieldId}">
             <select name="day_of_week" class="p-2 border rounded-md" required>
-                <option value="" ${slot.day_of_week === '' ? 'selected' : ''}>Selecione o Dia</option>
-                <option value="Segunda" ${slot.day_of_week === 'Segunda' ? 'selected' : ''}>Segunda-feira</option>
-                <option value="Terça" ${slot.day_of_week === 'Terça' ? 'selected' : ''}>Terça-feira</option>
-                <option value="Quarta" ${slot.day_of_week === 'Quarta' ? 'selected' : ''}>Quarta-feira</option>
-                <option value="Quinta" ${slot.day_of_week === 'Quinta' ? 'selected' : ''}>Quinta-feira</option>
-                <option value="Sexta" ${slot.day_of_week === 'Sexta' ? 'selected' : ''}>Sexta-feira</option>
+                <option value="" ${!slot.day_of_week ? 'selected' : ''}>Selecione o Dia</option>
+                <option value="Segunda" ${slot.day_of_week === 'Segunda' ? 'selected' : ''}>Segunda</option>
+                <option value="Terça" ${slot.day_of_week === 'Terça' ? 'selected' : ''}>Terça</option>
+                <option value="Quarta" ${slot.day_of_week === 'Quarta' ? 'selected' : ''}>Quarta</option>
+                <option value="Quinta" ${slot.day_of_week === 'Quinta' ? 'selected' : ''}>Quinta</option>
+                <option value="Sexta" ${slot.day_of_week === 'Sexta' ? 'selected' : ''}>Sexta</option>
                 <option value="Sábado" ${slot.day_of_week === 'Sábado' ? 'selected' : ''}>Sábado</option>
-                <option value="Domingo" ${slot.day_of_week === 'Domingo' ? 'selected' : ''}>Domingo</option>
             </select>
             <input type="time" name="start_time" value="${slot.start_time}" class="p-2 border rounded-md" required>
             <input type="time" name="end_time" value="${slot.end_time}" class="p-2 border rounded-md" required>
@@ -110,8 +109,11 @@ async function handleDeleteClick(classId, className, targetElement) {
 async function openEnrollStudentModal(targetElement, classId, className) {
     showLoading();
     try {
+        // CORREÇÃO: Chama a nova rota correta
         const response = await fetchWithAuth(`/api/admin/classes/${classId}/un-enrolled-students`);
+        if (!response.ok) throw new Error('Falha ao buscar alunos.');
         const students = await response.json();
+        
         const modalBodyHtml = students.length > 0 ? `
             <form id="enroll-student-form" data-class-id="${classId}">
                 <div class="mb-4">
@@ -128,8 +130,13 @@ async function openEnrollStudentModal(targetElement, classId, className) {
                 <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
             </form>
         ` : `<p>Todos os alunos já estão matriculados nesta turma.</p>`;
+        
         showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
-    } catch(error) { showModal('Erro', '<p>Não foi possível carregar os alunos.</p>'); }
+
+    } catch(error) { 
+        console.error("Erro no openEnrollStudentModal:", error);
+        showModal('Erro', '<p>Não foi possível carregar os alunos.</p>'); 
+    }
     finally { hideLoading(); }
 }
 
@@ -141,7 +148,6 @@ export async function renderClassList(targetElement) {
         </div>
         <div id="class-cards-container"><p>Carregando...</p></div>`;
 
-    // --- GERENCIADOR DE EVENTOS DA PÁGINA ---
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -154,8 +160,7 @@ export async function renderClassList(targetElement) {
         if (action === 'delete') handleDeleteClick(classId, className, targetElement);
     };
     targetElement.addEventListener('click', handlePageClick);
-
-    // --- GERENCIADOR DE EVENTOS DO MODAL ---
+    
     const modalBody = document.getElementById('modal-body');
     const handleModalClick = async (e) => {
         const button = e.target.closest('button');
@@ -199,7 +204,6 @@ export async function renderClassList(targetElement) {
     };
     modalBody.addEventListener('submit', handleModalSubmit);
     
-    // Carregamento inicial dos cards
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/classes/');
@@ -209,26 +213,19 @@ export async function renderClassList(targetElement) {
             cardsContainer.innerHTML = '<p>Nenhuma turma encontrada.</p>';
             return;
         }
-        // CORREÇÃO: Renderiza os cards em vez da tabela
         cardsContainer.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 ${classes.map(c => `
                     <div class="bg-white rounded-lg shadow-md p-6 flex flex-col">
                         <h3 class="text-xl font-bold text-gray-800">${c.name}</h3>
                         <p class="text-sm text-gray-500 mb-4">${c.discipline}</p>
-                        
                         <div class="space-y-2 text-sm text-gray-700 flex-grow">
                             <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
                             <p><strong>Capacidade:</strong> ${c.capacity}</p>
-                            <div>
-                                <strong>Horários:</strong>
-                                <div class="pl-2">
+                            <div><strong>Horários:</strong><div class="pl-2">
                                 ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
                                     <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
-                                </div>
-                            </div>
-                        </div>
-                        
+                            </div></div></div>
                         <div class="mt-6 pt-4 border-t flex justify-end space-x-2">
                              <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
                                 <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
@@ -239,19 +236,14 @@ export async function renderClassList(targetElement) {
                             <button data-action="delete" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Turma">
                                 <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             </button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+                        </div></div>`).join('')}</div>`;
     } catch (error) {
         console.error("Erro ao buscar turmas:", error);
         targetElement.querySelector('#class-cards-container').innerHTML = `<p class="text-red-500">Falha ao carregar as turmas.</p>`;
     } finally {
         hideLoading();
     }
-
-    // A função de limpeza que remove os listeners específicos desta página
+    
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
         modalBody.removeEventListener('click', handleModalClick);
