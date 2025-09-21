@@ -1,6 +1,5 @@
 import { getUserProfile } from "../auth/userState.js";
 
-// O link 'Sair' foi movido para fora para ser posicionado separadamente
 const navLinks = [
     { text: 'Dashboard', href: '/admin/dashboard', roles: ['admin', 'super_admin'], icon: '/assets/icons/dashboard.svg' },
     { text: 'Professores', href: '/admin/teachers', roles: ['admin', 'super_admin'], icon: '/assets/icons/professor.svg' },
@@ -23,7 +22,7 @@ export function createSidebar() {
     const accessibleLinks = navLinks.filter(link => link.roles.includes(user.role));
 
     return `
-        <!-- Em telas pequenas (mobile), a sidebar é uma barra inferior fixa -->
+        <!-- Mobile Sidebar -->
         <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-800 text-white flex justify-around p-2 z-40">
              ${accessibleLinks.map(link => `
                 <a href="${link.href}" data-navigo class="flex flex-col items-center text-xs p-1 rounded-md hover:bg-slate-700">
@@ -37,9 +36,8 @@ export function createSidebar() {
             </a>
         </nav>
 
-        <!-- Em telas grandes, a sidebar é uma barra lateral fixa -->
-        <nav class="hidden md:flex flex-col bg-slate-800 text-white w-64 h-full p-4 transition-all duration-300 ease-in-out">
-            <!-- Cabeçalho com Logo e Botão de Recolher -->
+        <!-- Desktop Sidebar -->
+        <nav class="hidden md:flex flex-col bg-slate-800 text-white w-64 h-full p-4">
             <div class="sidebar-header flex items-center justify-between pb-4 border-b border-slate-600">
                 <div class="flex items-center">
                     <img src="/logo-icon.png" alt="Logo" class="h-8 sidebar-logo">
@@ -50,11 +48,10 @@ export function createSidebar() {
                 </button>
             </div>
             
-            <!-- Links de Navegação Principais -->
             <ul class="flex flex-col mt-4 flex-grow">
                 ${accessibleLinks.map(link => `
                     <li>
-                        <a href="${link.href}" data-navigo class="sidebar-link flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                        <a href="${link.href}" data-navigo class="sidebar-link flex items-center justify-start p-2 rounded-lg hover:bg-slate-700">
                              <img src="${link.icon}" class="sidebar-icon" alt="${link.text}"/>
                              <span class="ml-3 sidebar-text">${link.text}</span>
                         </a>
@@ -62,9 +59,8 @@ export function createSidebar() {
                 `).join('')}
             </ul>
 
-            <!-- Link de Sair Fixo na Base -->
             <div class="mt-auto pt-4 border-t border-slate-600">
-                 <a href="${logoutLink.href}" id="${logoutLink.id}" class="sidebar-link flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                 <a href="${logoutLink.href}" id="${logoutLink.id}" class="sidebar-link flex items-center justify-start p-2 rounded-lg hover:bg-slate-700">
                      ${logoutLink.icon}
                      <span class="ml-3 sidebar-text">${logoutLink.text}</span>
                  </a>
