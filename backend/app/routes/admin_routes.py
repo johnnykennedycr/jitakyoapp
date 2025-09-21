@@ -200,17 +200,11 @@ def list_classes():
         teachers = teacher_service.get_all_teachers()
         teacher_map = {t.id: t.name for t in teachers}
         
-        # DEBUG: Imprime o mapa de professores para verificação
-        print(f"DEBUG: Teacher map gerado: {teacher_map}")
-
         classes_data = []
         for c in classes:
             class_dict = c.to_dict()
             teacher_id = class_dict.get('teacher_id')
-            
-            # DEBUG: Imprime o ID do professor de cada turma
-            print(f"DEBUG: Verificando turma '{c.name}' com teacher_id: '{teacher_id}'")
-            
+           
             class_dict['teacher_name'] = teacher_map.get(teacher_id, 'N/A')
             classes_data.append(class_dict)
             
