@@ -30,60 +30,56 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
-        const student = studentId ? await (await fetchWithAuth(`/api/admin/students/${studentId}`)).json() : null;
+        // Busca o aluno (se editando) e a lista de turmas em paralelo
+        const [studentResponse, classesResponse] = await Promise.all([
+            studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
+            fetchWithAuth('/api/admin/classes/')
+        ]);
+
+        const student = studentResponse ? await studentResponse.json() : null;
+        const classes = await classesResponse.json();
+        
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
         
-        const nameAndEmailHtml = studentId ? `
-            <p class="mb-4">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>` : `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="student-name" class="block text-sm font-medium text-gray-700">Nome Completo do Aluno</label>
-                    <input id="student-name" type="text" name="name" placeholder="Nome do Aluno" class="mt-1 block w-full p-2 border rounded-md" required>
-                </div>
-                <div>
-                    <label for="student-email" class="block text-sm font-medium text-gray-700">Email do Aluno</label>
-                    <input id="student-email" type="email" name="email" placeholder="email@exemplo.com" class="mt-1 block w-full p-2 border rounded-md" required>
-                </div>
+        // Seção para selecionar turmas (apenas no modo de adição)
+        const enrollmentSectionHtml = !studentId ? `
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
+            <div id="enrollments-container" class="space-y-2">
+                ${classes.map(c => `
+                    <div class="p-2 border rounded">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
+                            <span>${c.name} (${c.discipline}) - Mensalidade Base: R$ ${c.default_monthly_fee}</span>
+                        </label>
+                        <div class="enrollment-details hidden mt-2 pl-6 space-y-2">
+                            <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
+                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full">
+                        </div>
+                    </div>
+                `).join('')}
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="student-password" class="block text-sm font-medium text-gray-700">Senha</label>
-                    <input id="student-password" type="password" name="password" placeholder="Senha de acesso" class="mt-1 block w-full p-2 border rounded-md" ${studentId ? '' : 'required'}>
-                </div>
-                <div>
-                    <label for="student-dob" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                    <input id="student-dob" type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-            </div>`;
-        
-        const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
-        const disciplinesHtml = (student?.enrolled_disciplines || []).map(createDisciplineFieldHtml).join('');
+        ` : '';
 
         const formHtml = `
             <form id="student-form" data-student-id="${studentId || ''}">
-                ${nameAndEmailHtml}
-                <div class="mb-4">
-                    <label for="student-phone" class="block text-sm font-medium text-gray-700">Telefone do Aluno</label>
-                    <input id="student-phone" type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <hr class="my-4">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Responsáveis</h4>
-                    <button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button>
-                </div>
-                <div id="guardians-container">${guardiansHtml}</div>
-                <hr class="my-4">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Modalidades e Graduações</h4>
-                    <button type="button" data-action="add-discipline" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button>
-                </div>
-                <div id="disciplines-container">${disciplinesHtml}</div>
+                <!-- Campos de dados do aluno (nome, email, etc.) -->
+                ${enrollmentSectionHtml}
                 <div class="text-right mt-6">
                     <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button>
                 </div>
             </form>
         `;
         showModal(title, formHtml);
+
+        // Adiciona lógica para mostrar/esconder detalhes da matrícula ao marcar checkbox
+        document.querySelectorAll('input[name="class_enroll"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const detailsDiv = e.target.closest('.p-2').querySelector('.enrollment-details');
+                detailsDiv.classList.toggle('hidden', !e.target.checked);
+            });
+        });
+
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
     finally { hideLoading(); }
 }

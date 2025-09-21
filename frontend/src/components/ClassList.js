@@ -18,6 +18,61 @@ function createScheduleSlotHtml(slot = { day_of_week: '', start_time: '', end_ti
     `;
 }
 
+// --- LÓGICA DE MATRICULAR ALUNO EM UMA TURMA ---
+async function handleEnrollStudentClick(classId, className, targetElement) {
+    showLoading();
+    try {
+        const response = await fetchWithAuth('/api/admin/students/'); // Busca todos os alunos
+        const students = await response.json();
+
+        const formHtml = `
+            <form id="enroll-student-form" data-class-id="${classId}">
+                <p class="mb-4">Matriculando aluno na turma <strong>${className}</strong>.</p>
+                <div class="mb-4">
+                    <label for="student-select" class="block text-sm font-medium text-gray-700">Selecione o Aluno</label>
+                    <select id="student-select" name="student_id" class="mt-1 block w-full p-2 border rounded-md" required>
+                        <option value="">-- Buscar aluno --</option>
+                        ${students.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
+                    <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md">
+                </div>
+                <div class="text-right mt-6">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Confirmar Matrícula</button>
+                </div>
+            </form>
+        `;
+        showModal('Matricular Aluno', formHtml);
+
+        document.getElementById('enroll-student-form').onsubmit = async (e) => {
+            e.preventDefault();
+            hideModal();
+            showLoading();
+            const form = e.target;
+            const enrollmentData = {
+                student_id: form.elements.student_id.value,
+                // A base_monthly_fee será definida no backend a partir da turma
+                discount_amount: form.elements.discount_amount.value,
+                discount_reason: form.elements.discount_reason.value,
+            };
+            try {
+                await fetchWithAuth(`/api/admin/classes/${classId}/enroll`, {
+                    method: 'POST',
+                    body: JSON.stringify(enrollmentData)
+                });
+            } catch (error) { console.error("Erro ao matricular aluno:", error); }
+            finally {
+                // Apenas fecha o loading, não precisa recarregar a lista de turmas
+                hideLoading();
+            }
+        };
+
+    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
+    finally { hideLoading(); }
+}
+
 // --- LÓGICA DE ABRIR FORMULÁRIO (ADICIONAR/EDITAR) ---
 async function openClassForm(targetElement, classId = null) {
     showLoading();
@@ -179,6 +234,7 @@ export async function renderClassList(targetElement) {
                             <h3 class="text-xl font-bold">${c.name}</h3>
                             <p class="text-gray-600">${c.discipline}</p>
                             <p class="text-sm mt-2">Capacidade: ${c.capacity} alunos</p>
+                            <p class="text-sm mt-2">Mensalidade: R$${c.default_monthly_fee} alunos</p>
                             <div class="mt-2">
                                 ${c.schedule.map(s => `
                                     <p class="text-sm text-gray-800"><strong>${s.day_of_week}:</strong> ${s.start_time} - ${s.end_time}</p>
@@ -195,6 +251,7 @@ export async function renderClassList(targetElement) {
         `;
         container.addEventListener('click', (e) => {
             const button = e.target;
+            if (button.dataset.action === 'enroll') handleEnrollStudentClick(button.dataset.classId, button.dataset.className, targetElement);
             if (button.dataset.action === 'edit') openClassForm(targetElement, button.dataset.classId);
             if (button.dataset.action === 'delete') handleDeleteClassClick(button.dataset.classId, button.dataset.className, targetElement);
         });

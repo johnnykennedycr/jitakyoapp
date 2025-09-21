@@ -83,11 +83,6 @@ def dashboard_data():
         return jsonify(error=str(e)), 500
 
 
-@admin_api_bp.route('/test', methods=['GET'])
-def test_route():
-    """Uma rota de teste para verificar se o blueprint está funcionando."""
-    return jsonify(message="Rota de teste do admin_api_bp funcionando!"), 200
-
 
 # --- Rota para buscar usuários que podem ser professores ---
 @admin_api_bp.route('/available-users', methods=['GET'])
@@ -206,6 +201,20 @@ def list_classes():
         return jsonify([c.to_dict() for c in classes]), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
+    
+@admin_api_bp.route('/classes/<string:class_id>/enroll', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def enroll_student_in_class(class_id):
+    """Matricula um aluno existente em uma turma específica."""
+    data = request.get_json()
+    data['class_id'] = class_id # Adiciona o class_id da URL aos dados
+    
+    new_enrollment = enrollment_service.create_enrollment(data)
+    if new_enrollment:
+        return jsonify(new_enrollment.to_dict()), 201
+    else:
+        return jsonify(error="Falha ao criar matrícula."), 500
 
 @admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
 @login_required
@@ -304,6 +313,24 @@ def add_student():
     except Exception as e:
         print(f"Erro em add_student: {e}")
         return jsonify(error=str(e)), 500
+    
+@admin_api_bp.route('/students', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def add_student_with_enrollments():
+    """Cria um novo aluno e opcionalmente o matricula em turmas."""
+    data = request.get_json()
+    user_data = data.get('user_data', {})
+    enrollments_data = data.get('enrollments_data', [])
+    
+    if not user_data.get('email') or not user_data.get('password'):
+        return jsonify(error="Email e senha são obrigatórios."), 400
+
+    new_user = user_service.create_user_with_enrollments(user_data, enrollments_data)
+    if new_user:
+        return jsonify(new_user.to_dict()), 201
+    else:
+        return jsonify(error="Falha ao criar usuário e matrículas."), 500
 
 
 @admin_api_bp.route('/students/<string:student_id>', methods=['GET'])

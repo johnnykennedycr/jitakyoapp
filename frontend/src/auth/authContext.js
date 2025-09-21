@@ -4,12 +4,10 @@ import { createSidebar } from "../components/Sidebar.js";
 import { renderLogin } from "../components/Login.js";
 import { setUserProfile, getUserProfile } from "./userState.js";
 import router from "../router.js";
-
-// Importa todos os componentes de página que o roteador irá controlar
 import { renderAdminDashboard } from "../components/AdminDashboard.js";
 import { renderTeacherList } from "../components/TeacherList.js";
 import { renderStudentList } from "../components/StudentList.js";
-import { renderClassList } from "../components/ClassList.js"; // <-- Importação que faltava
+import { renderClassList } from "../components/ClassList.js";
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -30,14 +28,13 @@ export async function renderAuthenticatedApp(user, container) {
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
         const mainContent = document.getElementById('main-content');
 
-        // --- LÓGICA DE EVENTOS PARA SIDEBAR E LOGOUT ---
         const setupEventListeners = () => {
             const logoutDesktop = document.getElementById('logout-button');
             const logoutMobile = document.getElementById('logout-button-mobile');
             const toggleButton = document.getElementById('sidebar-toggle-btn');
             
             const sidebarNav = document.querySelector('#sidebar-container nav.hidden.md\\:flex');
-            const mainContentEl = document.getElementById('main-content');
+            const mainContent = document.getElementById('main-content');
             const textElements = document.querySelectorAll('.sidebar-text');
             const logo = document.querySelector('.sidebar-logo');
             const links = document.querySelectorAll('.sidebar-link');
@@ -52,12 +49,12 @@ export async function renderAuthenticatedApp(user, container) {
             if(logoutDesktop) logoutDesktop.addEventListener('click', handleLogout);
             if(logoutMobile) logoutMobile.addEventListener('click', handleLogout);
 
-            if (toggleButton && sidebarNav && mainContentEl) {
+            if (toggleButton && sidebarNav && mainContent) {
                 toggleButton.addEventListener('click', () => {
                     sidebarNav.classList.toggle('w-64');
                     sidebarNav.classList.toggle('w-20');
-                    mainContentEl.classList.toggle('md:ml-64');
-                    mainContentEl.classList.toggle('md:ml-20');
+                    mainContent.classList.toggle('md:ml-64');
+                    mainContent.classList.toggle('md:ml-20');
                     textElements.forEach(el => el.classList.toggle('hidden'));
                     logo?.classList.toggle('hidden');
                     header?.classList.toggle('justify-between');
@@ -69,15 +66,17 @@ export async function renderAuthenticatedApp(user, container) {
                 });
             }
         };
+        
         setupEventListeners();
 
         // --- ROTEAMENTO ---
-        router.off(router.routes); // Limpa rotas antigas para evitar duplicação
+        router.off(router.routes);
         router.on({
             '/admin/dashboard': () => renderAdminDashboard(mainContent, getUserProfile()),
             '/admin/teachers': () => renderTeacherList(mainContent),
             '/admin/students': () => renderStudentList(mainContent),
-            '/admin/classes': () => renderClassList(mainContent), // <-- Rota que faltava
+            '/admin/classes': () => renderClassList(mainContent),
+            
         }).notFound(() => {
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });
