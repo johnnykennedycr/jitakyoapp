@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÕES AUXILIARES PARA CAMPOS DINÂMICOS ---
+// --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE RESPONSÁVEL ---
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -15,34 +15,28 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
     `;
 }
 
-function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
-    const fieldId = `discipline-${Date.now()}-${Math.random()}`;
-    return `
-        <div class="discipline-entry flex items-center gap-2 mb-2" id="${fieldId}">
-            <input type="text" name="discipline_name" placeholder="Modalidade (ex: Judô)" value="${discipline.discipline_name}" class="flex-grow p-2 border rounded-md" required>
-            <input type="text" name="graduation" placeholder="Graduação (ex: Faixa Preta)" value="${discipline.graduation}" class="flex-grow p-2 border rounded-md" required>
-            <button type="button" data-action="remove-discipline" data-target="${fieldId}" class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600">&times;</button>
-        </div>
-    `;
-}
-
 // --- LÓGICA DE ABRIR FORMULÁRIO (ADICIONAR/EDITAR) ---
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
-        const [studentResponse, classesResponse] = await Promise.all([
+        const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
             studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
-            fetchWithAuth('/api/admin/classes/')
+            fetchWithAuth('/api/admin/classes/'),
+            studentId ? fetchWithAuth(`/api/admin/students/${studentId}/enrollments`) : Promise.resolve(null)
         ]);
 
-        const student = studentResponse ? await studentResponse.json() : null;
-        const classes = await classesResponse.json();
+        const student = studentRes ? await studentRes.json() : null;
+        const allClasses = await classesRes.json();
+        const currentEnrollments = enrollmentsRes ? await enrollmentsRes.json() : [];
         
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
-        
+
+        const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
+        const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
+        const availableClassesForEnrollment = allClasses.filter(c => !enrolledClassIds.has(c.id));
+
         const nameAndEmailHtml = studentId ? `
-            <p class="mb-2">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>
-            <p class="text-xs text-gray-500 mb-4">Nome, email e senha não podem ser alterados a partir daqui.</p>` 
+            <p class="mb-2">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>` 
             : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
@@ -60,11 +54,32 @@ async function openStudentForm(targetElement, studentId = null) {
             </div>
         `;
 
-        const enrollmentSectionHtml = !studentId ? `
+        const enrollmentSectionHtml = studentId ? `
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
+            <div id="current-enrollments-container" class="space-y-2">
+                ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
+                    <div class="p-2 border rounded flex justify-between items-center">
+                        <span>${classMap[e.class_id]?.name || 'Turma desconhecida'} (Desconto: R$ ${e.discount_amount || 0})</span>
+                        <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
+                    </div>
+                `).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
+            </div>
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
+            <div class="flex gap-2 items-center">
+                <select name="new_class_id" class="p-2 border rounded-md flex-grow">
+                    <option value="">Selecione uma turma</option>
+                    ${availableClassesForEnrollment.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
+                <input type="number" step="0.01" name="new_discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-32">
+                <button type="button" data-action="add-enrollment" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar</button>
+            </div>
+        ` : `
             <hr class="my-4">
             <h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
             <div id="enrollments-container" class="space-y-2">
-                ${classes.map(c => `
+                ${allClasses.map(c => `
                     <div class="p-2 border rounded">
                         <label class="flex items-center">
                             <input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
@@ -77,10 +92,9 @@ async function openStudentForm(targetElement, studentId = null) {
                     </div>
                 `).join('')}
             </div>
-        ` : '';
+        `;
         
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
-        const disciplinesHtml = (student?.enrolled_disciplines || []).map(createDisciplineFieldHtml).join('');
 
         const formHtml = `
             <form id="student-form" data-student-id="${studentId || ''}">
@@ -101,31 +115,37 @@ async function openStudentForm(targetElement, studentId = null) {
                     <button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button>
                 </div>
                 <div id="guardians-container">${guardiansHtml}</div>
-                <hr class="my-4">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Modalidades e Graduações</h4>
-                    <button type="button" data-action="add-discipline" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button>
-                </div>
-                <div id="disciplines-container">${disciplinesHtml}</div>
                 ${enrollmentSectionHtml}
                 <div class="text-right mt-6">
-                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar Dados Pessoais</button>
                 </div>
             </form>
         `;
         showModal(title, formHtml);
         
-        // Adiciona listeners para os botões dinâmicos
-        document.getElementById('modal-body').addEventListener('click', (e) => {
+        document.getElementById('modal-body').addEventListener('click', async (e) => {
             const action = e.target.dataset.action;
             if (action === 'add-guardian') {
                 document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
             }
-            if (action === 'add-discipline') {
-                document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
-            }
-            if (action === 'remove-dynamic-entry' || action === 'remove-discipline') {
+            if (action === 'remove-dynamic-entry') {
                 document.getElementById(e.target.dataset.target)?.remove();
+            }
+            if (action === 'add-enrollment') {
+                const classId = document.querySelector('[name="new_class_id"]').value;
+                const discount = document.querySelector('[name="new_discount_amount"]').value;
+                if (!classId) return;
+                showLoading();
+                await fetchWithAuth('/api/admin/enrollments', {
+                    method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
+                });
+                openStudentForm(targetElement, studentId);
+            }
+            if (action === 'remove-enrollment') {
+                const enrollmentId = e.target.dataset.enrollmentId;
+                showLoading();
+                await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
+                openStudentForm(targetElement, studentId);
             }
         });
 
@@ -140,7 +160,6 @@ async function openStudentForm(targetElement, studentId = null) {
     finally { hideLoading(); }
 }
 
-// --- LÓGICA DE SUBMISSÃO E DELEÇÃO ---
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     hideModal();
@@ -150,32 +169,24 @@ async function handleFormSubmit(e, targetElement) {
     try {
         if (form.id === 'student-form') {
             const studentId = form.dataset.studentId;
-            
             const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
                 name: entry.querySelector('[name="guardian_name"]').value,
                 kinship: entry.querySelector('[name="guardian_kinship"]').value,
                 contact: entry.querySelector('[name="guardian_contact"]').value,
             }));
             
-            const enrolled_disciplines = Array.from(form.querySelectorAll('.discipline-entry')).map(entry => ({
-                discipline_name: entry.querySelector('[name="discipline_name"]').value,
-                graduation: entry.querySelector('[name="graduation"]').value,
-            }));
-
-            // Monta o objeto de dados do usuário
             const userData = {
                 phone: form.elements.phone.value,
                 date_of_birth: form.elements.date_of_birth.value,
                 guardians: guardians,
-                enrolled_disciplines: enrolled_disciplines,
             };
 
-            if (studentId) { // MODO DE EDIÇÃO
+            if (studentId) {
                 await fetchWithAuth(`/api/admin/students/${studentId}`, {
                     method: 'PUT',
                     body: JSON.stringify(userData)
                 });
-            } else { // MODO DE CRIAÇÃO
+            } else {
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
                 userData.password = form.elements.password.value;
@@ -186,8 +197,8 @@ async function handleFormSubmit(e, targetElement) {
                     enrollmentsData.push({
                         class_id: checkbox.value,
                         base_monthly_fee: checkbox.dataset.fee,
-                        discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value,
-                        discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value,
+                        discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value || 0,
+                        discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
                     });
                 });
                 
@@ -232,8 +243,6 @@ async function handleDeleteStudentClick(studentId, studentName, targetElement) {
     };
 }
 
-
-// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -245,7 +254,6 @@ export async function renderStudentList(targetElement) {
         <div id="student-table-container"><p>Carregando alunos...</p></div>
     `;
 
-    // Listener de eventos principal
     targetElement.addEventListener('click', (e) => {
         const button = e.target;
         const action = button.dataset.action;
@@ -274,7 +282,6 @@ export async function renderStudentList(targetElement) {
                     <tr>
                         <th class="py-3 px-4 text-left">Nome</th>
                         <th class="py-3 px-4 text-left">Idade</th>
-                        <th class="py-3 px-4 text-left">Modalidades</th>
                         <th class="py-3 px-4 text-left">Ações</th>
                     </tr>
                 </thead>
@@ -283,7 +290,6 @@ export async function renderStudentList(targetElement) {
                         <tr class="border-b">
                             <td class="py-3 px-4">${student.name || 'N/A'}</td>
                             <td class="py-3 px-4">${student.age !== null ? student.age : 'N/A'}</td>
-                            <td class="py-3 px-4">${(student.enrolled_disciplines || []).map(d => d.discipline_name).join(', ') || 'Nenhuma'}</td>
                             <td class="py-3 px-4">
                                 <button data-action="edit" data-student-id="${student.id}" class="text-indigo-600 hover:underline mr-4">Editar</button>
                                 <button data-action="delete" data-student-id="${student.id}" data-student-name="${student.name}" class="text-red-600 hover:underline">Deletar</button>

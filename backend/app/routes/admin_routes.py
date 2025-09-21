@@ -380,62 +380,34 @@ def delete_student(student_id):
 
 # --- Rotas de Gerenciamento de Matrículas ---
 
-@admin_api_bp.route('/enrollments', methods=['GET'])
+# --- ROTAS DE MATRÍCULAS ---
+@admin_api_bp.route('/students/<string:student_id>/enrollments', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def list_enrollments():
-    """API para listar todas as matrículas."""
-    try:
-        enrollments = enrollment_service.get_all_enrollments()
-        detailed_enrollments = []
-        for enrollment in enrollments:
-            student = user_service.get_user_by_id(enrollment.student_id)
-            training_class = training_class_service.get_class_by_id(enrollment.class_id)
-            detailed_enrollments.append({
-                'id': enrollment.id,
-                'student_name': student.name if student else 'Aluno Desconhecido',
-                'class_name': training_class.name if training_class else 'Turma Desconhecida',
-                'enrollment_date': enrollment.enrollment_date.strftime('%d/%m/%Y')
-            })
-        return jsonify(detailed_enrollments), 200
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+@role_required('admin', 'super_admin')
+def get_student_enrollments(student_id):
+    """API para buscar todas as matrículas de um aluno."""
+    enrollments = enrollment_service.get_enrollments_by_student_id(student_id)
+    return jsonify([e.to_dict() for e in enrollments]), 200
 
 @admin_api_bp.route('/enrollments', methods=['POST'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def new_enrollment():
+@role_required('admin', 'super_admin')
+def add_enrollment():
     """API para criar uma nova matrícula."""
-    try:
-        data = request.get_json()
-        student_id = data.get('student_id')
-        class_id = data.get('class_id')
-        # ... outros dados ...
-
-        if not student_id or not class_id:
-            return jsonify(success=False, message="ID do aluno e da turma são obrigatórios."), 400
-        
-        # ... Sua lógica de create_enrollment
-        enrollment = enrollment_service.create_enrollment(...)
-        if enrollment:
-            return jsonify(success=True, enrollment=enrollment.to_dict()), 201
-        else:
-            return jsonify(success=False, message="Aluno já matriculado."), 409
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+    data = request.get_json()
+    new_enrollment = enrollment_service.create_enrollment(data)
+    if new_enrollment:
+        return jsonify(new_enrollment.to_dict()), 201
+    return jsonify(error="Falha ao criar matrícula, verifique se o aluno já está matriculado nesta turma."), 400
 
 @admin_api_bp.route('/enrollments/<string:enrollment_id>', methods=['DELETE'])
 @login_required
 @role_required('admin', 'super_admin')
 def delete_enrollment(enrollment_id):
     """API para deletar uma matrícula."""
-    try:
-        if enrollment_service.delete_enrollment(enrollment_id):
-            return jsonify(success=True), 200
-        else:
-            return jsonify(success=False, message="Erro ao deletar matrícula."), 500
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+    if enrollment_service.delete_enrollment(enrollment_id):
+        return jsonify(success=True), 200
+    return jsonify(error="Falha ao deletar matrícula."), 500
 
 # --- ROTAS PARA LISTA DE PRESENÇA (API) ---
 
