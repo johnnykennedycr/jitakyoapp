@@ -51,6 +51,14 @@ async function openStudentForm(targetElement, studentId = null) {
             </div>
         `;
 
+        // CORREÇÃO: O campo de senha só aparece no modo de edição
+        const passwordFieldHtml = studentId ? `
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
+                <input type="password" name="password" placeholder="Nova Senha" class="p-2 border rounded-md w-full">
+            </div>
+        ` : '';
+
         const enrollmentSectionHtml = studentId ? `
             <hr class="my-4">
             <h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
@@ -106,10 +114,7 @@ async function openStudentForm(targetElement, studentId = null) {
                         <input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
                      </div>
                 </div>
-                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
-                    <input type="password" name="password" placeholder="Nova Senha" class="p-2 border rounded-md w-full">
-                </div>
+                ${passwordFieldHtml}
                 <hr class="my-4">
                 <div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Responsáveis</h4>
@@ -213,8 +218,6 @@ async function handleFormSubmit(e, targetElement) {
             } else {
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
-                // A senha não é mais enviada daqui, o backend irá gerá-la
-                // userData.password = form.elements.password.value;
 
                 const enrollmentsData = [];
                 form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
