@@ -262,10 +262,24 @@ def delete_class(class_id):
 @login_required
 @role_required('admin', 'super_admin')
 def list_students():
-    """API para listar todos os alunos (usuários com role 'student')."""
+    """API para listar todos os alunos com suas matrículas e nomes de turmas."""
     try:
         students = user_service.get_users_by_role('student')
-        students_data = [student.to_dict() for student in students]
+        all_classes = training_class_service.get_all_classes()
+        class_map = {c.id: c.name for c in all_classes}
+        
+        students_data = []
+        for student in students:
+            student_dict = student.to_dict()
+            enrollments = enrollment_service.get_enrollments_by_student_id(student.id)
+            
+            # Adiciona os nomes das turmas aos dados de matrícula
+            student_dict['enrollments'] = [
+                {**enrollment.to_dict(), 'class_name': class_map.get(enrollment.class_id, 'Turma Desconhecida')}
+                for enrollment in enrollments
+            ]
+            students_data.append(student_dict)
+            
         return jsonify(students_data), 200
     except Exception as e:
         print(f"Erro em list_students: {e}")
