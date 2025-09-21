@@ -197,22 +197,29 @@ def delete_teacher(teacher_id):
 
 # --- Rotas de Gerenciamento de Turmas ---
 
-@admin_api_bp.route('/classes', methods=['GET'])
+# --- ROTAS DO CRUD DE TURMAS ---
+
+@admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
+@role_required('admin', 'super_admin')
 def list_classes():
     """API para listar todas as turmas."""
     try:
-        classes_raw = training_class_service.get_all_classes()
-        teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
-        
-        classes_data = []
-        for cls in classes_raw:
-            cls_dict = cls.to_dict()
-            cls_dict['teacher_name'] = teachers_map.get(cls.teacher_id, 'N/A')
-            classes_data.append(cls_dict)
-            
-        return jsonify(classes_data), 200
+        classes = training_class_service.get_all_classes()
+        return jsonify([c.to_dict() for c in classes]), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+@admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_class(class_id):
+    """API para buscar uma turma específica."""
+    try:
+        training_class = training_class_service.get_class_by_id(class_id)
+        if training_class:
+            return jsonify(training_class.to_dict()), 200
+        return jsonify(error="Turma não encontrada."), 404
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -223,63 +230,23 @@ def add_class():
     """API para criar uma nova turma."""
     try:
         data = request.get_json()
-        new_class = training_class_service.create_class(
-            name=data.get('name'),
-            discipline=data.get('discipline'),
-            teacher_id=data.get('teacher_id'),
-            schedule_data=data.get('schedule', []),
-            capacity=data.get('capacity'),
-            description=data.get('description'),
-            default_monthly_fee=data.get('default_monthly_fee', 0)
-        )
+        new_class = training_class_service.create_class(data)
         if new_class:
-            return jsonify(success=True, class_data=new_class.to_dict()), 201
-        else:
-            return jsonify(success=False, message="Erro ao criar a turma."), 500
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-@admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
-@login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def get_class_details(class_id):
-    """API para obter detalhes de uma turma específica, incluindo alunos."""
-    try:
-        training_class = training_class_service.get_class_by_id(class_id)
-        if not training_class:
-            return jsonify(error="Turma não encontrada."), 404
-
-        teachers = teacher_service.get_all_teachers()
-        
-        enrollments = enrollment_service.get_enrollments_by_class(class_id)
-        enrolled_students = [user_service.get_user_by_id(e.student_id) for e in enrollments]
-        enrolled_students = [s for s in enrolled_students if s]
-
-        all_students = user_service.get_users_by_role('student')
-        enrolled_student_ids = {s.id for s in enrolled_students}
-        available_students = [s for s in all_students if s.id not in enrolled_student_ids]
-        
-        response_data = {
-            "class": training_class.to_dict(),
-            "teachers": [t.to_dict() for t in teachers],
-            "enrolled_students": [s.to_dict() for s in enrolled_students],
-            "available_students": [s.to_dict() for s in available_students]
-        }
-        return jsonify(response_data), 200
+            return jsonify(new_class.to_dict()), 201
+        return jsonify(error="Falha ao criar turma."), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
 @admin_api_bp.route('/classes/<string:class_id>', methods=['PUT'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def edit_class(class_id):
-    """API para atualizar os dados de uma turma."""
+@role_required('admin', 'super_admin')
+def update_class(class_id):
+    """API para atualizar uma turma."""
     try:
         data = request.get_json()
         if training_class_service.update_class(class_id, data):
             return jsonify(success=True), 200
-        else:
-            return jsonify(success=False, message="Erro ao atualizar a turma."), 500
+        return jsonify(error="Turma não encontrada ou falha na atualização."), 404
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -291,11 +258,9 @@ def delete_class(class_id):
     try:
         if training_class_service.delete_class(class_id):
             return jsonify(success=True), 200
-        else:
-            return jsonify(success=False, message="Erro ao deletar a turma."), 500
+        return jsonify(error="Turma não encontrada."), 404
     except Exception as e:
         return jsonify(error=str(e)), 500
-
 
 # --- Rotas de Gerenciamento de Alunos ---
 

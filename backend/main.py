@@ -1,5 +1,3 @@
-# backend/app/main.py
-
 import os
 from dotenv import load_dotenv
 from flask import Flask
@@ -14,18 +12,20 @@ def create_app():
     app = Flask(__name__)
     load_dotenv()
     
+    # --- Configuração de Middlewares ---
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     CORS(app)
 
-    # --- Inicialização do Firebase ---
+    # --- INICIALIZAÇÃO DO FIREBASE ADMIN SDK ---
     try:
         if not firebase_admin._apps:
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
-            print("Firebase Admin SDK inicializado.")
+            print("Firebase Admin SDK inicializado com sucesso.")
     except Exception as e:
         print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
+    # --- CRIAÇÃO DO DB ---
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
@@ -46,26 +46,33 @@ def create_app():
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
-    # ... importe outros blueprints ...
+    from app.routes.student_routes import student_api_bp, init_student_bp
+    from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
     from app.utils.decorators import init_decorators
 
+    # Injeta as dependências necessárias em cada módulo
     init_decorators(user_service)
     init_user_bp(user_service)
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+    init_teacher_bp(user_service, teacher_service, training_class_service, enrollment_service)
+    init_student_bp(user_service, enrollment_service, training_class_service, teacher_service, payment_service)
 
-    # AQUI ESTÁ A CORREÇÃO: Passando todos os serviços necessários
-    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service) 
-    
-    app.register_blueprint(user_api_bp)
+    # Registra os blueprints na aplicação
+    app.register_blueprint(user_api_bp) 
     app.register_blueprint(admin_api_bp)
-    # ... registre outros blueprints ...
+    app.register_blueprint(student_api_bp)
+    app.register_blueprint(teacher_api_bp)
 
     @app.route('/')
     def index():
         return "JitaKyoApp API is running!"
 
     return app
+
+# --- Criação da Instância Final ---
 app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
+
