@@ -26,9 +26,10 @@ class EnrollmentService:
             student_id = data.get('student_id')
 
             # Validação: Verifica se o aluno já está matriculado na turma
-            existing_enrollment = self.enrollments_collection.where('student_id', '==', student_id).where('class_id', '==', class_id).limit(1).stream()
-            if next(existing_enrollment, None):
-                raise ValueError(f"Aluno {student_id} já está matriculado na turma {class_id}.")
+            existing_enrollment_query = self.enrollments_collection.where('student_id', '==', student_id).where('class_id', '==', class_id).limit(1).stream()
+            if next(existing_enrollment_query, None):
+                # CORREÇÃO: Usa f-string corretamente para uma mensagem de erro clara
+                raise ValueError(f"O aluno com ID {student_id} já está matriculado na turma com ID {class_id}.")
 
             # Busca a mensalidade base da turma
             class_doc = self.classes_collection.document(class_id).get()
@@ -42,8 +43,8 @@ class EnrollmentService:
                 'status': 'active',
                 'enrollment_date': datetime.now(),
                 'base_monthly_fee': base_fee,
-                'due_day': data.get('due_day', 10), # Dia de vencimento padrão
-                'discount_amount': float(data.get('discount_amount', 0)),
+                'due_day': data.get('due_day', 10),
+                'discount_amount': float(data.get('discount_amount', 0) or 0),
                 'discount_reason': data.get('discount_reason', ""),
                 'created_at': datetime.now(),
                 'updated_at': datetime.now()
@@ -53,8 +54,8 @@ class EnrollmentService:
             doc_ref.set(enrollment_data)
             return Enrollment.from_dict(enrollment_data, doc_ref.id)
         except Exception as e:
-            print(f"Erro ao criar matrícula: {e}")
-            return None
+            # Propaga o erro para a rota, para que o frontend receba a mensagem específica
+            raise e
 
     def delete_enrollment(self, enrollment_id):
         """Deleta uma matrícula."""

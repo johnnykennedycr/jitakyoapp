@@ -67,6 +67,7 @@ async function openStudentForm(targetElement, studentId = null) {
             </div>
             <hr class="my-4">
             <h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
+            <div id="enrollment-error" class="text-red-500 text-sm mb-2"></div>
             <div class="flex gap-2 items-center">
                 <select name="new_class_id" class="p-2 border rounded-md flex-grow">
                     <option value="">Selecione uma turma</option>
@@ -125,6 +126,9 @@ async function openStudentForm(targetElement, studentId = null) {
         
         document.getElementById('modal-body').addEventListener('click', async (e) => {
             const action = e.target.dataset.action;
+            const errorDiv = document.getElementById('enrollment-error');
+            if (errorDiv) errorDiv.textContent = ''; // Limpa erros antigos
+
             if (action === 'add-guardian') {
                 document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
             }
@@ -135,17 +139,30 @@ async function openStudentForm(targetElement, studentId = null) {
                 const classId = document.querySelector('[name="new_class_id"]').value;
                 const discount = document.querySelector('[name="new_discount_amount"]').value;
                 if (!classId) return;
+                
                 showLoading();
-                await fetchWithAuth('/api/admin/enrollments', {
-                    method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
-                });
-                openStudentForm(targetElement, studentId);
+                try {
+                    await fetchWithAuth('/api/admin/enrollments', {
+                        method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
+                    });
+                    openStudentForm(targetElement, studentId); // Recarrega o formulário
+                } catch (error) {
+                    const errorJson = await error.response.json();
+                    if (errorDiv) errorDiv.textContent = errorJson.error || 'Erro desconhecido.';
+                    hideLoading();
+                }
             }
             if (action === 'remove-enrollment') {
                 const enrollmentId = e.target.dataset.enrollmentId;
                 showLoading();
-                await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
-                openStudentForm(targetElement, studentId);
+                try {
+                    await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
+                    openStudentForm(targetElement, studentId); // Recarrega o formulário
+                } catch (error) {
+                    const errorJson = await error.response.json();
+                    if (errorDiv) errorDiv.textContent = errorJson.error || 'Erro desconhecido.';
+                    hideLoading();
+                }
             }
         });
 
@@ -159,7 +176,6 @@ async function openStudentForm(targetElement, studentId = null) {
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
     finally { hideLoading(); }
 }
-
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     hideModal();
