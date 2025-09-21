@@ -6,39 +6,60 @@
     <title>JitaKyoApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Estilos básicos para o layout */
-        html, body {
+        /* Estilos personalizados para a sidebar e layout */
+        html, body, #app-container {
             height: 100%;
             margin: 0;
             font-family: Inter, sans-serif;
             background-color: #f1f5f9;
         }
+
+        /* Estilo para os ícones da sidebar para que fiquem brancos */
+        .sidebar-icon {
+            filter: brightness(0) invert(1);
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Transições suaves para o recolhimento da sidebar */
+        #sidebar-container, #main-content {
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Estilos para o estado recolhido em telas grandes (md e acima) */
+        .sidebar-collapsed #sidebar-container {
+            width: 5rem; /* 80px */
+        }
+        .sidebar-collapsed #main-content {
+            margin-left: 5rem; /* 80px */
+        }
+        .sidebar-collapsed .sidebar-text {
+            display: none;
+        }
+        .sidebar-collapsed .sidebar-header {
+            justify-content: center;
+        }
+        .sidebar-collapsed .sidebar-logo {
+            display: none;
+        }
     </style>
 </head>
 <body class="h-full">
-    <!-- O contêiner principal que o main.js está procurando -->
     <div id="app-container" class="h-full">
         <!-- O conteúdo (Login ou App Autenticado) será renderizado aqui -->
     </div>
 
-    <!-- 
-      Este template contém a estrutura da página DEPOIS do login.
-      Ele agora usa classes do Tailwind para ser responsivo.
-    -->
+    <!-- O template agora define uma estrutura para a sidebar fixa e o conteúdo principal com margem -->
     <template id="layout-template">
-        <div class="app-layout flex flex-col md:flex-row h-full">
-            <!-- Em telas médias ou maiores, o conteúdo principal vem primeiro na ordem visual -->
-            <main id="main-content" class="flex-grow p-4 md:p-8 overflow-y-auto order-1 md:order-2">
+        <div class="app-layout relative md:flex h-full w-full">
+            <aside id="sidebar-container" class="fixed inset-y-0 left-0 z-30"></aside>
+            <main id="main-content" class="flex-grow overflow-y-auto md:ml-64 p-4 md:p-8">
                 <!-- O conteúdo da página será carregado aqui -->
             </main>
-            <!-- A sidebar é o segundo item, mas a ordem muda com base no tamanho da tela -->
-            <aside id="sidebar-container" class="order-2 md:order-1">
-                <!-- A sidebar será renderizada aqui -->
-            </aside>
         </div>
     </template>
     
-    <!-- O script principal da sua aplicação -->
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+

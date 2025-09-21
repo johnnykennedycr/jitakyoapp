@@ -51,4 +51,14 @@ export async function renderAuthenticatedApp(user, container) {
         console.error("Falha ao carregar o perfil e montar a página:", error);
         auth.signOut();
     }
+        // --- LÓGICA PARA RECOLHER/EXPANDIR SIDEBAR ---
+    const toggleButton = document.getElementById('sidebar-toggle-btn');
+    const layoutContainer = document.querySelector('.app-layout');
+
+    if (toggleButton && layoutContainer) {
+        toggleButton.addEventListener('click', () => {
+            layoutContainer.classList.toggle('sidebar-collapsed');
+        });
+    }
+
 }
