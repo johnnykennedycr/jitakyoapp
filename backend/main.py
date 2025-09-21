@@ -5,6 +5,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask_cors import CORS
+from flask_mail import Mail
 
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
@@ -12,32 +13,41 @@ def create_app():
     app = Flask(__name__)
     load_dotenv()
     
-    # --- Configuração de Middlewares ---
+    # --- Configuração de Middlewares e Mail ---
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     CORS(app)
+    app.config.update(
+        MAIL_SERVER=os.getenv('MAIL_SERVER'),
+        MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
+        MAIL_USE_TLS=os.getenv('MAIL_USE_TLS', 'true').lower() in ('true', '1', 't'),
+        MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+        MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
+        MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
+    )
+    mail = Mail(app)
 
-    # --- INICIALIZAÇÃO DO FIREBASE ADMIN SDK ---
+    # --- Inicialização do Firebase ---
     try:
         if not firebase_admin._apps:
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
-            print("Firebase Admin SDK inicializado com sucesso.")
+            print("Firebase Admin SDK inicializado.")
     except Exception as e:
         print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
-    # --- CRIAÇÃO DO DB ---
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
+    from app.services.enrollment_service import EnrollmentService
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
-    from app.services.enrollment_service import EnrollmentService
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     
     enrollment_service = EnrollmentService(db)
-    user_service = UserService(db, enrollment_service)
+    # Passa a instância 'mail' para o UserService
+    user_service = UserService(db, enrollment_service, mail)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
     attendance_service = AttendanceService(db)
@@ -50,22 +60,16 @@ def create_app():
     from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
     from app.utils.decorators import init_decorators
 
-    # Injeta as dependências necessárias em cada módulo
     init_decorators(user_service)
     init_user_bp(user_service)
-    
-    # AQUI ESTÁ A CORREÇÃO: Passando todos os serviços necessários, incluindo os que faltavam
     init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
-    
-    # Descomente e ajuste estas linhas quando for implementar as rotas de student e teacher
-    # init_student_bp(...) 
-    # init_teacher_bp(...)
+    init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
+    init_student_bp(user_service, enrollment_service, attendance_service, payment_service)
 
-    # Registra os blueprints na aplicação
     app.register_blueprint(user_api_bp) 
     app.register_blueprint(admin_api_bp)
-    # app.register_blueprint(student_api_bp)
-    # app.register_blueprint(teacher_api_bp)
+    app.register_blueprint(student_api_bp)
+    app.register_blueprint(teacher_api_bp)
 
     @app.route('/')
     def index():
@@ -73,7 +77,6 @@ def create_app():
 
     return app
 
-# --- Criação da Instância Final ---
 app = create_app()
 
 if __name__ == '__main__':
