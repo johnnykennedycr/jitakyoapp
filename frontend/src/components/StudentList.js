@@ -123,7 +123,9 @@ async function openStudentForm(targetElement, studentId = null) {
         `;
         showModal(title, formHtml);
         
-        document.getElementById('modal-body').addEventListener('click', async (e) => {
+        // Listener de eventos para os botões dinâmicos dentro do modal
+        const modalBody = document.getElementById('modal-body');
+        modalBody.onclick = async (e) => {
             const button = e.target;
             const action = button.dataset.action;
             
@@ -134,8 +136,8 @@ async function openStudentForm(targetElement, studentId = null) {
                 document.getElementById(button.dataset.target)?.remove();
             }
             if (action === 'add-enrollment') {
-                const classId = document.querySelector('[name="new_class_id"]').value;
-                const discount = document.querySelector('[name="new_discount_amount"]').value;
+                const classId = modalBody.querySelector('[name="new_class_id"]').value;
+                const discount = modalBody.querySelector('[name="new_discount_amount"]').value;
                 if (!classId) {
                     alert('Por favor, selecione uma turma.');
                     return;
@@ -156,6 +158,7 @@ async function openStudentForm(targetElement, studentId = null) {
                         const errorData = await response.json();
                         throw new Error(errorData.error || 'Falha ao criar matrícula.');
                     }
+
                 } catch (error) {
                     alert(`Erro: ${error.message}`);
                 } finally {
@@ -177,15 +180,15 @@ async function openStudentForm(targetElement, studentId = null) {
                     openStudentForm(targetElement, studentId);
                 }
             }
-        });
+        };
 
-        document.querySelectorAll('input[name="class_enroll"]').forEach(checkbox => {
+        modalBody.querySelectorAll('input[name="class_enroll"]').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 const detailsDiv = e.target.closest('.p-2').querySelector('.enrollment-details');
                 detailsDiv.classList.toggle('hidden', !e.target.checked);
             });
         });
-        document.getElementById('student-form').onsubmit = (e) => handleFormSubmit(e, targetElement);
+        modalBody.querySelector('#student-form').onsubmit = (e) => handleFormSubmit(e, targetElement);
 
     } catch (error) { 
         console.error("Erro ao abrir formulário do aluno:", error);

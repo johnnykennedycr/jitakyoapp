@@ -24,9 +24,8 @@ class Enrollment:
         """
         Cria um objeto Enrollment a partir de um dicionário do Firestore.
         """
-        # Converte Timestamps para datetime
         enrollment_date = source_dict.get('enrollment_date')
-        if hasattr(enrollment_date, 'to_date_time'):
+        if hasattr(enrollment_date, 'to_date_time'): # Converte Timestamp para datetime
             enrollment_date = enrollment_date.to_date_time()
 
         created = source_dict.get('created_at')

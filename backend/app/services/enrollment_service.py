@@ -31,12 +31,10 @@ class EnrollmentService:
         ).limit(1).stream()
 
         if len(list(existing_enrollment_query)) > 0:
-            # Busca nomes para uma mensagem de erro mais clara
             student_name = self.users_collection.document(student_id).get().to_dict().get('name', 'desconhecido')
             class_name = self.classes_collection.document(class_id).get().to_dict().get('name', 'desconhecida')
             raise ValueError(f"O aluno '{student_name}' já está matriculado na turma '{class_name}'.")
 
-        # Busca a mensalidade base da turma
         class_doc = self.classes_collection.document(class_id).get()
         if not class_doc.exists:
             raise ValueError(f"Turma com ID {class_id} não encontrada.")
@@ -50,9 +48,9 @@ class EnrollmentService:
             'created_at': datetime.now(),
             'updated_at': datetime.now(),
             'base_monthly_fee': base_fee,
-            'discount_amount': data.get('discount_amount', 0),
+            'discount_amount': float(data.get('discount_amount', 0) or 0),
             'discount_reason': data.get('discount_reason', ''),
-            'due_day': data.get('due_day', 10) # Dia de vencimento padrão
+            'due_day': data.get('due_day', 10)
         }
         
         doc_ref = self.enrollments_collection.document()
@@ -66,7 +64,6 @@ class EnrollmentService:
         try:
             enrollment_docs = self.enrollments_collection.where('student_id', '==', student_id).stream()
             for doc in enrollment_docs:
-                # CORREÇÃO: Passando os dois argumentos necessários
                 enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
