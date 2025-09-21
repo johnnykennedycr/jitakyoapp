@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// As funções auxiliares e de formulário permanecem as mesmas
+// --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE DISCIPLINA ---
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
     const fieldId = `discipline-${Date.now()}-${Math.random()}`;
     return `
@@ -14,9 +14,11 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
+// --- LÓGICA DE ABRIR FORMULÁRIO (ADICIONAR/EDITAR) ---
 async function openTeacherForm(targetElement, teacherId = null) {
     showLoading();
     try {
+        // Busca os dados do professor (se estiver editando) e a lista de usuários disponíveis (se estiver adicionando)
         const [teacherRes, usersRes] = await Promise.all([
             teacherId ? fetchWithAuth(`/api/admin/teachers/${teacherId}`) : Promise.resolve(null),
             !teacherId ? fetchWithAuth('/api/admin/available-users') : Promise.resolve(null)
@@ -26,6 +28,7 @@ async function openTeacherForm(targetElement, teacherId = null) {
         const availableUsers = usersRes ? await usersRes.json() : [];
         const title = teacherId ? `Editando ${teacher.name}` : 'Adicionar Novo Professor';
 
+        // Lógica para exibir a seleção de usuário (apenas no modo de criação)
         const userSelectionHtml = !teacherId ? `
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">Usuário a ser promovido</label>
@@ -62,12 +65,14 @@ async function openTeacherForm(targetElement, teacherId = null) {
         `;
         showModal(title, formHtml);
     } catch (error) {
+        console.error("Erro ao abrir formulário do professor:", error);
         showModal('Erro', '<p>Não foi possível carregar os dados do formulário.</p>');
     } finally {
         hideLoading();
     }
 }
 
+// --- LÓGICA DE SUBMISSÃO E DELEÇÃO ---
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     const form = e.target;
@@ -128,6 +133,7 @@ async function handleDeleteClick(teacherId, teacherName, targetElement) {
     );
 }
 
+// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderTeacherList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -153,7 +159,7 @@ export async function renderTeacherList(targetElement) {
         if (action === 'delete') handleDeleteClick(teacherId, teacherName, targetElement);
     });
     
-    // Listener para o modal
+    // Listener para o modal (botões dinâmicos e de confirmação)
     document.getElementById('modal-body').addEventListener('click', async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -183,7 +189,7 @@ export async function renderTeacherList(targetElement) {
         }
     });
 
-    // Submissão do formulário
+    // Submissão do formulário do modal
     document.getElementById('modal-body').onsubmit = (e) => handleFormSubmit(e, targetElement);
     
     // Carregamento inicial da tabela
