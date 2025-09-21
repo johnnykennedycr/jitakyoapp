@@ -28,3 +28,4 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
