@@ -196,9 +196,6 @@ def delete_teacher(teacher_id):
         return jsonify(error=str(e)), 500
 
 # --- Rotas de Gerenciamento de Turmas ---
-
-# --- ROTAS DO CRUD DE TURMAS ---
-
 @admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
@@ -261,6 +258,7 @@ def delete_class(class_id):
         return jsonify(error="Turma não encontrada."), 404
     except Exception as e:
         return jsonify(error=str(e)), 500
+
 
 # --- Rotas de Gerenciamento de Alunos ---
 
