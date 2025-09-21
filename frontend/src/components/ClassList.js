@@ -1,8 +1,8 @@
 import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
-import { getUserProfile } from '../auth/userState.js';
 
+// As funções auxiliares e de formulário permanecem as mesmas
 function createScheduleFieldHtml(slot = { day_of_week: '', start_time: '', end_time: '' }) {
     const fieldId = `schedule-${Date.now()}-${Math.random()}`;
     return `
@@ -139,7 +139,7 @@ export async function renderClassList(targetElement) {
             <h1 class="text-3xl font-bold">Gerenciamento de Turmas</h1>
             <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Turma</button>
         </div>
-        <div id="table-container"><p>Carregando...</p></div>`;
+        <div id="class-cards-container"><p>Carregando...</p></div>`;
 
     // --- GERENCIADOR DE EVENTOS DA PÁGINA ---
     const handlePageClick = (e) => {
@@ -199,60 +199,54 @@ export async function renderClassList(targetElement) {
     };
     modalBody.addEventListener('submit', handleModalSubmit);
     
-    // Carregamento inicial da tabela
+    // Carregamento inicial dos cards
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/classes/');
         const classes = await response.json();
-        const tableContainer = targetElement.querySelector('#table-container');
+        const cardsContainer = targetElement.querySelector('#class-cards-container');
         if (classes.length === 0) {
-            tableContainer.innerHTML = '<p>Nenhuma turma encontrada.</p>';
+            cardsContainer.innerHTML = '<p>Nenhuma turma encontrada.</p>';
             return;
         }
-        tableContainer.innerHTML = `
-            <div class="bg-white rounded-md shadow overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Professor</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horários</th>
-                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        ${classes.map(c => `
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">${c.name}</div>
-                                    <div class="text-xs text-gray-500">${c.discipline} | Cap: ${c.capacity}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${c.teacher_name || 'N/A'}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    ${(c.schedule || []).map(s => `<div><strong>${s.day_of_week}:</strong> ${s.start_time} - ${s.end_time}</div>`).join('')}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex items-center justify-end space-x-2">
-                                        <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
-                                            <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-                                        </button>
-                                        <button data-action="edit" data-class-id="${c.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Turma">
-                                            <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                        </button>
-                                        <button data-action="delete" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Turma">
-                                            <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+        // CORREÇÃO: Renderiza os cards em vez da tabela
+        cardsContainer.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                ${classes.map(c => `
+                    <div class="bg-white rounded-lg shadow-md p-6 flex flex-col">
+                        <h3 class="text-xl font-bold text-gray-800">${c.name}</h3>
+                        <p class="text-sm text-gray-500 mb-4">${c.discipline}</p>
+                        
+                        <div class="space-y-2 text-sm text-gray-700 flex-grow">
+                            <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
+                            <p><strong>Capacidade:</strong> ${c.capacity}</p>
+                            <div>
+                                <strong>Horários:</strong>
+                                <div class="pl-2">
+                                ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
+                                    <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 pt-4 border-t flex justify-end space-x-2">
+                             <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
+                                <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                            </button>
+                            <button data-action="edit" data-class-id="${c.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Turma">
+                                <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            </button>
+                            <button data-action="delete" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Turma">
+                                <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         `;
     } catch (error) {
         console.error("Erro ao buscar turmas:", error);
-        targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar as turmas.</p>`;
+        targetElement.querySelector('#class-cards-container').innerHTML = `<p class="text-red-500">Falha ao carregar as turmas.</p>`;
     } finally {
         hideLoading();
     }
