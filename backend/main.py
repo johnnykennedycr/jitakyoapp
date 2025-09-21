@@ -19,8 +19,6 @@ def create_app():
     # --- INICIALIZAÇÃO DO FIREBASE ADMIN SDK ---
     try:
         if not firebase_admin._apps:
-            # Em um ambiente Google Cloud (como Cloud Run), ApplicationDefault()
-            # automaticamente encontra as credenciais de serviço corretas.
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
             print("Firebase Admin SDK inicializado com sucesso.")
@@ -31,32 +29,37 @@ def create_app():
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
-    # Importamos os serviços aqui para que eles estejam disponíveis para as rotas
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
     from app.services.enrollment_service import EnrollmentService
+    from app.services.attendance_service import AttendanceService
+    from app.services.payment_service import PaymentService
     
     enrollment_service = EnrollmentService(db)
     user_service = UserService(db, enrollment_service)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
+    attendance_service = AttendanceService(db)
+    payment_service = PaymentService(db)
     
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
-    # Importamos os blueprints AQUI, dentro da função create_app
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
     from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
     from app.utils.decorators import init_decorators
 
-    # Injeta as dependências necessárias em cada módulo de rotas
+    # Injeta as dependências necessárias em cada módulo
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service)
-    # Inicialize outros blueprints se necessário
+    
+    # AQUI ESTÁ A CORREÇÃO: Passando todos os serviços necessários, incluindo os que faltavam
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+    
+    # Descomente e ajuste estas linhas quando for implementar as rotas de student e teacher
+    # init_student_bp(...) 
     # init_teacher_bp(...)
-    # init_student_bp(...)
 
     # Registra os blueprints na aplicação
     app.register_blueprint(user_api_bp) 
@@ -71,7 +74,6 @@ def create_app():
     return app
 
 # --- Criação da Instância Final ---
-# Esta parte é importante para o Gunicorn
 app = create_app()
 
 if __name__ == '__main__':
