@@ -35,7 +35,6 @@ async function openClassForm(targetElement, classId = null) {
         const trainingClass = classRes ? await classRes.json() : null;
         const teachers = await teachersRes.json();
         const title = classId ? `Editando ${trainingClass.name}` : 'Adicionar Nova Turma';
-
         const scheduleHtml = (trainingClass?.schedule || []).map(createScheduleFieldHtml).join('');
 
         const formHtml = `
@@ -113,7 +112,6 @@ async function openEnrollStudentModal(targetElement, classId, className) {
     try {
         const response = await fetchWithAuth(`/api/admin/classes/${classId}/un-enrolled-students`);
         const students = await response.json();
-        
         const modalBodyHtml = students.length > 0 ? `
             <form id="enroll-student-form" data-class-id="${classId}">
                 <div class="mb-4">
@@ -130,9 +128,7 @@ async function openEnrollStudentModal(targetElement, classId, className) {
                 <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
             </form>
         ` : `<p>Todos os alunos já estão matriculados nesta turma.</p>`;
-        
         showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
-
     } catch(error) { showModal('Erro', '<p>Não foi possível carregar os alunos.</p>'); }
     finally { hideLoading(); }
 }
@@ -145,8 +141,8 @@ export async function renderClassList(targetElement) {
         </div>
         <div id="table-container"><p>Carregando...</p></div>`;
 
-    // --- GERENCIADOR DE EVENTOS CENTRAL ---
-    targetElement.addEventListener('click', (e) => {
+    // --- GERENCIADOR DE EVENTOS DA PÁGINA ---
+    const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
@@ -156,9 +152,12 @@ export async function renderClassList(targetElement) {
         if (action === 'enroll') openEnrollStudentModal(targetElement, classId, className);
         if (action === 'edit') openClassForm(targetElement, classId);
         if (action === 'delete') handleDeleteClick(classId, className, targetElement);
-    });
+    };
+    targetElement.addEventListener('click', handlePageClick);
 
-    document.getElementById('modal-body').addEventListener('click', async (e) => {
+    // --- GERENCIADOR DE EVENTOS DO MODAL ---
+    const modalBody = document.getElementById('modal-body');
+    const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
@@ -172,9 +171,10 @@ export async function renderClassList(targetElement) {
             } catch (error) { alert('Falha ao deletar turma.');
             } finally { await renderClassList(targetElement); hideLoading(); }
         }
-    });
-
-    document.getElementById('modal-body').onsubmit = async (e) => {
+    };
+    modalBody.addEventListener('click', handleModalClick);
+    
+    const handleModalSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
         if (form.id === 'enroll-student-form') {
@@ -197,7 +197,9 @@ export async function renderClassList(targetElement) {
             handleFormSubmit(e, targetElement);
         }
     };
+    modalBody.addEventListener('submit', handleModalSubmit);
     
+    // Carregamento inicial da tabela
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/classes/');
@@ -254,5 +256,12 @@ export async function renderClassList(targetElement) {
     } finally {
         hideLoading();
     }
+
+    // A função de limpeza que remove os listeners específicos desta página
+    return () => {
+        targetElement.removeEventListener('click', handlePageClick);
+        modalBody.removeEventListener('click', handleModalClick);
+        modalBody.removeEventListener('submit', handleModalSubmit);
+    };
 }
 

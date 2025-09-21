@@ -2,6 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
+// --- FUNÇÕES AUXILIARES ---
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -14,6 +15,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
     `;
 }
 
+// --- LÓGICA DE ABRIR FORMULÁRIO ---
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
@@ -34,14 +36,8 @@ async function openStudentForm(targetElement, studentId = null) {
 
         const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Nome Completo</label>
-                    <input type="text" name="name" class="p-2 border rounded-md w-full" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" name="email" class="p-2 border rounded-md w-full" required>
-                </div>
+                <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
+                <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
             </div>`;
 
         const passwordFieldHtml = studentId ? `
@@ -61,10 +57,7 @@ async function openStudentForm(targetElement, studentId = null) {
             </div>
             <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
             <div class="flex gap-2 items-center">
-                <select name="new_class_id" class="p-2 border rounded-md flex-grow">
-                    <option value="">Selecione uma turma</option>
-                    ${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-                </select>
+                <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
                 <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-32">
                 <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar</button>
             </div>` : `
@@ -83,14 +76,11 @@ async function openStudentForm(targetElement, studentId = null) {
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                        <input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label>
-                        <input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
+                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
                 ${passwordFieldHtml}
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Responsáveis</h4>
-                    <button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
+                    <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
                 <div id="guardians-container">${guardiansHtml}</div>
                 ${enrollmentsHtml}
                 <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button></div></form>`;
@@ -125,6 +115,8 @@ async function handleFormSubmit(e, targetElement) {
             method = 'PUT';
             const password = form.elements.password.value;
             if (password) userData.password = password;
+            const response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
+            if (!response.ok) throw await response.json();
         } else {
             userData.name = form.elements.name.value;
             userData.email = form.elements.email.value;
@@ -138,10 +130,10 @@ async function handleFormSubmit(e, targetElement) {
                     discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
                 });
             });
-            userData.enrollments_data = enrollmentsData;
+            const payload = { user_data: userData, enrollments_data: enrollmentsData };
+            const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+            if (!response.ok) throw await response.json();
         }
-        const response = await fetchWithAuth(url, { method, body: JSON.stringify(studentId ? userData : { user_data: userData }) });
-        if (!response.ok) throw await response.json();
     } catch (error) {
         alert(`Erro ao salvar aluno: ${error.error || 'Ocorreu uma falha.'}`);
     } finally {
@@ -157,6 +149,7 @@ async function handleDeleteClick(studentId, studentName, targetElement) {
             <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
+// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -165,8 +158,8 @@ export async function renderStudentList(targetElement) {
         </div>
         <div id="table-container"><p>Carregando...</p></div>`;
 
-    // --- GERENCIADOR DE EVENTOS CENTRAL ---
-    targetElement.addEventListener('click', (e) => {
+    // --- GERENCIADOR DE EVENTOS DA PÁGINA ---
+    const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
@@ -175,16 +168,21 @@ export async function renderStudentList(targetElement) {
         if (action === 'add') openStudentForm(targetElement);
         if (action === 'edit') openStudentForm(targetElement, studentId);
         if (action === 'delete') handleDeleteClick(studentId, studentName, targetElement);
-    });
+    };
+    targetElement.addEventListener('click', handlePageClick);
 
-    document.getElementById('modal-body').addEventListener('click', async (e) => {
+    // --- GERENCIADOR DE EVENTOS DO MODAL ---
+    const modalBody = document.getElementById('modal-body');
+    const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
         const studentId = document.querySelector('#student-form')?.dataset.studentId;
+        
         if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
         if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
         if (action === 'cancel-delete') hideModal();
+
         if (action === 'confirm-delete') {
             const studentIdToDelete = button.dataset.studentId;
             hideModal(); showLoading();
@@ -192,7 +190,9 @@ export async function renderStudentList(targetElement) {
             } catch (error) { alert('Falha ao deletar aluno.');
             } finally { await renderStudentList(targetElement); hideLoading(); }
         }
+
         if (action === 'add-enrollment' || action === 'remove-enrollment') {
+            e.stopPropagation(); // Impede que o evento se propague para outros listeners
             const isAdding = action === 'add-enrollment';
             const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
             const method = isAdding ? 'POST' : 'DELETE';
@@ -208,17 +208,13 @@ export async function renderStudentList(targetElement) {
             } catch (error) { alert(`Erro: ${error.error || 'Falha na operação.'}`);
             } finally { openStudentForm(targetElement, studentId); }
         }
-    });
+    };
+    modalBody.addEventListener('click', handleModalClick);
 
-    document.querySelectorAll('input[name="class_enroll"]').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            const detailsDiv = e.target.closest('.p-2').querySelector('.enrollment-details');
-            detailsDiv.classList.toggle('hidden', !e.target.checked);
-        });
-    });
+    const handleModalSubmit = (e) => handleFormSubmit(e, targetElement);
+    modalBody.addEventListener('submit', handleModalSubmit);
     
-    document.getElementById('modal-body').onsubmit = (e) => handleFormSubmit(e, targetElement);
-
+    // Carregamento inicial da tabela
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/students/');
@@ -274,5 +270,12 @@ export async function renderStudentList(targetElement) {
     } finally {
         hideLoading();
     }
+
+    // A função de limpeza que remove os listeners específicos desta página
+    return () => {
+        targetElement.removeEventListener('click', handlePageClick);
+        modalBody.removeEventListener('click', handleModalClick);
+        modalBody.removeEventListener('submit', handleModalSubmit);
+    };
 }
 

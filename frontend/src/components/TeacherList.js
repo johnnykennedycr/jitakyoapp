@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE DISCIPLINA ---
+// As funções auxiliares (createDisciplineFieldHtml, openTeacherForm, etc.) permanecem as mesmas
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
     const fieldId = `discipline-${Date.now()}-${Math.random()}`;
     return `
@@ -14,21 +14,16 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE ABRIR FORMULÁRIO (ADICIONAR/EDITAR) ---
 async function openTeacherForm(targetElement, teacherId = null) {
     showLoading();
     try {
-        // Busca os dados do professor (se estiver editando) e a lista de usuários disponíveis (se estiver adicionando)
         const [teacherRes, usersRes] = await Promise.all([
             teacherId ? fetchWithAuth(`/api/admin/teachers/${teacherId}`) : Promise.resolve(null),
             !teacherId ? fetchWithAuth('/api/admin/available-users') : Promise.resolve(null)
         ]);
-
         const teacher = teacherRes ? await teacherRes.json() : null;
         const availableUsers = usersRes ? await usersRes.json() : [];
         const title = teacherId ? `Editando ${teacher.name}` : 'Adicionar Novo Professor';
-
-        // Lógica para exibir a seleção de usuário (apenas no modo de criação)
         const userSelectionHtml = !teacherId ? `
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">Usuário a ser promovido</label>
@@ -38,9 +33,7 @@ async function openTeacherForm(targetElement, teacherId = null) {
                 </select>
             </div>
         ` : `<p class="mb-4 text-sm text-gray-600">Editando o perfil de <strong>${teacher.name}</strong>.</p>`;
-
         const disciplinesHtml = (teacher?.disciplines || []).map(createDisciplineFieldHtml).join('');
-
         const formHtml = `
             <form id="teacher-form" data-teacher-id="${teacherId || ''}">
                 ${userSelectionHtml}
@@ -72,25 +65,20 @@ async function openTeacherForm(targetElement, teacherId = null) {
     }
 }
 
-// --- LÓGICA DE SUBMISSÃO E DELEÇÃO ---
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     const form = e.target;
     const teacherId = form.dataset.teacherId;
-
     hideModal();
     showLoading();
-
     const disciplines = Array.from(form.querySelectorAll('.discipline-entry')).map(entry => ({
         discipline_name: entry.querySelector('[name="discipline_name"]').value,
         graduation: entry.querySelector('[name="graduation"]').value,
     }));
-
     let data;
     let url;
     let method;
-
-    if (teacherId) { // MODO EDIÇÃO
+    if (teacherId) {
         url = `/api/admin/teachers/${teacherId}`;
         method = 'PUT';
         data = {
@@ -98,7 +86,7 @@ async function handleFormSubmit(e, targetElement) {
             description: form.elements.description.value,
             disciplines: disciplines
         };
-    } else { // MODO CRIAÇÃO
+    } else {
         url = '/api/admin/teachers';
         method = 'POST';
         const selectedOption = form.elements.user_id.options[form.elements.user_id.selectedIndex];
@@ -110,14 +98,13 @@ async function handleFormSubmit(e, targetElement) {
             disciplines: disciplines
         };
     }
-
     try {
         const response = await fetchWithAuth(url, { method, body: JSON.stringify(data) });
         if (!response.ok) throw await response.json();
     } catch (error) {
         alert(`Erro ao salvar professor: ${error.error || error.message || 'Ocorreu uma falha.'}`);
     } finally {
-        await renderTeacherList(targetElement); // Re-renderiza a lista principal
+        await renderTeacherList(targetElement);
         hideLoading();
     }
 }
@@ -146,24 +133,23 @@ export async function renderTeacherList(targetElement) {
     `;
 
     // --- GERENCIADOR DE EVENTOS CENTRAL ---
-    targetElement.addEventListener('click', (e) => {
+    const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
-
         const action = button.dataset.action;
         const teacherId = button.dataset.teacherId;
         const teacherName = button.dataset.teacherName;
-
         if (action === 'add') openTeacherForm(targetElement);
         if (action === 'edit') openTeacherForm(targetElement, teacherId);
         if (action === 'delete') handleDeleteClick(teacherId, teacherName, targetElement);
-    });
+    };
+    targetElement.addEventListener('click', handlePageClick);
     
-    // Listener para o modal (botões dinâmicos e de confirmação)
-    document.getElementById('modal-body').addEventListener('click', async (e) => {
+    // Listener para o modal
+    const modalBody = document.getElementById('modal-body');
+    const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
-        
         const action = button.dataset.action;
         if (action === 'add-discipline') {
             document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
@@ -187,10 +173,11 @@ export async function renderTeacherList(targetElement) {
                 hideLoading();
             }
         }
-    });
+    };
+    modalBody.addEventListener('click', handleModalClick);
 
-    // Submissão do formulário do modal
-    document.getElementById('modal-body').onsubmit = (e) => handleFormSubmit(e, targetElement);
+    const handleModalSubmit = (e) => handleFormSubmit(e, targetElement);
+    modalBody.addEventListener('submit', handleModalSubmit);
     
     // Carregamento inicial da tabela
     showLoading();
@@ -246,5 +233,12 @@ export async function renderTeacherList(targetElement) {
     } finally {
         hideLoading();
     }
+
+    // A função de limpeza que remove os listeners específicos desta página
+    return () => {
+        targetElement.removeEventListener('click', handlePageClick);
+        modalBody.removeEventListener('click', handleModalClick);
+        modalBody.removeEventListener('submit', handleModalSubmit);
+    };
 }
 
