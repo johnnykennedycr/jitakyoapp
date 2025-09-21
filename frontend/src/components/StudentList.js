@@ -213,6 +213,8 @@ async function handleFormSubmit(e, targetElement) {
             } else {
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
+                // A senha não é mais enviada daqui, o backend irá gerá-la
+                // userData.password = form.elements.password.value;
 
                 const enrollmentsData = [];
                 form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
