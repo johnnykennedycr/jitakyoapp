@@ -6,6 +6,7 @@ import { setUserProfile, getUserProfile } from "./userState.js";
 import router from "../router.js";
 import { renderAdminDashboard } from "../components/AdminDashboard.js";
 import { renderTeacherList } from "../components/TeacherList.js";
+import { renderStudentList } from "../components/StudentList.js"; 
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -78,6 +79,7 @@ export async function renderAuthenticatedApp(user, container) {
         router.on({
             '/admin/dashboard': () => renderAdminDashboard(mainContent, getUserProfile()),
             '/admin/teachers': () => renderTeacherList(mainContent),
+            '/admin/students': () => renderStudentList(mainContent),
         }).notFound(() => {
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });

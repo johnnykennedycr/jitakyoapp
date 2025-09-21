@@ -1,5 +1,3 @@
-# services/user_service.py ATUALIZADO E FINALIZADO
-
 from datetime import datetime
 from firebase_admin import firestore, auth
 from app.models.user import User
@@ -7,49 +5,37 @@ from app.models.user import User
 class UserService:
     def __init__(self, db, mail=None):
         self.db = db
-        self.mail = mail # Mantido para outras funcionalidades de e-mail que você possa ter
+        self.mail = mail
         self.users_collection = self.db.collection('users')
 
     def create_user(self, user_id, name, email, role, **kwargs):
         """Cria um registro de usuário no Firestore."""
         try:
             if self.users_collection.document(user_id).get().exists:
-                print(f"Erro: Registro de usuário no Firestore com ID {user_id} já existe.")
                 return None
 
             user_data = {
                 'name': name, 'email': email, 'role': role,
-                'created_at': datetime.now(firestore. আচ্ছা),
-                'updated_at': datetime.now(firestore. আচ্ছা)
+                'created_at': datetime.now(), # CORRIGIDO
+                'updated_at': datetime.now()  # CORRIGIDO
             }
             user_data.update(kwargs)
             
             self.users_collection.document(user_id).set(user_data)
             return self.get_user_by_id(user_id)
         except Exception as e:
-            print(f"Ocorreu um erro ao criar o registro do usuário no Firestore: {e}")
+            print(f"Ocorreu um erro ao criar o registro do usuário: {e}")
             return None
 
     def get_user_by_id(self, user_id):
-        """Busca um usuário por seu ID (que é o UID do Firebase Auth)."""
-        if not user_id:
-            print("DEBUG (user_service): get_user_by_id foi chamado com user_id nulo ou vazio.")
-            return None
+        """Busca um usuário por seu ID (UID do Firebase Auth)."""
         try:
-            print(f"DEBUG (user_service): Buscando documento para user_id: '{user_id}'")
-            doc_ref = self.users_collection.document(user_id)
-            doc = doc_ref.get()
-            
+            doc = self.users_collection.document(user_id).get()
             if doc.exists:
-                print(f"DEBUG (user_service): Documento encontrado para user_id: {user_id}.")
-                user_data = doc.to_dict()
-                print(f"DEBUG (user_service): Dados do documento: {user_data}")
-                return User.from_dict(user_data, doc.id)
-            
-            print(f"DEBUG (user_service): Documento NÃO encontrado para user_id: {user_id}.")
+                return User.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            print(f"ERRO CRÍTICO em get_user_by_id: {e}")
+            print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
             return None
 
     def get_user_by_email(self, email):
@@ -67,7 +53,7 @@ class UserService:
     def update_user(self, user_id, update_data):
         """Atualiza os dados de um usuário no Firestore."""
         try:
-            update_data['updated_at'] = datetime.now(firestore. अच्छा)
+            update_data['updated_at'] = datetime.now() # CORRIGIDO
             self.users_collection.document(user_id).update(update_data)
             return True
         except Exception as e:
@@ -79,7 +65,6 @@ class UserService:
         try:
             self.users_collection.document(user_id).delete()
             auth.delete_user(user_id)
-            print(f"Usuário com UID {user_id} deletado com sucesso.")
             return True
         except Exception as e:
             print(f"Erro ao deletar usuário com ID '{user_id}': {e}")
@@ -118,3 +103,4 @@ class UserService:
         except Exception as e:
             print(f"Erro ao salvar a inscrição push para o usuário {user_id}: {e}")
             return False
+

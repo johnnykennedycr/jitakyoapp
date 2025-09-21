@@ -298,56 +298,65 @@ def delete_class(class_id):
 
 # --- Rotas de Gerenciamento de Alunos (Usuários com role='student') ---
 
-@admin_api_bp.route('/students', methods=['GET'])
+@admin_api_bp.route('/students/', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
+@role_required('admin', 'super_admin')
 def list_students():
     """API para listar todos os alunos."""
-    try:
-        students = user_service.get_users_by_role('student')
-        return jsonify([s.to_dict() for s in students]), 200
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+    students = user_service.get_all_students()
+    return jsonify([s.to_dict() for s in students]), 200
 
-# A rota de ADICIONAR aluno é complexa, pois envolve criar o usuário no Firebase Auth
-# e no Firestore. Ela deve ficar em uma rota de 'users' mais genérica.
+@admin_api_bp.route('/students', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def add_student():
+    """API para adicionar um novo aluno (cria o usuário e o perfil)."""
+    data = request.get_json()
+    student_details = {
+        "phone": data.get('phone'),
+        "date_of_birth": data.get('date_of_birth'),
+        "guardians": data.get('guardians', []),
+        "enrolled_disciplines": data.get('enrolled_disciplines', [])
+    }
+    new_student = user_service.create_user_with_student_details(
+        email=data.get('email'),
+        password=data.get('password'),
+        name=data.get('name'),
+        student_details=student_details
+    )
+    if new_student:
+        return jsonify(new_student.to_dict()), 201
+    return jsonify(error='Erro ao criar aluno.'), 500
+
+@admin_api_bp.route('/students/<string:user_id>', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_student(user_id):
+    """API para buscar um aluno específico."""
+    student = user_service.get_user_by_id(user_id)
+    if student and student.role == 'student':
+        return jsonify(student.to_dict()), 200
+    return jsonify(error="Aluno não encontrado."), 404
 
 @admin_api_bp.route('/students/<string:user_id>', methods=['PUT'])
 @login_required
-@role_required('admin', 'super_admin', 'receptionist')
+@role_required('admin', 'super_admin')
 def edit_student(user_id):
-    """API para editar os dados de um aluno."""
-    try:
-        user = user_service.get_user_by_id(user_id)
-        if not user or user.role != 'student':
-            return jsonify(error="Aluno não encontrado."), 404
-        
-        data = request.get_json()
+    """API para editar os detalhes de um aluno."""
+    data = request.get_json()
+    if user_service.update_student_details(user_id, data):
+        return jsonify(success=True), 200
+    return jsonify(error='Erro ao atualizar aluno.'), 500
 
-        # Lógica de matricular/desmatricular
-        current_enrollments = enrollment_service.get_enrollments_by_student(user_id)
-        current_class_ids = {e.class_id for e in current_enrollments}
-        selected_class_ids = set(data.get('enrolled_classes', []))
-        
-        class_ids_to_enroll = list(selected_class_ids - current_class_ids)
-        class_ids_to_unenroll = list(current_class_ids - selected_class_ids)
+@admin_api_bp.route('/students/<string:user_id>', methods=['DELETE'])
+@login_required
+@role_required('admin', 'super_admin')
+def delete_student(user_id):
+    """API para deletar um aluno (usuário)."""
+    if user_service.delete_user(user_id):
+        return jsonify(success=True), 200
+    return jsonify(error='Erro ao deletar aluno.'), 500
 
-        for class_id in class_ids_to_enroll:
-            # ... sua lógica de create_enrollment ...
-            pass
-        for class_id in class_ids_to_unenroll:
-            # ... sua lógica de delete_enrollment ...
-            pass
-
-        # Remove 'enrolled_classes' para não tentar salvar no documento do usuário
-        data.pop('enrolled_classes', None)
-        
-        if user_service.update_user(user_id, data):
-            return jsonify(success=True), 200
-        else:
-            return jsonify(success=False, message="Erro ao atualizar aluno."), 500
-    except Exception as e:
-        return jsonify(error=str(e)), 500
 
 # A rota para DELETAR um aluno deve ser uma rota de 'users' mais genérica para
 # lidar com a exclusão no Auth e no Firestore.
