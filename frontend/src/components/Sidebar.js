@@ -40,7 +40,7 @@ export function createSidebar() {
         <nav class="hidden md:flex flex-col bg-slate-800 text-white w-64 h-full p-4">
             <div class="sidebar-header flex items-center justify-between pb-4 border-b border-slate-600">
                 <div class="flex items-center">
-                    <img src="/logo-icon.png" alt="Logo" class="h-8 sidebar-logo">
+                    <img src="../../public/assets/logo.png" alt="Logo" class="h-8 sidebar-logo">
                     <span class="text-xl font-bold ml-3 sidebar-text">JitaKyoApp</span>
                 </div>
                 <button id="sidebar-toggle-btn" class="p-1 rounded-md hover:bg-slate-700">

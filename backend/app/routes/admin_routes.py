@@ -296,7 +296,6 @@ def delete_class(class_id):
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-# --- Rotas de Gerenciamento de Alunos (Usuários com role='student') ---
 
 # --- Rotas de Gerenciamento de Alunos ---
 
