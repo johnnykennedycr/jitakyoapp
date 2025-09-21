@@ -1,5 +1,4 @@
 import { auth } from "../config/firebaseConfig.js";
-import { onAuthStateChanged } from "firebase/auth";
 
 /**
  * Retorna uma Promise que resolve com o usuário atual do Firebase.
@@ -8,11 +7,11 @@ import { onAuthStateChanged } from "firebase/auth";
  */
 const getCurrentUser = () => {
   return new Promise((resolve, reject) => {
-    const unsubscribe = onAuthStateChanged(auth, 
+    const unsubscribe = auth.onAuthStateChanged(
       (user) => {
         unsubscribe(); // Para de ouvir após obter o primeiro resultado
         resolve(user);
-      }, 
+      },
       (error) => {
         unsubscribe();
         reject(error);
@@ -23,7 +22,8 @@ const getCurrentUser = () => {
 
 
 /**
- * Executa uma chamada fetch para a API, adicionando automaticamente o token de autenticação.
+ * Executa uma chamada fetch para a API, adicionando automaticamente o token de autenticação
+ * e aprimorando o tratamento de erros.
  * @param {string} url - A URL da API para a qual fazer a requisição.
  * @param {object} options - Opções de fetch (método, corpo, etc.).
  * @returns {Promise<Response>}
@@ -35,10 +35,8 @@ export const fetchWithAuth = async (url, options = {}) => {
     throw new Error('Usuário não autenticado no Firebase.');
   }
 
-  // Pega o token mais recente, forçando a atualização se necessário.
   const token = await user.getIdToken(true);
 
-  // Adiciona o cabeçalho de autorização às opções de fetch
   const headers = {
     ...options.headers,
     'Authorization': `Bearer ${token}`,
@@ -48,9 +46,15 @@ export const fetchWithAuth = async (url, options = {}) => {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    const errorData = await response.text();
-    console.error("Erro da API:", errorData);
-    throw new Error(`Erro na chamada da API: ${response.statusText}`);
+    // Tenta extrair a mensagem de erro específica do backend
+    try {
+        const errorData = await response.json();
+        // Lança um erro com a mensagem do servidor
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+    } catch (e) {
+        // Se a resposta de erro não for JSON, lança um erro genérico
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+    }
   }
 
   return response;
