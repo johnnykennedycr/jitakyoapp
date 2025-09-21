@@ -66,6 +66,7 @@ class EnrollmentService:
         try:
             enrollment_docs = self.enrollments_collection.where('student_id', '==', student_id).stream()
             for doc in enrollment_docs:
+                # CORREÇÃO: Passando os dois argumentos necessários
                 enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")

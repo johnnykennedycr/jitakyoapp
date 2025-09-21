@@ -19,7 +19,6 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
-        // Busca todos os dados necessários em paralelo para otimizar o carregamento
         const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
             studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
             fetchWithAuth('/api/admin/classes/'),
@@ -32,7 +31,6 @@ async function openStudentForm(targetElement, studentId = null) {
         
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
 
-        // Lógica para determinar turmas disponíveis para matrícula
         const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
         const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
         const availableClassesForEnrollment = allClasses.filter(c => !enrolledClassIds.has(c.id));
@@ -125,7 +123,6 @@ async function openStudentForm(targetElement, studentId = null) {
         `;
         showModal(title, formHtml);
         
-        // Listener de eventos para os botões dinâmicos dentro do modal
         document.getElementById('modal-body').addEventListener('click', async (e) => {
             const button = e.target;
             const action = button.dataset.action;
@@ -146,15 +143,22 @@ async function openStudentForm(targetElement, studentId = null) {
                 
                 showLoading();
                 try {
-                    await fetchWithAuth('/api/admin/enrollments', {
-                        method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
+                    const response = await fetchWithAuth('/api/admin/enrollments', {
+                        method: 'POST', 
+                        body: JSON.stringify({ 
+                            student_id: studentId, 
+                            class_id: classId, 
+                            discount_amount: discount 
+                        })
                     });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Falha ao criar matrícula.');
+                    }
                 } catch (error) {
-                    // CORREÇÃO: Captura e exibe o erro da API
-                    const errorData = await error.json();
-                    alert(`Erro: ${errorData.error}`);
+                    alert(`Erro: ${error.message}`);
                 } finally {
-                    // Recarrega o formulário para mostrar a nova matrícula ou o erro
                     openStudentForm(targetElement, studentId);
                 }
             }
@@ -162,9 +166,13 @@ async function openStudentForm(targetElement, studentId = null) {
                 const enrollmentId = button.dataset.enrollmentId;
                 showLoading();
                 try {
-                    await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
+                    const response = await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Falha ao remover matrícula.');
+                    }
                 } catch (error) {
-                    alert('Erro ao remover matrícula.');
+                    alert(`Erro: ${error.message}`);
                 } finally {
                     openStudentForm(targetElement, studentId);
                 }
@@ -179,7 +187,10 @@ async function openStudentForm(targetElement, studentId = null) {
         });
         document.getElementById('student-form').onsubmit = (e) => handleFormSubmit(e, targetElement);
 
-    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados do formulário.</p>'); }
+    } catch (error) { 
+        console.error("Erro ao abrir formulário do aluno:", error);
+        showModal('Erro', '<p>Não foi possível carregar os dados do formulário.</p>'); 
+    }
     finally { hideLoading(); }
 }
 
@@ -204,12 +215,16 @@ async function handleFormSubmit(e, targetElement) {
                 guardians: guardians,
             };
 
-            if (studentId) { // MODO DE EDIÇÃO
-                await fetchWithAuth(`/api/admin/students/${studentId}`, {
+            if (studentId) {
+                const response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
                     method: 'PUT',
                     body: JSON.stringify(userData)
                 });
-            } else { // MODO DE CRIAÇÃO
+                 if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Falha ao atualizar aluno.');
+                }
+            } else {
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
                 userData.password = form.elements.password.value;
@@ -225,17 +240,22 @@ async function handleFormSubmit(e, targetElement) {
                     });
                 });
                 
-                await fetchWithAuth('/api/admin/students', {
+                const response = await fetchWithAuth('/api/admin/students', {
                     method: 'POST',
                     body: JSON.stringify({
                         user_data: userData,
                         enrollments_data: enrollmentsData
                     })
                 });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Falha ao criar aluno.');
+                }
             }
         }
     } catch (error) {
         console.error("Erro ao salvar aluno:", error);
+        alert(`Erro: ${error.message}`);
     } finally {
         await renderStudentList(targetElement);
         hideLoading();
