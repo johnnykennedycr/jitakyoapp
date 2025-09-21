@@ -1,5 +1,6 @@
 import { getUserProfile } from "../auth/userState.js";
 
+// O link 'Sair' foi movido para fora para ser posicionado separadamente
 const navLinks = [
     { text: 'Dashboard', href: '/admin/dashboard', roles: ['admin', 'super_admin'], icon: '/assets/icons/dashboard.svg' },
     { text: 'Professores', href: '/admin/teachers', roles: ['admin', 'super_admin'], icon: '/assets/icons/professor.svg' },
@@ -30,6 +31,10 @@ export function createSidebar() {
                     <span>${link.text}</span>
                 </a>
             `).join('')}
+             <a href="${logoutLink.href}" id="${logoutLink.id}-mobile" class="flex flex-col items-center text-xs p-1 rounded-md hover:bg-slate-700">
+                ${logoutLink.icon}
+                <span>${logoutLink.text}</span>
+            </a>
         </nav>
 
         <!-- Em telas grandes, a sidebar é uma barra lateral fixa -->
@@ -49,7 +54,7 @@ export function createSidebar() {
             <ul class="flex flex-col mt-4 flex-grow">
                 ${accessibleLinks.map(link => `
                     <li>
-                        <a href="${link.href}" data-navigo class="flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                        <a href="${link.href}" data-navigo class="sidebar-link flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
                              <img src="${link.icon}" class="sidebar-icon" alt="${link.text}"/>
                              <span class="ml-3 sidebar-text">${link.text}</span>
                         </a>
@@ -59,7 +64,7 @@ export function createSidebar() {
 
             <!-- Link de Sair Fixo na Base -->
             <div class="mt-auto pt-4 border-t border-slate-600">
-                 <a href="${logoutLink.href}" id="${logoutLink.id}" class="flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                 <a href="${logoutLink.href}" id="${logoutLink.id}" class="sidebar-link flex items-center p-2 rounded-lg hover:bg-slate-700 transition-colors">
                      ${logoutLink.icon}
                      <span class="ml-3 sidebar-text">${logoutLink.text}</span>
                  </a>

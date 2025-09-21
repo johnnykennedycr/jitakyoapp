@@ -6,52 +6,56 @@
     <title>JitaKyoApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Estilos personalizados para a sidebar e layout */
         html, body, #app-container {
             height: 100%;
             margin: 0;
             font-family: Inter, sans-serif;
             background-color: #f1f5f9;
         }
-
-        /* Estilo para os ícones da sidebar para que fiquem brancos */
         .sidebar-icon {
             filter: brightness(0) invert(1);
             width: 24px;
             height: 24px;
         }
-
-        /* Transições suaves para o recolhimento da sidebar */
         #sidebar-container, #main-content {
             transition: all 0.3s ease-in-out;
         }
 
-        /* Estilos para o estado recolhido em telas grandes (md e acima) */
-        .sidebar-collapsed #sidebar-container {
+        /* --- ESTILOS PARA SIDEBAR RECOLHIDA (Telas Grandes) --- */
+        /* Altera a largura da sidebar */
+        .sidebar-collapsed #sidebar-container .md\:w-64 {
             width: 5rem; /* 80px */
         }
+        /* Ajusta a margem do conteúdo principal */
         .sidebar-collapsed #main-content {
             margin-left: 5rem; /* 80px */
         }
+        /* Esconde o texto */
         .sidebar-collapsed .sidebar-text {
             display: none;
         }
+        /* Centraliza o header */
         .sidebar-collapsed .sidebar-header {
             justify-content: center;
         }
+        /* Esconde o logo */
         .sidebar-collapsed .sidebar-logo {
             display: none;
+        }
+        /* Centraliza o ícone dentro do link */
+        .sidebar-collapsed .sidebar-link {
+            justify-content: center;
         }
     </style>
 </head>
 <body class="h-full">
     <div id="app-container" class="h-full">
-        <!-- O conteúdo (Login ou App Autenticado) será renderizado aqui -->
+        <!-- Conteúdo renderizado aqui -->
     </div>
 
-    <!-- O template agora define uma estrutura para a sidebar fixa e o conteúdo principal com margem -->
     <template id="layout-template">
-        <div class="app-layout relative md:flex h-full w-full">
+        <!-- Adicionada a classe 'sidebar-wrapper' para o JS manipular -->
+        <div class="app-layout sidebar-wrapper relative md:flex h-full w-full">
             <aside id="sidebar-container" class="fixed inset-y-0 left-0 z-30"></aside>
             <main id="main-content" class="flex-grow overflow-y-auto md:ml-64 p-4 md:p-8">
                 <!-- O conteúdo da página será carregado aqui -->
