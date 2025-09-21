@@ -1,14 +1,13 @@
 from datetime import date, datetime
-from app.models.discipline_graduation import DisciplineGraduation
 
 class User:
     """
-    Representa um usuário no sistema, que pode ter a role 'student'
-    e conter campos adicionais relacionados.
+    Representa um usuário no sistema, com métodos robustos para conversão
+    de e para o formato do Firestore, lidando com diferentes tipos de data.
     """
     def __init__(self, id=None, name=None, email=None, role='student',
                  date_of_birth=None, phone=None, guardians=None, 
-                 enrolled_disciplines=None, created_at=None, updated_at=None, **kwargs):
+                 enrolled_disciplines=None, created_at=None, updated_at=None):
         
         self.id = id
         self.name = name
@@ -23,14 +22,28 @@ class User:
 
     @staticmethod
     def from_dict(source_dict, doc_id):
-        """Cria um objeto User a partir de um dicionário do Firestore."""
-        
+        """
+        Cria um objeto User a partir de um dicionário do Firestore.
+        Lida com a conversão de Timestamps e Strings de data para datetime do Python.
+        """
         dob = source_dict.get('date_of_birth')
-        if hasattr(dob, 'to_date_time'): # Converte Timestamp para datetime
+        # LÓGICA DE CONVERSÃO DE DATA ROBUSTA
+        if hasattr(dob, 'to_date_time'): # Verifica se é um Timestamp do Firestore
             dob = dob.to_date_time()
+        elif isinstance(dob, str): # Se for uma string, tenta converter
+            try:
+                dob = datetime.strptime(dob, '%Y-%m-%d')
+            except ValueError:
+                print(f"Aviso: formato de data inválido para a string '{dob}'. Ignorando.")
+                dob = None
 
-        disciplines_data = source_dict.get('enrolled_disciplines', [])
-        disciplines_objects = [DisciplineGraduation.from_dict(d) for d in disciplines_data]
+        created = source_dict.get('created_at')
+        if hasattr(created, 'to_date_time'):
+            created = created.to_date_time()
+
+        updated = source_dict.get('updated_at')
+        if hasattr(updated, 'to_date_time'):
+            updated = updated.to_date_time()
 
         return User(
             id=doc_id,
@@ -40,13 +53,15 @@ class User:
             date_of_birth=dob,
             phone=source_dict.get('phone'),
             guardians=source_dict.get('guardians', []),
-            enrolled_disciplines=disciplines_objects,
-            created_at=source_dict.get('created_at'),
-            updated_at=source_dict.get('updated_at')
+            enrolled_disciplines=source_dict.get('enrolled_disciplines', []),
+            created_at=created,
+            updated_at=updated
         )
 
     def to_dict(self):
-        """Converte o objeto User para um dicionário JSON-serializável."""
+        """
+        Converte o objeto User para um dicionário JSON-serializável.
+        """
         return {
             "id": self.id,
             "name": self.name,
@@ -55,19 +70,25 @@ class User:
             "phone": self.phone,
             "age": self.age,
             "guardians": self.guardians,
-            "enrolled_disciplines": [d.to_dict() for d in self.enrolled_disciplines],
+            "enrolled_disciplines": self.enrolled_disciplines,
             "date_of_birth": self.date_of_birth.isoformat() if isinstance(self.date_of_birth, (datetime, date)) else None,
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, (datetime, date)) else None,
+            "updated_at": self.updated_at.isoformat() if isinstance(self.updated_at, (datetime, date)) else None
         }
 
     @property
     def age(self):
         """Calcula a idade com base na data de nascimento."""
-        if not self.date_of_birth: return None
+        if not isinstance(self.date_of_birth, (datetime, date)):
+            return None
+        
         birth_date = self.date_of_birth
-        if isinstance(birth_date, datetime): birth_date = birth_date.date()
+        if isinstance(birth_date, datetime):
+            birth_date = birth_date.date()
+
         today = date.today()
         return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
-
+        
     def __repr__(self):
         return f"<User(id='{self.id}', name='{self.name}', role='{self.role}')>"
 
