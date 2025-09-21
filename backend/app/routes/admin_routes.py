@@ -202,6 +202,23 @@ def list_classes():
         return jsonify([c.to_dict() for c in classes]), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
+    
+@admin_api_bp.route('/classes/<string:class_id>/enrolled-students', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_enrolled_students(class_id):
+    """API para buscar todos os alunos matriculados em uma turma específica."""
+    try:
+        enrolled_student_ids = enrollment_service.get_student_ids_by_class_id(class_id)
+        students = []
+        for student_id in enrolled_student_ids:
+            student = user_service.get_user_by_id(student_id)
+            if student:
+                students.append(student.to_dict())
+        return jsonify(students), 200
+    except Exception as e:
+        print(f"Erro em get_enrolled_students: {e}")
+        return jsonify(error=str(e)), 500
 
 @admin_api_bp.route('/classes', methods=['POST'])
 @login_required

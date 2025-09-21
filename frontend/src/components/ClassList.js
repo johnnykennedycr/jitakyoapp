@@ -153,6 +153,28 @@ async function openEnrollStudentModal(targetElement, classId, className) {
     });
 }
 
+async function openEnrolledStudentsModal(classId, className) {
+    showLoading();
+    try {
+        const response = await fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`);
+        if (!response.ok) {
+            throw new Error('Falha ao buscar alunos matriculados.');
+        }
+        const students = await response.json();
+
+        const studentsHtml = students.length > 0
+            ? `<ul class="list-disc pl-5 space-y-1">${students.map(s => `<li>${s.name}</li>`).join('')}</ul>`
+            : '<p>Nenhum aluno matriculado nesta turma.</p>';
+
+        showModal(`Alunos em ${className}`, studentsHtml);
+    } catch (error) {
+        console.error("Erro ao buscar alunos matriculados:", error);
+        showModal('Erro', '<p>Não foi possível carregar a lista de alunos.</p>');
+    } finally {
+        hideLoading();
+    }
+}
+
 export async function renderClassList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -169,6 +191,7 @@ export async function renderClassList(targetElement) {
         const className = button.dataset.className;
         if (action === 'add') openClassForm(targetElement);
         if (action === 'enroll') openEnrollStudentModal(targetElement, classId, className);
+        if (action === 'view-students') openEnrolledStudentsModal(classId, className);
         if (action === 'edit') openClassForm(targetElement, classId);
         if (action === 'delete') handleDeleteClick(classId, className, targetElement);
     };
@@ -240,6 +263,9 @@ export async function renderClassList(targetElement) {
                                     <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
                             </div></div></div>
                         <div class="mt-6 pt-4 border-t flex justify-end space-x-2">
+                             <button data-action="view-students" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Alunos Matriculados">
+                                <svg class="w-5 h-5 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                             </button>
                              <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
                                 <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                             </button>
