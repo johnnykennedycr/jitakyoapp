@@ -194,13 +194,29 @@ def delete_teacher(teacher_id):
 
 @admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin')
 def list_classes():
-    """API para listar todas as turmas."""
     try:
         classes = training_class_service.get_all_classes()
-        return jsonify([c.to_dict() for c in classes]), 200
+        teachers = teacher_service.get_all_teachers()
+        teacher_map = {t.id: t.name for t in teachers}
+        
+        # DEBUG: Imprime o mapa de professores para verificação
+        print(f"DEBUG: Teacher map gerado: {teacher_map}")
+
+        classes_data = []
+        for c in classes:
+            class_dict = c.to_dict()
+            teacher_id = class_dict.get('teacher_id')
+            
+            # DEBUG: Imprime o ID do professor de cada turma
+            print(f"DEBUG: Verificando turma '{c.name}' com teacher_id: '{teacher_id}'")
+            
+            class_dict['teacher_name'] = teacher_map.get(teacher_id, 'N/A')
+            classes_data.append(class_dict)
+            
+        return jsonify(classes_data), 200
     except Exception as e:
+        print(f"Erro em list_classes: {e}")
         return jsonify(error=str(e)), 500
     
 @admin_api_bp.route('/classes/<string:class_id>/enrolled-students', methods=['GET'])
