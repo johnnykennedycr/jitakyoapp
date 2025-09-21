@@ -37,7 +37,7 @@ export function createSidebar() {
         </nav>
 
         <!-- Desktop Sidebar -->
-        <nav class="hidden md:flex flex-col bg-slate-800 text-white w-64 h-full p-4">
+        <nav class="hidden md:flex flex-col bg-slate-300 text-white w-64 h-full p-4">
             <div class="sidebar-header flex items-center justify-between pb-4 border-b border-slate-600">
                 <div class="flex items-center">
                     <img src="/assets/logo-horizontal.png" alt="Logo" class="h-8 sidebar-logo">
