@@ -3,83 +3,68 @@ from firebase_admin import firestore, auth
 from app.models.user import User
 
 class UserService:
-    def __init__(self, db):
+    def __init__(self, db, enrollment_service):
         self.db = db
         self.users_collection = self.db.collection('users')
-        self.enrollments_collection = self.db.collection('enrollments') # Referência para matrículas
+        self.enrollment_service = enrollment_service
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
         """
-        Cria um usuário no Firebase Auth e seu perfil no Firestore,
-        juntamente com múltiplas matrículas, em uma única transação.
+        Cria um usuário no Firebase Auth, um documento de perfil no Firestore,
+        e opcionalmente cria suas matrículas em uma única operação.
         """
+        auth_user = None
         try:
             # 1. Cria o usuário no Firebase Authentication
-            new_auth_user = auth.create_user(
-                email=user_data.get('email'),
-                password=user_data.get('password'),
+            auth_user = auth.create_user(
+                email=user_data['email'],
+                password=user_data['password'],
                 display_name=user_data.get('name')
             )
-            user_id = new_auth_user.uid
 
-            # Inicia um batch para garantir que todas as operações sejam atômicas
-            batch = self.db.batch()
+            # 2. Prepara os dados para salvar no Firestore
+            firestore_data = user_data.copy()
+            firestore_data['role'] = 'student'  # Garante a role padrão
+            if 'password' in firestore_data:
+                del firestore_data['password']  # Nunca salve a senha em texto plano
 
-            # 2. Prepara o perfil do usuário para o Firestore
-            profile_data = {
-                'name': user_data.get('name'),
-                'email': user_data.get('email'),
-                'role': 'student',
-                'phone': user_data.get('phone'),
-                'date_of_birth': datetime.strptime(user_data.get('date_of_birth'), '%Y-%m-%d') if user_data.get('date_of_birth') else None,
-                'guardians': user_data.get('guardians', []),
-                'enrolled_disciplines': user_data.get('enrolled_disciplines', []),
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
-            }
-            user_ref = self.users_collection.document(user_id)
-            batch.set(user_ref, profile_data)
+            firestore_data['created_at'] = datetime.now()
+            firestore_data['updated_at'] = datetime.now()
 
-            # 3. Prepara as matrículas para serem adicionadas ao batch
-            for enroll_data in enrollments_data:
-                enrollment_ref = self.enrollments_collection.document()
-                enrollment_record = {
-                    'student_id': user_id,
-                    'class_id': enroll_data.get('class_id'),
-                    'status': 'active',
-                    'enrollment_date': datetime.now(),
-                    'base_monthly_fee': enroll_data.get('base_monthly_fee'),
-                    'due_day': 10, # Ou um valor padrão
-                    'discount_amount': float(enroll_data.get('discount_amount', 0)),
-                    'discount_reason': enroll_data.get('discount_reason', ""),
-                    'created_at': datetime.now(),
-                    'updated_at': datetime.now()
-                }
-                batch.set(enrollment_ref, enrollment_record)
+            # 3. Cria o documento do usuário no Firestore usando o UID do Auth
+            self.users_collection.document(auth_user.uid).set(firestore_data)
+            new_user = self.get_user_by_id(auth_user.uid)
 
-            # 4. Executa todas as operações de uma vez
-            batch.commit()
+            # 4. Cria as matrículas, se houver
+            if new_user and enrollments_data:
+                for enrollment_data in enrollments_data:
+                    enrollment_data['student_id'] = new_user.id
+                    # Delega a criação da matrícula para o serviço de matrículas
+                    self.enrollment_service.create_enrollment(enrollment_data)
             
-            return self.get_user_by_id(user_id)
+            return new_user
         except Exception as e:
-            print(f"Erro ao criar usuário com matrículas: {e}")
-            # Se a criação no Auth funcionou mas o Firestore falhou, deleta o usuário do Auth para consistência
-            if 'new_auth_user' in locals():
-                auth.delete_user(new_auth_user.uid)
+            print(f"ERRO CRÍTICO ao criar usuário com matrículas: {e}")
+            # Rollback: se a criação falhar em qualquer etapa, deleta o usuário do Auth
+            if auth_user:
+                auth.delete_user(auth_user.uid)
             return None
-    
-    # Seus outros métodos (get_user_by_id, update_user, etc.) permanecem aqui
+
     def get_user_by_id(self, user_id):
+        """Busca um usuário por seu ID (que é o UID do Firebase Auth)."""
+        if not user_id:
+            return None
         try:
             doc = self.users_collection.document(user_id).get()
             if doc.exists:
                 return User.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            print(f"ERRO CRÍTICO em get_user_by_id: {e}")
+            print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
             return None
 
     def get_users_by_role(self, role):
+        """Retorna uma lista de usuários com uma função (role) específica."""
         users = []
         try:
             docs = self.users_collection.where('role', '==', role).stream()
@@ -88,8 +73,9 @@ class UserService:
         except Exception as e:
             print(f"Erro ao buscar usuários por role '{role}': {e}")
         return users
-    
+
     def update_user(self, user_id, update_data):
+        """Atualiza os dados de um usuário no Firestore."""
         try:
             update_data['updated_at'] = datetime.now()
             self.users_collection.document(user_id).update(update_data)
@@ -99,10 +85,20 @@ class UserService:
             return False
 
     def delete_user(self, user_id):
-        # Esta função precisará ser expandida para também deletar matrículas associadas
+        """Deleta um usuário do Firestore, do Firebase Auth e todas as suas matrículas."""
         try:
+            # 1. Deleta todas as matrículas associadas ao aluno
+            student_enrollments = self.enrollment_service.get_enrollments_by_student_id(user_id)
+            for enrollment in student_enrollments:
+                self.enrollment_service.delete_enrollment(enrollment.id)
+            
+            # 2. Deleta o documento do Firestore
             self.users_collection.document(user_id).delete()
+            
+            # 3. Deleta o usuário do Firebase Authentication
             auth.delete_user(user_id)
+            
+            print(f"Usuário com UID {user_id} e suas matrículas foram deletados com sucesso.")
             return True
         except Exception as e:
             print(f"Erro ao deletar usuário com ID '{user_id}': {e}")

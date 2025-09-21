@@ -191,6 +191,7 @@ def delete_teacher(teacher_id):
         return jsonify(error=str(e)), 500
 
 # --- Rotas de Gerenciamento de Turmas ---
+
 @admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
@@ -199,33 +200,6 @@ def list_classes():
     try:
         classes = training_class_service.get_all_classes()
         return jsonify([c.to_dict() for c in classes]), 200
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-    
-@admin_api_bp.route('/classes/<string:class_id>/enroll', methods=['POST'])
-@login_required
-@role_required('admin', 'super_admin')
-def enroll_student_in_class(class_id):
-    """Matricula um aluno existente em uma turma específica."""
-    data = request.get_json()
-    data['class_id'] = class_id # Adiciona o class_id da URL aos dados
-    
-    new_enrollment = enrollment_service.create_enrollment(data)
-    if new_enrollment:
-        return jsonify(new_enrollment.to_dict()), 201
-    else:
-        return jsonify(error="Falha ao criar matrícula."), 500
-
-@admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
-@login_required
-@role_required('admin', 'super_admin')
-def get_class(class_id):
-    """API para buscar uma turma específica."""
-    try:
-        training_class = training_class_service.get_class_by_id(class_id)
-        if training_class:
-            return jsonify(training_class.to_dict()), 200
-        return jsonify(error="Turma não encontrada."), 404
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -243,6 +217,19 @@ def add_class():
     except Exception as e:
         return jsonify(error=str(e)), 500
 
+@admin_api_bp.route('/classes/<string:class_id>', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_class(class_id):
+    """API para buscar uma turma específica."""
+    try:
+        training_class = training_class_service.get_class_by_id(class_id)
+        if training_class:
+            return jsonify(training_class.to_dict()), 200
+        return jsonify(error="Turma não encontrada."), 404
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
 @admin_api_bp.route('/classes/<string:class_id>', methods=['PUT'])
 @login_required
 @role_required('admin', 'super_admin')
@@ -252,7 +239,7 @@ def update_class(class_id):
         data = request.get_json()
         if training_class_service.update_class(class_id, data):
             return jsonify(success=True), 200
-        return jsonify(error="Turma não encontrada ou falha na atualização."), 404
+        return jsonify(error="Falha ao atualizar turma."), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -264,7 +251,7 @@ def delete_class(class_id):
     try:
         if training_class_service.delete_class(class_id):
             return jsonify(success=True), 200
-        return jsonify(error="Turma não encontrada."), 404
+        return jsonify(error="Falha ao deletar turma."), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -375,39 +362,48 @@ def delete_student(student_id):
         return jsonify(error=str(e)), 500
 
 
-# A rota para DELETAR um aluno deve ser uma rota de 'users' mais genérica para
-# lidar com a exclusão no Auth e no Firestore.
 
 # --- Rotas de Gerenciamento de Matrículas ---
 
-# --- ROTAS DE MATRÍCULAS ---
 @admin_api_bp.route('/students/<string:student_id>/enrollments', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')
 def get_student_enrollments(student_id):
-    """API para buscar todas as matrículas de um aluno."""
-    enrollments = enrollment_service.get_enrollments_by_student_id(student_id)
-    return jsonify([e.to_dict() for e in enrollments]), 200
+    """API para buscar todas as matrículas de um aluno específico."""
+    try:
+        enrollments = enrollment_service.get_enrollments_by_student_id(student_id)
+        return jsonify([e.to_dict() for e in enrollments]), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 @admin_api_bp.route('/enrollments', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def add_enrollment():
-    """API para criar uma nova matrícula."""
-    data = request.get_json()
-    new_enrollment = enrollment_service.create_enrollment(data)
-    if new_enrollment:
-        return jsonify(new_enrollment.to_dict()), 201
-    return jsonify(error="Falha ao criar matrícula, verifique se o aluno já está matriculado nesta turma."), 400
+    """API para criar uma nova matrícula para um aluno em uma turma."""
+    try:
+        data = request.get_json()
+        new_enrollment = enrollment_service.create_enrollment(data)
+        if new_enrollment:
+            return jsonify(new_enrollment.to_dict()), 201
+        # O serviço já deve lançar uma exceção que será capturada abaixo
+    except ValueError as ve: # Captura erros de negócio, como "aluno já matriculado"
+        return jsonify(error=str(ve)), 400 # Bad Request
+    except Exception as e:
+        print(f"Erro em add_enrollment: {e}")
+        return jsonify(error="Falha interna ao criar matrícula."), 500
 
 @admin_api_bp.route('/enrollments/<string:enrollment_id>', methods=['DELETE'])
 @login_required
 @role_required('admin', 'super_admin')
 def delete_enrollment(enrollment_id):
     """API para deletar uma matrícula."""
-    if enrollment_service.delete_enrollment(enrollment_id):
-        return jsonify(success=True), 200
-    return jsonify(error="Falha ao deletar matrícula."), 500
+    try:
+        if enrollment_service.delete_enrollment(enrollment_id):
+            return jsonify(success=True), 200
+        return jsonify(error="Falha ao deletar matrícula."), 500
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 # --- ROTAS PARA LISTA DE PRESENÇA (API) ---
 

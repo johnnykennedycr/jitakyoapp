@@ -19,6 +19,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
+        // Busca todos os dados necessários em paralelo para otimizar o carregamento
         const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
             studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
             fetchWithAuth('/api/admin/classes/'),
@@ -67,7 +68,7 @@ async function openStudentForm(targetElement, studentId = null) {
             </div>
             <hr class="my-4">
             <h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
-            <div id="enrollment-error" class="text-red-500 text-sm mb-2"></div>
+            <div id="enrollment-error" class="text-red-500 text-sm mb-2 font-semibold"></div>
             <div class="flex gap-2 items-center">
                 <select name="new_class_id" class="p-2 border rounded-md flex-grow">
                     <option value="">Selecione uma turma</option>
@@ -124,10 +125,11 @@ async function openStudentForm(targetElement, studentId = null) {
         `;
         showModal(title, formHtml);
         
+        // Listener de eventos dinâmicos dentro do modal
         document.getElementById('modal-body').addEventListener('click', async (e) => {
             const action = e.target.dataset.action;
             const errorDiv = document.getElementById('enrollment-error');
-            if (errorDiv) errorDiv.textContent = ''; // Limpa erros antigos
+            if (errorDiv) errorDiv.textContent = '';
 
             if (action === 'add-guardian') {
                 document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
@@ -145,10 +147,15 @@ async function openStudentForm(targetElement, studentId = null) {
                     await fetchWithAuth('/api/admin/enrollments', {
                         method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
                     });
-                    openStudentForm(targetElement, studentId); // Recarrega o formulário
+                    await openStudentForm(targetElement, studentId); // Recarrega o formulário com sucesso
                 } catch (error) {
-                    const errorJson = await error.response.json();
-                    if (errorDiv) errorDiv.textContent = errorJson.error || 'Erro desconhecido.';
+                    // Tratamento de erro robusto
+                    if (error.response) {
+                        const errorJson = await error.response.json();
+                        if (errorDiv) errorDiv.textContent = errorJson.error || 'Erro desconhecido.';
+                    } else {
+                        if (errorDiv) errorDiv.textContent = 'Erro de comunicação com o servidor.';
+                    }
                     hideLoading();
                 }
             }
@@ -157,10 +164,9 @@ async function openStudentForm(targetElement, studentId = null) {
                 showLoading();
                 try {
                     await fetchWithAuth(`/api/admin/enrollments/${enrollmentId}`, { method: 'DELETE' });
-                    openStudentForm(targetElement, studentId); // Recarrega o formulário
+                    await openStudentForm(targetElement, studentId); // Recarrega o formulário
                 } catch (error) {
-                    const errorJson = await error.response.json();
-                    if (errorDiv) errorDiv.textContent = errorJson.error || 'Erro desconhecido.';
+                    if (errorDiv) errorDiv.textContent = 'Falha ao remover matrícula.';
                     hideLoading();
                 }
             }
@@ -176,11 +182,13 @@ async function openStudentForm(targetElement, studentId = null) {
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
     finally { hideLoading(); }
 }
+
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
-    hideModal();
-    showLoading();
     const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Salvando...';
     
     try {
         if (form.id === 'student-form') {
@@ -197,12 +205,12 @@ async function handleFormSubmit(e, targetElement) {
                 guardians: guardians,
             };
 
-            if (studentId) {
+            if (studentId) { // MODO DE EDIÇÃO
                 await fetchWithAuth(`/api/admin/students/${studentId}`, {
                     method: 'PUT',
                     body: JSON.stringify(userData)
                 });
-            } else {
+            } else { // MODO DE CRIAÇÃO
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
                 userData.password = form.elements.password.value;
@@ -226,12 +234,16 @@ async function handleFormSubmit(e, targetElement) {
                     })
                 });
             }
+            hideModal();
         }
     } catch (error) {
         console.error("Erro ao salvar aluno:", error);
+        // Se houver um erro, reabilita o botão para nova tentativa
+        submitButton.disabled = false;
+        submitButton.textContent = 'Salvar';
+        // Idealmente, mostrar o erro em algum lugar no modal
     } finally {
         await renderStudentList(targetElement);
-        hideLoading();
     }
 }
 
@@ -259,6 +271,7 @@ async function handleDeleteStudentClick(studentId, studentName, targetElement) {
     };
 }
 
+// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -290,6 +303,7 @@ export async function renderStudentList(targetElement) {
         const tableContainer = targetElement.querySelector('#student-table-container');
         if (students.length === 0) {
             tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
+            hideLoading(); // Esconde o loading se não houver alunos
             return;
         }
         tableContainer.innerHTML = `
