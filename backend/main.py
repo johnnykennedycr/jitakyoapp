@@ -37,7 +37,7 @@ def create_app():
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     
-    user_service = UserService(db)
+    user_service = UserService(db, enrollment_service)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
     enrollment_service = EnrollmentService(db)
