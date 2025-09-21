@@ -14,7 +14,7 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-// --- LÓGICA DE DELETAR (COM ATUALIZAÇÃO OTIMISTA DA UI) ---
+// --- LÓGICA DE DELETAR (COM MODAL E ATUALIZAÇÃO OTIMISTA) ---
 function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
     showModal(
         `Confirmar Exclusão`,
@@ -28,24 +28,18 @@ function handleDeleteProfessorClick(teacherId, teacherName, targetElement) {
     document.getElementById('cancel-delete-btn').onclick = () => hideModal();
     document.getElementById('confirm-delete-btn').onclick = async () => {
         hideModal();
-
-        // 1. Atualização Otimista: Remove o professor da UI imediatamente com uma animação.
         const rowToDelete = targetElement.querySelector(`button[data-teacher-id="${teacherId}"]`)?.closest('tr');
         if (rowToDelete) {
             rowToDelete.style.transition = 'opacity 0.5s ease';
             rowToDelete.style.opacity = '0';
             setTimeout(() => rowToDelete.remove(), 500);
         }
-
-        // 2. Processo em Segundo Plano: Mostra o loading e faz a chamada real à API.
         showLoading();
         try {
             await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
-            // Se a exclusão for bem-sucedida, não precisamos fazer nada, a UI já está correta.
         } catch (error) {
             console.error('Erro ao deletar professor:', error);
-            // Se der erro, renderiza a lista novamente para trazer o professor de volta.
-            await renderTeacherList(targetElement);
+            await renderTeacherList(targetElement); // Restaura a lista em caso de erro
         } finally {
             hideLoading();
         }
@@ -62,12 +56,12 @@ async function handleEditProfessorClick(teacherId, targetElement) {
         const formHtml = `
             <form id="edit-teacher-form" data-teacher-id="${teacherId}">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Telefone</label>
-                    <input type="text" name="phone" value="${teacher.contact_info?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
+                    <label for="edit-contact-phone" class="block text-sm font-medium text-gray-700">Telefone</label>
+                    <input type="text" id="edit-contact-phone" name="phone" value="${teacher.contact_info?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Descrição</label>
-                    <textarea name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md">${teacher.description || ''}</textarea>
+                    <label for="edit-description" class="block text-sm font-medium text-gray-700">Descrição</label>
+                    <textarea id="edit-description" name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md">${teacher.description || ''}</textarea>
                 </div>
                 <hr class="my-4">
                 <div class="flex justify-between items-center mb-2">
@@ -81,13 +75,9 @@ async function handleEditProfessorClick(teacherId, targetElement) {
             </form>
         `;
         showModal(`Editando ${teacher.name}`, formHtml);
-        document.getElementById('add-discipline-btn').onclick = () => {
-            document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
-        };
+        document.getElementById('add-discipline-btn').onclick = () => document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
         document.getElementById('disciplines-container').addEventListener('click', (e) => {
-            if (e.target.dataset.action === 'remove-discipline') {
-                document.getElementById(e.target.dataset.target)?.remove();
-            }
+            if (e.target.dataset.action === 'remove-discipline') document.getElementById(e.target.dataset.target)?.remove();
         });
         document.getElementById('edit-teacher-form').onsubmit = (e) => handleFormSubmit(e, targetElement);
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados do professor.</p>'); }
@@ -107,19 +97,19 @@ async function handleAddProfessorClick(targetElement) {
         const formHtml = `
             <form id="add-teacher-form">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Usuário a ser promovido</label>
-                    <select name="user_id" class="mt-1 block w-full p-2 border rounded-md" required>
+                    <label for="add-user-select" class="block text-sm font-medium text-gray-700">Usuário a ser promovido</label>
+                    <select id="add-user-select" name="user_id" class="mt-1 block w-full p-2 border rounded-md" required>
                         <option value="">Selecione um usuário</option>
                         ${availableUsers.map(user => `<option value="${user.id}" data-name="${user.name}">${user.name} (${user.email})</option>`).join('')}
                     </select>
                 </div>
                  <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Telefone</label>
-                    <input type="text" name="phone" class="mt-1 block w-full p-2 border rounded-md">
+                    <label for="add-contact-phone" class="block text-sm font-medium text-gray-700">Telefone de Contato</label>
+                    <input type="text" id="add-contact-phone" name="phone" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Descrição</label>
-                    <textarea name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
+                    <label for="add-description" class="block text-sm font-medium text-gray-700">Descrição</label>
+                    <textarea id="add-description" name="description" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
                 </div>
                 <hr class="my-4">
                 <div class="flex justify-between items-center mb-2">
@@ -133,13 +123,9 @@ async function handleAddProfessorClick(targetElement) {
             </form>
         `;
         showModal('Adicionar Novo Professor', formHtml);
-        document.getElementById('add-discipline-btn').onclick = () => {
-             document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
-        };
+        document.getElementById('add-discipline-btn').onclick = () => document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
         document.getElementById('disciplines-container').addEventListener('click', (e) => {
-            if (e.target.dataset.action === 'remove-discipline') {
-                document.getElementById(e.target.dataset.target)?.remove();
-            }
+            if (e.target.dataset.action === 'remove-discipline') document.getElementById(e.target.dataset.target)?.remove();
         });
         document.getElementById('add-teacher-form').onsubmit = (e) => handleFormSubmit(e, targetElement);
     } catch (error) { showModal('Erro', '<p>Não foi possível carregar a lista de usuários.</p>'); }
@@ -152,14 +138,11 @@ async function handleFormSubmit(e, targetElement) {
     hideModal();
     showLoading();
     const form = e.target;
-    
     const disciplines = [];
     form.querySelectorAll('.discipline-entry').forEach(entry => {
         const disciplineName = entry.querySelector('[name="discipline_name"]').value;
         const graduation = entry.querySelector('[name="graduation"]').value;
-        if(disciplineName && graduation) {
-            disciplines.push({ discipline_name: disciplineName, graduation: graduation });
-        }
+        if(disciplineName && graduation) disciplines.push({ discipline_name: disciplineName, graduation: graduation });
     });
 
     try {
@@ -201,7 +184,6 @@ export async function renderTeacherList(targetElement) {
         </div>
         <div id="teacher-table-container"><p>Carregando professores...</p></div>
     `;
-
     document.getElementById('add-btn').onclick = () => handleAddProfessorClick(targetElement);
     
     showLoading();
@@ -211,7 +193,6 @@ export async function renderTeacherList(targetElement) {
         const tableContainer = targetElement.querySelector('#teacher-table-container');
         if (teachers.length === 0) {
             tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>';
-            hideLoading();
             return;
         }
         tableContainer.innerHTML = `
@@ -248,7 +229,6 @@ export async function renderTeacherList(targetElement) {
             const action = button.dataset.action;
             const teacherId = button.dataset.teacherId;
             const teacherName = button.dataset.teacherName;
-            
             if (action === 'edit' && teacherId) handleEditProfessorClick(teacherId, targetElement);
             if (action === 'delete' && teacherId) handleDeleteProfessorClick(teacherId, teacherName, targetElement);
         });

@@ -18,10 +18,10 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
     const fieldId = `discipline-${Date.now()}-${Math.random()}`;
     return `
-        <div class="dynamic-entry flex items-center gap-2 mb-2" id="${fieldId}">
+        <div class="discipline-entry flex items-center gap-2 mb-2" id="${fieldId}">
             <input type="text" name="discipline_name" placeholder="Modalidade (ex: Judô)" value="${discipline.discipline_name}" class="flex-grow p-2 border rounded-md" required>
             <input type="text" name="graduation" placeholder="Graduação (ex: Faixa Preta)" value="${discipline.graduation}" class="flex-grow p-2 border rounded-md" required>
-            <button type="button" data-action="remove-dynamic-entry" data-target="${fieldId}" class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600">&times;</button>
+            <button type="button" data-action="remove-discipline" data-target="${fieldId}" class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600">&times;</button>
         </div>
     `;
 }
@@ -33,26 +33,38 @@ async function openStudentForm(targetElement, studentId = null) {
         const student = studentId ? await (await fetchWithAuth(`/api/admin/students/${studentId}`)).json() : null;
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
         
-        const credentialsHtml = !studentId ? `
+        const nameAndEmailHtml = studentId ? `
+            <p class="mb-4">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>` : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input type="text" name="name" placeholder="Nome Completo do Aluno" class="p-2 border rounded-md" required>
-                <input type="email" name="email" placeholder="Email do Aluno" class="p-2 border rounded-md" required>
+                <div>
+                    <label for="student-name" class="block text-sm font-medium text-gray-700">Nome Completo do Aluno</label>
+                    <input id="student-name" type="text" name="name" placeholder="Nome do Aluno" class="mt-1 block w-full p-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="student-email" class="block text-sm font-medium text-gray-700">Email do Aluno</label>
+                    <input id="student-email" type="email" name="email" placeholder="email@exemplo.com" class="mt-1 block w-full p-2 border rounded-md" required>
+                </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input type="password" name="password" placeholder="Senha" class="p-2 border rounded-md" required>
-                <input type="date" name="date_of_birth" class="p-2 border rounded-md">
-            </div>` : `<p class="mb-4">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>
-            <input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md mb-4 w-full">`;
+                <div>
+                    <label for="student-password" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input id="student-password" type="password" name="password" placeholder="Senha de acesso" class="mt-1 block w-full p-2 border rounded-md" ${studentId ? '' : 'required'}>
+                </div>
+                <div>
+                    <label for="student-dob" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                    <input id="student-dob" type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+            </div>`;
         
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
         const disciplinesHtml = (student?.enrolled_disciplines || []).map(createDisciplineFieldHtml).join('');
 
         const formHtml = `
             <form id="student-form" data-student-id="${studentId || ''}">
-                ${credentialsHtml}
+                ${nameAndEmailHtml}
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Telefone do Aluno</label>
-                    <input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
+                    <label for="student-phone" class="block text-sm font-medium text-gray-700">Telefone do Aluno</label>
+                    <input id="student-phone" type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
                 <hr class="my-4">
                 <div class="flex justify-between items-center mb-2">
@@ -76,128 +88,104 @@ async function openStudentForm(targetElement, studentId = null) {
     finally { hideLoading(); }
 }
 
-// --- LÓGICA DE SUBMISSÃO DO FORMULÁRIO ---
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     hideModal();
     showLoading();
     const form = e.target;
     const studentId = form.dataset.studentId;
+    const isEditing = !!studentId;
 
-    // Coleta dinâmica dos responsáveis
-    const guardians = [];
-    form.querySelectorAll('#guardians-container .dynamic-entry').forEach(entry => {
-        guardians.push({
-            name: entry.querySelector('[name="guardian_name"]').value,
-            kinship: entry.querySelector('[name="guardian_kinship"]').value,
-            contact: entry.querySelector('[name="guardian_contact"]').value,
-        });
-    });
+    const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
+        name: entry.querySelector('[name="guardian_name"]').value,
+        kinship: entry.querySelector('[name="guardian_kinship"]').value,
+        contact: entry.querySelector('[name="guardian_contact"]').value,
+    }));
 
-    // Coleta dinâmica das disciplinas
-    const enrolled_disciplines = [];
-    form.querySelectorAll('#disciplines-container .dynamic-entry').forEach(entry => {
-        enrolled_disciplines.push({
-            discipline_name: entry.querySelector('[name="discipline_name"]').value,
-            graduation: entry.querySelector('[name="graduation"]').value,
-        });
-    });
-    
-    let payload = {
+    const enrolled_disciplines = Array.from(form.querySelectorAll('.discipline-entry')).map(entry => ({
+        discipline_name: entry.querySelector('[name="discipline_name"]').value,
+        graduation: entry.querySelector('[name="graduation"]').value,
+    }));
+
+    const studentData = {
         phone: form.elements.phone.value,
         date_of_birth: form.elements.date_of_birth.value,
-        guardians,
-        enrolled_disciplines,
+        guardians: guardians,
+        enrolled_disciplines: enrolled_disciplines,
     };
 
-    let url = '/api/admin/students';
-    let method = 'POST';
-
-    if (studentId) { // Se for edição
-        url = `/api/admin/students/${studentId}`;
-        method = 'PUT';
-    } else { // Se for criação
-        payload.name = form.elements.name.value;
-        payload.email = form.elements.email.value;
-        payload.password = form.elements.password.value;
+    if (!isEditing) {
+        studentData.name = form.elements.name.value;
+        studentData.email = form.elements.email.value;
+        studentData.password = form.elements.password.value;
     }
 
+    const url = isEditing ? `/api/admin/students/${studentId}` : '/api/admin/students';
+    const method = isEditing ? 'PUT' : 'POST';
+
     try {
-        await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-        await renderStudentList(targetElement); // Atualiza a lista
-    } catch (error) {
-        console.error("Erro ao salvar aluno:", error);
-    } finally {
+        await fetchWithAuth(url, { method, body: JSON.stringify(studentData) });
+    } catch (error) { console.error("Erro ao salvar aluno:", error); }
+    finally {
+        await renderStudentList(targetElement);
         hideLoading();
     }
 }
 
-// --- LÓGICA DE EXCLUSÃO ---
 async function handleDeleteStudentClick(studentId, studentName, targetElement) {
-    showModal('Confirmar Exclusão', `
-        <p>Tem certeza que deseja deletar o aluno <strong>${studentName}</strong>? Esta ação é irreversível.</p>
-        <div class="text-right mt-6">
-            <button id="cancel-delete-btn" class="bg-gray-300 px-4 py-2 rounded-md">Cancelar</button>
-            <button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded-md ml-2">Deletar</button>
-        </div>
-    `);
-
-    document.getElementById('cancel-delete-btn').onclick = hideModal;
+    showModal(
+        `Confirmar Exclusão`,
+        `<p>Tem certeza que deseja deletar o aluno <strong>${studentName}</strong>?</p>
+         <div class="text-right mt-6">
+            <button id="cancel-delete-btn" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+            <button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button>
+         </div>`
+    );
+    document.getElementById('cancel-delete-btn').onclick = () => hideModal();
     document.getElementById('confirm-delete-btn').onclick = async () => {
         hideModal();
         showLoading();
         try {
             await fetchWithAuth(`/api/admin/students/${studentId}`, { method: 'DELETE' });
+        } catch (error) { console.error('Erro ao deletar aluno:', error); }
+        finally {
             await renderStudentList(targetElement);
-        } catch (error) {
-            console.error("Erro ao deletar aluno:", error);
-        } finally {
             hideLoading();
         }
     };
 }
 
-
-// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
-            <button id="add-student-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
-                Adicionar Aluno
-            </button>
+            <button id="add-student-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
         </div>
         <div id="student-table-container"><p>Carregando alunos...</p></div>
     `;
 
-    targetElement.querySelector('#add-student-btn').onclick = () => openStudentForm(targetElement);
-
-    // Gerenciamento de eventos no modal para os botões dinâmicos
-    document.getElementById('modal-body').onclick = (e) => {
+    document.getElementById('add-student-btn').onclick = () => openStudentForm(targetElement);
+    
+    // Listeners para os botões dinâmicos dentro do modal
+    document.getElementById('modal-body').addEventListener('click', e => {
         const action = e.target.dataset.action;
-        if (action === 'add-guardian') {
-            document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
-        }
-        if (action === 'add-discipline') {
-            document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
-        }
-        if (action === 'remove-dynamic-entry') {
-            document.getElementById(e.target.dataset.target)?.remove();
-        }
+        if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
+        if (action === 'add-discipline') document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
+        if (action === 'remove-dynamic-entry' || action === 'remove-discipline') document.getElementById(e.target.dataset.target)?.remove();
+    });
+
+    // Listener para o submit do formulário
+    document.getElementById('modal-body').onsubmit = (e) => {
+        if (e.target.id === 'student-form') handleFormSubmit(e, targetElement);
     };
-    document.getElementById('modal-body').onsubmit = (e) => handleFormSubmit(e, targetElement);
     
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/students/');
         const students = await response.json();
         const tableContainer = targetElement.querySelector('#student-table-container');
+        if (students.length === 0) { tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>'; return; }
         
-        if (students.length === 0) {
-            tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
-            return;
-        }
-
         tableContainer.innerHTML = `
             <table class="min-w-full bg-white rounded-md shadow">
                 <thead class="bg-gray-200">
@@ -214,9 +202,7 @@ export async function renderStudentList(targetElement) {
                             <td class="py-3 px-4 align-top">${student.name || 'N/A'}</td>
                             <td class="py-3 px-4 align-top">${student.age !== null ? student.age : 'N/A'}</td>
                             <td class="py-3 px-4 align-top">
-                                ${ (Array.isArray(student.enrolled_disciplines) && student.enrolled_disciplines.length > 0)
-                                    ? student.enrolled_disciplines.map(d => `<div>${d.discipline_name}</div>`).join('')
-                                    : 'Nenhuma' }
+                                ${ (student.enrolled_disciplines || []).map(d => `<div>${d.discipline_name} (${d.graduation})</div>`).join('') || 'Nenhuma' }
                             </td>
                             <td class="py-3 px-4 align-top">
                                 <button data-action="edit" data-student-id="${student.id}" class="text-indigo-600 hover:underline mr-4">Editar</button>
@@ -227,18 +213,14 @@ export async function renderStudentList(targetElement) {
                 </tbody>
             </table>
         `;
-        
         tableContainer.addEventListener('click', (e) => {
             const button = e.target;
-            const action = button.dataset.action;
-            const studentId = button.dataset.studentId;
-            const studentName = button.dataset.studentName;
-            if (action === 'edit' && studentId) openStudentForm(targetElement, studentId);
-            if (action === 'delete' && studentId) handleDeleteStudentClick(studentId, studentName, targetElement);
+            if (button.dataset.action === 'edit') openStudentForm(targetElement, button.dataset.studentId);
+            if (button.dataset.action === 'delete') handleDeleteStudentClick(button.dataset.studentId, button.dataset.studentName, targetElement);
         });
     } catch (error) {
         console.error("Erro ao buscar alunos:", error);
-        targetElement.querySelector('#student-table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
+        targetElement.querySelector('#student-table-container').innerHTML = `<p class="text-red-500">Falha ao carregar alunos.</p>`;
     } finally {
         hideLoading();
     }
