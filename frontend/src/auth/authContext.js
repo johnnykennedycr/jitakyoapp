@@ -4,9 +4,12 @@ import { createSidebar } from "../components/Sidebar.js";
 import { renderLogin } from "../components/Login.js";
 import { setUserProfile, getUserProfile } from "./userState.js";
 import router from "../router.js";
+
+// Importa todos os componentes de página que o roteador irá controlar
 import { renderAdminDashboard } from "../components/AdminDashboard.js";
 import { renderTeacherList } from "../components/TeacherList.js";
-import { renderStudentList } from "../components/StudentList.js"; 
+import { renderStudentList } from "../components/StudentList.js";
+import { renderClassList } from "../components/ClassList.js"; // <-- Importação que faltava
 
 export async function renderAuthenticatedApp(user, container) {
     try {
@@ -27,14 +30,14 @@ export async function renderAuthenticatedApp(user, container) {
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
         const mainContent = document.getElementById('main-content');
 
-        // --- LÓGICA CORRIGIDA PARA BOTÕES E SIDEBAR ---
+        // --- LÓGICA DE EVENTOS PARA SIDEBAR E LOGOUT ---
         const setupEventListeners = () => {
             const logoutDesktop = document.getElementById('logout-button');
             const logoutMobile = document.getElementById('logout-button-mobile');
             const toggleButton = document.getElementById('sidebar-toggle-btn');
             
             const sidebarNav = document.querySelector('#sidebar-container nav.hidden.md\\:flex');
-            const mainContent = document.getElementById('main-content');
+            const mainContentEl = document.getElementById('main-content');
             const textElements = document.querySelectorAll('.sidebar-text');
             const logo = document.querySelector('.sidebar-logo');
             const links = document.querySelectorAll('.sidebar-link');
@@ -49,19 +52,14 @@ export async function renderAuthenticatedApp(user, container) {
             if(logoutDesktop) logoutDesktop.addEventListener('click', handleLogout);
             if(logoutMobile) logoutMobile.addEventListener('click', handleLogout);
 
-            if (toggleButton && sidebarNav && mainContent) {
+            if (toggleButton && sidebarNav && mainContentEl) {
                 toggleButton.addEventListener('click', () => {
-                    // Alterna a largura da sidebar e a margem do conteúdo
                     sidebarNav.classList.toggle('w-64');
-                    sidebarNav.classList.toggle('w-20'); // w-20 = 5rem
-                    mainContent.classList.toggle('md:ml-64');
-                    mainContent.classList.toggle('md:ml-20');
-                    
-                    // Mostra/esconde todos os textos e o logo
+                    sidebarNav.classList.toggle('w-20');
+                    mainContentEl.classList.toggle('md:ml-64');
+                    mainContentEl.classList.toggle('md:ml-20');
                     textElements.forEach(el => el.classList.toggle('hidden'));
                     logo?.classList.toggle('hidden');
-                    
-                    // Alterna o alinhamento do header e dos links
                     header?.classList.toggle('justify-between');
                     header?.classList.toggle('justify-center');
                     links.forEach(link => {
@@ -71,15 +69,15 @@ export async function renderAuthenticatedApp(user, container) {
                 });
             }
         };
-        
         setupEventListeners();
 
         // --- ROTEAMENTO ---
-        router.off(router.routes); // Limpa rotas antigas
+        router.off(router.routes); // Limpa rotas antigas para evitar duplicação
         router.on({
             '/admin/dashboard': () => renderAdminDashboard(mainContent, getUserProfile()),
             '/admin/teachers': () => renderTeacherList(mainContent),
             '/admin/students': () => renderStudentList(mainContent),
+            '/admin/classes': () => renderClassList(mainContent), // <-- Rota que faltava
         }).notFound(() => {
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });
