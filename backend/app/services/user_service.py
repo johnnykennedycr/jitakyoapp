@@ -102,20 +102,34 @@ class UserService:
             return False
 
     def delete_user(self, user_id):
-        """Deleta um usuário do Firestore, suas matrículas e do Firebase Auth."""
+        """
+        Deleta um usuário do Firebase Auth, do Firestore e suas matrículas.
+        É resiliente a casos onde o usuário já foi deletado do Auth (dado órfão).
+        """
         try:
+            # 1. Tenta deletar o usuário do Firebase Authentication.
+            try:
+                auth.delete_user(user_id)
+            except auth.UserNotFoundError:
+                # Se o usuário não for encontrado no Auth, é um dado órfão.
+                # Apenas registramos um aviso e continuamos para limpar o Firestore.
+                print(f"AVISO: Usuário com UID {user_id} não encontrado no Firebase Auth. Prosseguindo com a limpeza do Firestore.")
+                pass # Ignora o erro e continua
+
+            # 2. Deleta as matrículas do aluno.
             if self.enrollment_service:
                 self.enrollment_service.delete_enrollments_by_student_id(user_id)
-            
+                print(f"Matrículas do aluno {user_id} deletadas com sucesso.")
+
+            # 3. Deleta o documento do usuário no Firestore.
             self.users_collection.document(user_id).delete()
-            auth.delete_user(user_id)
             
-            print(f"Usuário com UID {user_id} e suas matrículas foram deletados com sucesso.")
+            print(f"Usuário com UID {user_id} e seus dados foram deletados com sucesso.")
             return True
         except Exception as e:
-            print(f"Erro ao deletar usuário {user_id}: {e}")
-            # Re-lança a exceção para que a rota possa retornar um erro 500
-            raise e
+            # Captura qualquer outro erro inesperado durante o processo.
+            print(f"Erro inesperado ao deletar usuário {user_id}: {e}")
+            raise e # Re-lança para a rota retornar 500.
 
     def get_user_by_id(self, user_id):
         try:
@@ -149,4 +163,3 @@ class UserService:
         except Exception as e:
             print(f"Erro ao buscar alunos por nome: {e}")
         return students
-
