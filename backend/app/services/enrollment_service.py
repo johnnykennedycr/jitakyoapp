@@ -42,7 +42,7 @@ class EnrollmentService:
             'base_monthly_fee': data.get('base_monthly_fee', 0),
             'discount_amount': data.get('discount_amount', 0),
             'discount_reason': data.get('discount_reason', ''),
-            'due_day': data.get('due_day', 10), # Dia de vencimento padrão
+            'due_day': data.get('due_day', 10),
             'created_at': datetime.now(),
             'updated_at': datetime.now()
         }
@@ -81,5 +81,18 @@ class EnrollmentService:
             return True
         except Exception as e:
             print(f"Erro ao deletar matrícula {enrollment_id}: {e}")
+            return False
+            
+    # --- MÉTODO ADICIONADO ---
+    def delete_enrollments_by_student_id(self, student_id):
+        """Deleta todas as matrículas de um aluno específico."""
+        try:
+            enrollments_to_delete = self.enrollments_collection.where('student_id', '==', student_id).stream()
+            for doc in enrollments_to_delete:
+                doc.reference.delete()
+            print(f"Matrículas do aluno {student_id} deletadas com sucesso.")
+            return True
+        except Exception as e:
+            print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             return False
 
