@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO (sem alterações) ---
+// --- FUNÇÃO AUXILIAR PARA CRIAR CAMPOS DE RESPONSÁVEL ---
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -15,6 +15,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
     `;
 }
 
+// --- LÓGICA DE ABRIR FORMULÁRIO (ADICIONAR/EDITAR) ---
 async function openStudentForm(targetElement, studentId = null) {
     showLoading();
     try {
@@ -23,92 +24,145 @@ async function openStudentForm(targetElement, studentId = null) {
             fetchWithAuth('/api/admin/classes/'),
             studentId ? fetchWithAuth(`/api/admin/students/${studentId}/enrollments`) : Promise.resolve(null)
         ]);
+
         const student = studentRes ? await studentRes.json() : null;
         const allClasses = await classesRes.json();
         const currentEnrollments = enrollmentsRes ? await enrollmentsRes.json() : [];
+        
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
+
         const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
         const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
-        const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
-        const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
+        const availableClassesForEnrollment = allClasses.filter(c => !enrolledClassIds.has(c.id));
+
+        const nameAndEmailHtml = studentId ? `
+            <p class="mb-2">Editando o perfil de <strong>${student.name}</strong> (${student.email}).</p>` 
+            : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
-                <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
-            </div>`;
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                    <input type="text" name="name" placeholder="Nome Completo do Aluno" class="p-2 border rounded-md w-full" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" name="email" placeholder="Email do Aluno" class="p-2 border rounded-md w-full" required>
+                </div>
+            </div>
+        `;
+        
         const passwordFieldHtml = studentId ? `
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
-                <input type="password" name="password" class="p-2 border rounded-md w-full">
-            </div>` : '';
-        const enrollmentsHtml = studentId ? `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
+                <input type="password" name="password" placeholder="Nova Senha" class="p-2 border rounded-md w-full">
+            </div>
+        ` : '';
+
+        const enrollmentSectionHtml = studentId ? `
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
             <div id="current-enrollments-container" class="space-y-2">
                 ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
                     <div class="p-2 border rounded flex justify-between items-center">
-                        <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0})</span>
+                        <span>${classMap[e.class_id]?.name || 'Turma desconhecida'} (Desconto: R$ ${e.discount_amount || 0})</span>
                         <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
-                    </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
+                    </div>
+                `).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
             </div>
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
             <div class="flex gap-2 items-center">
-                <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
-                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-32">
-                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar</button>
-            </div>` : `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
-            <div class="space-y-2">
+                <select name="new_class_id" class="p-2 border rounded-md flex-grow">
+                    <option value="">Selecione uma turma</option>
+                    ${availableClassesForEnrollment.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
+                <input type="number" step="0.01" name="new_discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-32">
+                <button type="button" data-action="add-enrollment" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar</button>
+            </div>
+        ` : `
+            <hr class="my-4">
+            <h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
+            <div id="enrollments-container" class="space-y-2">
                 ${allClasses.map(c => `
                     <div class="p-2 border rounded">
-                        <label class="flex items-center"><input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
-                            <span>${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
+                            <span>${c.name} (${c.discipline}) - Mensalidade Base: R$ ${c.default_monthly_fee}</span>
+                        </label>
                         <div class="enrollment-details hidden mt-2 pl-6 space-y-2">
                             <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
                             <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full">
-                        </div></div>`).join('')}</div>`;
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
-        const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
+
+        const formHtml = `
+            <form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                        <input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full">
+                     </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700">Telefone do Aluno</label>
+                        <input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md">
+                     </div>
+                </div>
                 ${passwordFieldHtml}
-                <hr class="my-4"><div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
+                <hr class="my-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-lg font-medium">Responsáveis</h4>
+                    <button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button>
+                </div>
                 <div id="guardians-container">${guardiansHtml}</div>
-                ${enrollmentsHtml}
-                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button></div></form>`;
+                ${enrollmentSectionHtml}
+                <div class="text-right mt-6">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar Dados</button>
+                </div>
+            </form>
+        `;
         showModal(title, formHtml);
-    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
+        
+    } catch (error) { 
+        console.error("Erro ao abrir formulário do aluno:", error);
+        showModal('Erro', '<p>Não foi possível carregar os dados do formulário.</p>'); 
+    }
     finally { hideLoading(); }
 }
 
 async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
-    const form = e.target;
-    const studentId = form.dataset.studentId;
     hideModal();
     showLoading();
+    const form = e.target;
+    
     try {
+        const studentId = form.dataset.studentId;
         const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
             name: entry.querySelector('[name="guardian_name"]').value,
             kinship: entry.querySelector('[name="guardian_kinship"]').value,
             contact: entry.querySelector('[name="guardian_contact"]').value,
         }));
+        
         const userData = {
             phone: form.elements.phone.value,
             date_of_birth: form.elements.date_of_birth.value,
             guardians: guardians,
         };
-        let url = '/api/admin/students';
-        let method = 'POST';
 
+        let response;
         if (studentId) {
-            url = `/api/admin/students/${studentId}`;
-            method = 'PUT';
             const password = form.elements.password.value;
-            if (password) userData.password = password;
-            const response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
-            if (!response.ok) throw await response.json();
+            if (password) {
+                userData.password = password;
+            }
+            response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
+                method: 'PUT', body: JSON.stringify(userData)
+            });
         } else {
             userData.name = form.elements.name.value;
             userData.email = form.elements.email.value;
@@ -122,12 +176,21 @@ async function handleFormSubmit(e, targetElement) {
                     discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
                 });
             });
-            const payload = { user_data: userData, enrollments_data: enrollmentsData };
-            const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-            if (!response.ok) throw await response.json();
+            response = await fetchWithAuth('/api/admin/students', {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_data: userData,
+                    enrollments_data: enrollmentsData
+                })
+            });
+        }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ocorreu uma falha no servidor.');
         }
     } catch (error) {
-        alert(`Erro ao salvar aluno: ${error.error || 'Ocorreu uma falha.'}`);
+        console.error("Erro ao salvar aluno:", error);
+        alert(`Erro: ${error.message}`);
     } finally {
         await renderStudentList(targetElement);
         hideLoading();
@@ -135,17 +198,24 @@ async function handleFormSubmit(e, targetElement) {
 }
 
 async function handleDeleteClick(studentId, studentName, targetElement) {
-    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
+    showModal(
+        `Confirmar Exclusão`,
+        `<p>Tem certeza que deseja deletar o aluno <strong>${studentName}</strong>? Esta ação é irreversível.</p>
          <div class="text-right mt-6">
             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-            <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+            <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button>
+         </div>`
+    );
 }
 
+// --- RENDERIZAÇÃO PRINCIPAL DA PÁGINA ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
-            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
+            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                Adicionar Aluno
+            </button>
         </div>
         <div id="table-container"><p>Carregando...</p></div>`;
 
@@ -198,7 +268,7 @@ export async function renderStudentList(targetElement) {
             const body = isAdding ? {
                 student_id: studentId,
                 class_id: document.querySelector('[name="new_class_id"]').value,
-                discount_amount: document.querySelector('[name="new_discount"]').value
+                discount_amount: document.querySelector('[name="new_discount_amount"]').value
             } : null;
             if (isAdding && !body.class_id) return alert('Selecione uma turma.');
             showLoading();
@@ -272,8 +342,7 @@ export async function renderStudentList(targetElement) {
     } finally {
         hideLoading();
     }
-
-    // A função de limpeza que remove os listeners específicos desta página
+    
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
         modalBody.removeEventListener('click', handleModalClick);

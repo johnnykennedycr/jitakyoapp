@@ -10,7 +10,7 @@ export function renderAdminDashboard(targetElement, user) {
     }
 
     targetElement.innerHTML = `
-        <h1 class="text-3xl gray-50 font-bold">Dashboard</h1>
+        <h1 class="text-gray-50 font-bold">Dashboard</h1>
         <p class="mt-2 text-gray-200">Bem-vindo(a) de volta, ${user.name}!</p>
     `;
 }
