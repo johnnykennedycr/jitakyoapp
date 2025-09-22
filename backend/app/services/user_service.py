@@ -1,5 +1,6 @@
 from datetime import datetime, date
 from firebase_admin import firestore, auth
+from flask_mail import Message
 from app.models.user import User
 import string
 import secrets
@@ -64,15 +65,15 @@ class UserService:
                     enrollment_info['student_id'] = auth_user.uid
                     self.enrollment_service.create_enrollment(enrollment_info)
             
-            # Envia o e-mail de boas-vindas
+            # --- CORREÇÃO: ATIVA O ENVIO DE E-MAIL ---
             if self.mail:
                 try:
-                    # Lógica de envio de e-mail aqui (descomente quando configurado)
-                    # msg = Message("Bem-vindo ao JitaKyoApp!", recipients=[email])
-                    # msg.body = f"Olá {user_data.get('name')},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password}\n\nRecomendamos que você a altere no seu primeiro acesso."
-                    # self.mail.send(msg)
-                    print(f"INFO: E-mail de boas-vindas para {email} com a senha {password} seria enviado aqui.")
+                    msg = Message("Bem-vindo ao JitaKyoApp!", recipients=[email])
+                    msg.body = f"Olá {user_data.get('name')},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password}\n\nRecomendamos que você a altere no seu primeiro acesso."
+                    self.mail.send(msg)
+                    print(f"INFO: E-mail de boas-vindas para {email} enviado com sucesso.")
                 except Exception as e:
+                    # Mesmo se o e-mail falhar, o usuário foi criado. Apenas registramos o erro.
                     print(f"AVISO: Usuário {email} criado, mas o e-mail de boas-vindas falhou: {e}")
 
             return self.get_user_by_id(auth_user.uid)
@@ -163,3 +164,4 @@ class UserService:
         except Exception as e:
             print(f"Erro ao buscar alunos por nome: {e}")
         return students
+
