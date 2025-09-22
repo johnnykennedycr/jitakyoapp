@@ -143,7 +143,7 @@ async function handleDeleteClick(classId, className) {
 export async function renderClassList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold">Gerenciamento de Turmas</h1>
+            <h1 class="text-3xl font-bold text-white">Gerenciamento de Turmas</h1>
             <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Turma</button>
         </div>
         <div id="class-cards-container"><p>Carregando...</p></div>`;
@@ -298,3 +298,4 @@ export async function renderClassList(targetElement) {
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
+

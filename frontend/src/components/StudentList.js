@@ -15,7 +15,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
     `;
 }
 
-async function openStudentForm(targetElement, studentId = null) {
+async function openStudentForm(studentId = null) {
     showLoading();
     try {
         const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
@@ -69,8 +69,8 @@ async function openStudentForm(targetElement, studentId = null) {
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
+                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
                 ${passwordFieldHtml}
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
@@ -82,106 +82,103 @@ async function openStudentForm(targetElement, studentId = null) {
     finally { hideLoading(); }
 }
 
-// --- LÓGICA DE RENDERIZAÇÃO DA TABELA (EXTRAÍDA) ---
-async function renderTable(tableContainer) {
-    tableContainer.innerHTML = `<p>Carregando...</p>`;
-    showLoading();
-    try {
-        const response = await fetchWithAuth('/api/admin/students/');
-        const students = await response.json();
-        
-        if (students.length === 0) {
-            tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
-            return;
-        }
-
-        tableContainer.innerHTML = `
-            <div class="bg-white rounded-md shadow overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turmas Matriculadas</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsáveis</th>
-                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        ${students.map(student => `
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
-                                    <div class="text-xs text-gray-500">Idade: ${student.age !== null ? student.age : 'N/A'}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex items-center justify-end space-x-2">
-                                        <button data-action="edit" data-student-id="${student.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Aluno">
-                                            <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                        </button>
-                                        <button data-action="delete" data-student-id="${student.id}" data-student-name="${student.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Aluno">
-                                            <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    } catch (error) {
-        console.error("Erro ao buscar alunos:", error);
-        tableContainer.innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
-    } finally {
-        hideLoading();
-    }
+async function handleDeleteClick(studentId, studentName) {
+    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
+         <div class="text-right mt-6">
+             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+             <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
-
-// --- COMPONENTE PRINCIPAL ---
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
+            <h1 class="text-3xl font-bold text-white">Gerenciamento de Alunos</h1>
             <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
         </div>
         <div id="table-container"><p>Carregando...</p></div>`;
 
     const tableContainer = targetElement.querySelector('#table-container');
 
-    // --- HANDLERS DE EVENTOS ---
+    const renderTable = async () => {
+        showLoading();
+        try {
+            const response = await fetchWithAuth('/api/admin/students/');
+            const students = await response.json();
+            if (students.length === 0) {
+                tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
+                return;
+            }
+            tableContainer.innerHTML = `
+                <div class="bg-white rounded-md shadow overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turmas Matriculadas</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsáveis</th>
+                                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${students.map(student => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
+                                        <div class="text-xs text-gray-500">Idade: ${student.age !== null ? student.age : 'N/A'}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                         ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <button data-action="edit" data-student-id="${student.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Aluno">
+                                                <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                            <button data-action="delete" data-student-id="${student.id}" data-student-name="${student.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Aluno">
+                                                <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch (error) {
+            console.error("Erro ao buscar alunos:", error);
+            targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
+        } finally {
+            hideLoading();
+        }
+    }
+
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
         const studentId = button.dataset.studentId;
         const studentName = button.dataset.studentName;
-        if (action === 'add') openStudentForm(targetElement);
-        if (action === 'edit') openStudentForm(targetElement, studentId);
-        if (action === 'delete') {
-             showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-                <div class="text-right mt-6">
-                    <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button>
-                </div>`);
-        }
+        if (action === 'add') openStudentForm();
+        if (action === 'edit') openStudentForm(studentId);
+        if (action === 'delete') handleDeleteClick(studentId, studentName);
     };
+ 
+    const modalBody = document.getElementById('modal-body');
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
+        if (form.id !== 'student-form') return;
+
         const studentId = form.dataset.studentId;
         const submitButton = form.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.textContent = 'Salvando...';
-        showLoading();
-
+        
         try {
             const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
                 name: entry.querySelector('[name="guardian_name"]').value,
@@ -195,14 +192,14 @@ export async function renderStudentList(targetElement) {
             };
             let url = '/api/admin/students';
             let method = 'POST';
-            let response;
 
             if (studentId) {
                 url = `/api/admin/students/${studentId}`;
                 method = 'PUT';
                 const password = form.elements.password.value;
                 if (password) userData.password = password;
-                response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
+                const response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
+                if (!response.ok) throw await response.json();
             } else {
                 userData.name = form.elements.name.value;
                 userData.email = form.elements.email.value;
@@ -217,29 +214,23 @@ export async function renderStudentList(targetElement) {
                     });
                 });
                 const payload = { user_data: userData, enrollments_data: enrollmentsData };
-                response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+                const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+                if (!response.ok) throw await response.json();
             }
-
-            if (!response.ok) throw await response.json();
-            
             hideModal();
-            await renderTable(tableContainer); // ATUALIZA APENAS A TABELA
-
+            await renderTable();
         } catch (error) {
-            showModal('Erro ao Salvar', `<p class="text-red-500">${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
+            showModal('Erro ao Salvar', `<p>${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
         } finally {
             submitButton.disabled = false;
             submitButton.textContent = 'Salvar';
-            hideLoading();
         }
     };
 
-    const modalBody = document.getElementById('modal-body');
     const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
-        const studentId = document.querySelector('#student-form')?.dataset.studentId;
         
         if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
         if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
@@ -247,23 +238,25 @@ export async function renderStudentList(targetElement) {
 
         if (action === 'confirm-delete') {
             const studentIdToDelete = button.dataset.studentId;
-            hideModal(); showLoading();
+            hideModal(); 
+            showLoading();
             try { 
                 const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
                     throw new Error(errorData.error);
                 }
-                await renderTable(tableContainer); // ATUALIZA APENAS A TABELA
             } catch (error) { 
                 showModal('Erro', `<p>${error.message}</p>`);
             } finally { 
+                await renderTable(); 
                 hideLoading(); 
             }
         }
 
         if (action === 'add-enrollment' || action === 'remove-enrollment') {
             e.stopPropagation();
+            const studentId = document.querySelector('#student-form')?.dataset.studentId;
             const isAdding = action === 'add-enrollment';
             const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
             const method = isAdding ? 'POST' : 'DELETE';
@@ -272,7 +265,10 @@ export async function renderStudentList(targetElement) {
                 class_id: document.querySelector('[name="new_class_id"]').value,
                 discount_amount: document.querySelector('[name="new_discount"]').value
             } : null;
-            if (isAdding && !body.class_id) return showModal('Atenção', '<p>Selecione uma turma.</p>');
+            if (isAdding && !body.class_id) {
+                showModal('Atenção', '<p>Selecione uma turma para matricular.</p>');
+                return;
+            };
             showLoading();
             try { 
                 const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
@@ -280,23 +276,21 @@ export async function renderStudentList(targetElement) {
             } catch (error) { 
                 showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
             } finally { 
-                openStudentForm(targetElement, studentId); 
+                await openStudentForm(studentId); 
             }
         }
     };
 
-    // --- ANEXAÇÃO DE LISTENERS E CARGA INICIAL ---
     targetElement.addEventListener('click', handlePageClick);
-    modalBody.addEventListener('submit', handleFormSubmit);
     modalBody.addEventListener('click', handleModalClick);
+    modalBody.addEventListener('submit', handleFormSubmit);
     
-    await renderTable(tableContainer); // Carga inicial dos dados
-    
-    // --- FUNÇÃO DE LIMPEZA ---
+    await renderTable();
+
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
-        modalBody.removeEventListener('submit', handleFormSubmit);
         modalBody.removeEventListener('click', handleModalClick);
+        modalBody.removeEventListener('submit', handleFormSubmit);
     };
 }
 

@@ -80,7 +80,7 @@ async function handleDeleteClick(teacherId, teacherName) {
 export async function renderTeacherList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold">Gerenciamento de Professores</h1>
+            <h1 class="text-3xl font-bold text-white">Gerenciamento de Professores</h1>
             <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
                 Adicionar Professor
             </button>
@@ -249,3 +249,4 @@ export async function renderTeacherList(targetElement) {
         modalBody.removeEventListener('submit', handleFormSubmit);
     };
 }
+

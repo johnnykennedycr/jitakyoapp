@@ -43,8 +43,9 @@ class TrainingClassService:
                 'description': data.get('description'),
                 'default_monthly_fee': data.get('default_monthly_fee'),
                 'schedule': schedule_objects,
-                'created_at': datetime.now(firestore.SERVER_TIMESTAMP),
-                'updated_at': datetime.now(firestore.SERVER_TIMESTAMP)
+                # CORREÇÃO: Usar o sentinel value do Firestore diretamente.
+                'created_at': firestore.SERVER_TIMESTAMP,
+                'updated_at': firestore.SERVER_TIMESTAMP
             }
             
             doc_ref = self.collection.document()
@@ -52,7 +53,8 @@ class TrainingClassService:
             return self.get_class_by_id(doc_ref.id)
         except Exception as e:
             print(f"Erro ao criar turma: {e}")
-            return None
+            # Re-lança a exceção para que a rota possa capturá-la e retornar um erro apropriado.
+            raise e
 
     def update_class(self, class_id, data):
         """Atualiza uma turma existente."""
@@ -61,7 +63,8 @@ class TrainingClassService:
             if 'schedule' in data:
                 data['schedule'] = [ScheduleSlot(**s).to_dict() for s in data.get('schedule', [])]
             
-            data['updated_at'] = datetime.now(firestore.SERVER_TIMESTAMP)
+            # CORREÇÃO: Usar o sentinel value do Firestore diretamente.
+            data['updated_at'] = firestore.SERVER_TIMESTAMP
             self.collection.document(class_id).update(data)
             return True
         except Exception as e:
