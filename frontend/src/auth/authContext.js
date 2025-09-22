@@ -31,6 +31,12 @@ export async function renderAuthenticatedApp(user, container) {
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
         const mainContent = document.getElementById('main-content');
         
+        // --- CORREÇÃO PARA SCROLL RESPONSIVO ---
+        // Adiciona a classe que permite a rolagem vertical na área de conteúdo
+        // quando o conteúdo (como uma lista longa) excede a altura da tela.
+        mainContent.classList.add('overflow-y-auto');
+        // --- FIM DA CORREÇÃO ---
+
         // A função de setup dos listeners da sidebar (que é persistente)
         setupEventListeners();
 
@@ -108,4 +114,3 @@ function setupEventListeners() {
         });
     }
 }
-
