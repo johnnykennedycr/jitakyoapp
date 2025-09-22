@@ -167,7 +167,8 @@ export async function renderClassList(targetElement) {
                             <p class="text-sm text-gray-500 mb-4">${c.discipline}</p>
                             <div class="space-y-2 text-sm text-gray-700 flex-grow">
                                 <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
-                                <p><strong>Capacidade:</strong> ${c.capacity}</p>
+                                <p><strong>Capacidade:</strong> ${c.capacity} Alunos</p>
+                                <p><strong>Mensalidade: R$</strong> ${c.default_monthly_fee}</p>
                                 <div><strong>Horários:</strong><div class="pl-2">
                                     ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
                                         <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
