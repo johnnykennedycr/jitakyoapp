@@ -13,7 +13,7 @@ export function renderLogin(container) {
     <div class="flex items-center justify-center min-h-screen bg-gray-900">
       <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
         <div class="flex justify-center">
-          <img src="/logo-horizontal.png" alt="Logo JitaKyoApp" class="h-20">
+          <img src="assets/logo.png" alt="Logo JitaKyoApp" class="h-20">
         </div>
         <div class="text-center">
           <h2 class="text-3xl font-extrabold text-gray-900">Acesso ao Painel</h2>
