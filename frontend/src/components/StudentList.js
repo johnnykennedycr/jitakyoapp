@@ -69,8 +69,8 @@ async function openStudentForm(targetElement, studentId = null) {
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
                 ${passwordFieldHtml}
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
@@ -86,7 +86,12 @@ async function handleFormSubmit(e, targetElement) {
     e.preventDefault();
     const form = e.target;
     const studentId = form.dataset.studentId;
-    hideModal();
+    
+    // ---> ALTERAÇÃO 1: Desabilitar o botão de submit para evitar cliques duplos
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Salvando...';
+
     showLoading();
     try {
         const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
@@ -102,13 +107,13 @@ async function handleFormSubmit(e, targetElement) {
         let url = '/api/admin/students';
         let method = 'POST';
 
+        let response;
         if (studentId) {
             url = `/api/admin/students/${studentId}`;
             method = 'PUT';
             const password = form.elements.password.value;
             if (password) userData.password = password;
-            const response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
-            if (!response.ok) throw await response.json();
+            response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
         } else {
             userData.name = form.elements.name.value;
             userData.email = form.elements.email.value;
@@ -123,13 +128,26 @@ async function handleFormSubmit(e, targetElement) {
                 });
             });
             const payload = { user_data: userData, enrollments_data: enrollmentsData };
-            const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-            if (!response.ok) throw await response.json();
+            response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
         }
-    } catch (error) {
-        alert(`Erro ao salvar aluno: ${error.error || 'Ocorreu uma falha.'}`);
-    } finally {
+
+        if (!response.ok) {
+            // Lança o erro para ser pego pelo catch
+            throw await response.json();
+        }
+
+        // ---> ALTERAÇÃO 2: Esconder o modal apenas em caso de sucesso
+        hideModal();
+        // Recarrega a lista para mostrar o novo aluno
         await renderStudentList(targetElement);
+
+    } catch (error) {
+        // ---> ALTERAÇÃO 3: Usar o modal para exibir erros, em vez de alert()
+        showModal('Erro ao Salvar', `<p class="text-red-500">${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
+    } finally {
+        // ---> ALTERAÇÃO 4: Reabilitar o botão no 'finally' para garantir que o usuário possa tentar novamente em caso de erro
+        submitButton.disabled = false;
+        submitButton.textContent = 'Salvar';
         hideLoading();
     }
 }
@@ -137,8 +155,8 @@ async function handleFormSubmit(e, targetElement) {
 async function handleDeleteClick(studentId, studentName, targetElement) {
     showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
          <div class="text-right mt-6">
-            <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-            <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+             <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
 export async function renderStudentList(targetElement) {
@@ -182,7 +200,7 @@ export async function renderStudentList(targetElement) {
                     throw new Error(errorData.error);
                 }
             } catch (error) { 
-                alert(`Erro: ${error.message}`);
+                showModal('Erro', `<p>${error.message}</p>`);
             } finally { 
                 await renderStudentList(targetElement); 
                 hideLoading(); 
@@ -199,13 +217,13 @@ export async function renderStudentList(targetElement) {
                 class_id: document.querySelector('[name="new_class_id"]').value,
                 discount_amount: document.querySelector('[name="new_discount"]').value
             } : null;
-            if (isAdding && !body.class_id) return alert('Selecione uma turma.');
+            if (isAdding && !body.class_id) return showModal('Atenção', '<p>Selecione uma turma.</p>');
             showLoading();
             try { 
                 const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
                 if (!response.ok) throw await response.json();
             } catch (error) { 
-                alert(`Erro: ${error.error || 'Falha na operação.'}`);
+                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
             } finally { 
                 openStudentForm(targetElement, studentId); 
             }
@@ -223,9 +241,9 @@ export async function renderStudentList(targetElement) {
         const tableContainer = targetElement.querySelector('#table-container');
         if (students.length === 0) {
             tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
-            return;
-        }
-        tableContainer.innerHTML = `
+            // ---> ALTERAÇÃO 5: Retornar a função de limpeza mesmo se não houver alunos
+        } else {
+            tableContainer.innerHTML = `
             <div class="bg-white rounded-md shadow overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-100">
@@ -247,7 +265,7 @@ export async function renderStudentList(targetElement) {
                                     ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                     ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
+                                    ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
@@ -265,6 +283,7 @@ export async function renderStudentList(targetElement) {
                 </table>
             </div>
         `;
+        }
     } catch (error) {
         console.error("Erro ao buscar alunos:", error);
         targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
@@ -272,11 +291,10 @@ export async function renderStudentList(targetElement) {
         hideLoading();
     }
     
-    // CORREÇÃO: A função de limpeza agora remove os listeners corretamente
+    // ---> ALTERAÇÃO 6: A função de limpeza agora remove os listeners corretamente de todos os elementos
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
         modalBody.removeEventListener('click', handleModalClick);
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
-
