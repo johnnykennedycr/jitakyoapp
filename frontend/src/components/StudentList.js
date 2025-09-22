@@ -82,168 +82,20 @@ async function openStudentForm(targetElement, studentId = null) {
     finally { hideLoading(); }
 }
 
-async function handleFormSubmit(e, targetElement) {
-    e.preventDefault();
-    const form = e.target;
-    const studentId = form.dataset.studentId;
-    
-    // ---> ALTERAÇÃO 1: Desabilitar o botão de submit para evitar cliques duplos
-    const submitButton = form.querySelector('button[type="submit"]');
-    submitButton.disabled = true;
-    submitButton.textContent = 'Salvando...';
-
-    showLoading();
-    try {
-        const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
-            name: entry.querySelector('[name="guardian_name"]').value,
-            kinship: entry.querySelector('[name="guardian_kinship"]').value,
-            contact: entry.querySelector('[name="guardian_contact"]').value,
-        }));
-        const userData = {
-            phone: form.elements.phone.value,
-            date_of_birth: form.elements.date_of_birth.value,
-            guardians: guardians,
-        };
-        let url = '/api/admin/students';
-        let method = 'POST';
-
-        let response;
-        if (studentId) {
-            url = `/api/admin/students/${studentId}`;
-            method = 'PUT';
-            const password = form.elements.password.value;
-            if (password) userData.password = password;
-            response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
-        } else {
-            userData.name = form.elements.name.value;
-            userData.email = form.elements.email.value;
-            const enrollmentsData = [];
-            form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
-                const detailsDiv = checkbox.closest('.p-2');
-                enrollmentsData.push({
-                    class_id: checkbox.value,
-                    base_monthly_fee: checkbox.dataset.fee,
-                    discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value || 0,
-                    discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
-                });
-            });
-            const payload = { user_data: userData, enrollments_data: enrollmentsData };
-            response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-        }
-
-        if (!response.ok) {
-            // Lança o erro para ser pego pelo catch
-            throw await response.json();
-        }
-
-        // ---> ALTERAÇÃO 2: Esconder o modal apenas em caso de sucesso
-        hideModal();
-        // Recarrega a lista para mostrar o novo aluno
-        await renderStudentList(targetElement);
-
-    } catch (error) {
-        // ---> ALTERAÇÃO 3: Usar o modal para exibir erros, em vez de alert()
-        showModal('Erro ao Salvar', `<p class="text-red-500">${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
-    } finally {
-        // ---> ALTERAÇÃO 4: Reabilitar o botão no 'finally' para garantir que o usuário possa tentar novamente em caso de erro
-        submitButton.disabled = false;
-        submitButton.textContent = 'Salvar';
-        hideLoading();
-    }
-}
-
-async function handleDeleteClick(studentId, studentName, targetElement) {
-    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-         <div class="text-right mt-6">
-             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-             <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
-}
-
-export async function renderStudentList(targetElement) {
-    targetElement.innerHTML = `
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
-            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
-        </div>
-        <div id="table-container"><p>Carregando...</p></div>`;
-
-    const handlePageClick = (e) => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const action = button.dataset.action;
-        const studentId = button.dataset.studentId;
-        const studentName = button.dataset.studentName;
-        if (action === 'add') openStudentForm(targetElement);
-        if (action === 'edit') openStudentForm(targetElement, studentId);
-        if (action === 'delete') handleDeleteClick(studentId, studentName, targetElement);
-    };
-    targetElement.addEventListener('click', handlePageClick);
-
-    const modalBody = document.getElementById('modal-body');
-    const handleModalClick = async (e) => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const action = button.dataset.action;
-        const studentId = document.querySelector('#student-form')?.dataset.studentId;
-        
-        if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
-        if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
-        if (action === 'cancel-delete') hideModal();
-
-        if (action === 'confirm-delete') {
-            const studentIdToDelete = button.dataset.studentId;
-            hideModal(); showLoading();
-            try { 
-                const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
-                    throw new Error(errorData.error);
-                }
-            } catch (error) { 
-                showModal('Erro', `<p>${error.message}</p>`);
-            } finally { 
-                await renderStudentList(targetElement); 
-                hideLoading(); 
-            }
-        }
-
-        if (action === 'add-enrollment' || action === 'remove-enrollment') {
-            e.stopPropagation();
-            const isAdding = action === 'add-enrollment';
-            const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
-            const method = isAdding ? 'POST' : 'DELETE';
-            const body = isAdding ? {
-                student_id: studentId,
-                class_id: document.querySelector('[name="new_class_id"]').value,
-                discount_amount: document.querySelector('[name="new_discount"]').value
-            } : null;
-            if (isAdding && !body.class_id) return showModal('Atenção', '<p>Selecione uma turma.</p>');
-            showLoading();
-            try { 
-                const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
-                if (!response.ok) throw await response.json();
-            } catch (error) { 
-                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
-            } finally { 
-                openStudentForm(targetElement, studentId); 
-            }
-        }
-    };
-    modalBody.addEventListener('click', handleModalClick);
-
-    const handleModalSubmit = (e) => handleFormSubmit(e, targetElement);
-    modalBody.addEventListener('submit', handleModalSubmit);
-    
+// --- LÓGICA DE RENDERIZAÇÃO DA TABELA (EXTRAÍDA) ---
+async function renderTable(tableContainer) {
+    tableContainer.innerHTML = `<p>Carregando...</p>`;
     showLoading();
     try {
         const response = await fetchWithAuth('/api/admin/students/');
         const students = await response.json();
-        const tableContainer = targetElement.querySelector('#table-container');
+        
         if (students.length === 0) {
             tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
-            // ---> ALTERAÇÃO 5: Retornar a função de limpeza mesmo se não houver alunos
-        } else {
-            tableContainer.innerHTML = `
+            return;
+        }
+
+        tableContainer.innerHTML = `
             <div class="bg-white rounded-md shadow overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-100">
@@ -283,18 +135,168 @@ export async function renderStudentList(targetElement) {
                 </table>
             </div>
         `;
-        }
     } catch (error) {
         console.error("Erro ao buscar alunos:", error);
-        targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
+        tableContainer.innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
     } finally {
         hideLoading();
     }
+}
+
+
+// --- COMPONENTE PRINCIPAL ---
+export async function renderStudentList(targetElement) {
+    targetElement.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Gerenciamento de Alunos</h1>
+            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
+        </div>
+        <div id="table-container"><p>Carregando...</p></div>`;
+
+    const tableContainer = targetElement.querySelector('#table-container');
+
+    // --- HANDLERS DE EVENTOS ---
+    const handlePageClick = (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+        const action = button.dataset.action;
+        const studentId = button.dataset.studentId;
+        const studentName = button.dataset.studentName;
+        if (action === 'add') openStudentForm(targetElement);
+        if (action === 'edit') openStudentForm(targetElement, studentId);
+        if (action === 'delete') {
+             showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
+                <div class="text-right mt-6">
+                    <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button>
+                </div>`);
+        }
+    };
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const studentId = form.dataset.studentId;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.textContent = 'Salvando...';
+        showLoading();
+
+        try {
+            const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
+                name: entry.querySelector('[name="guardian_name"]').value,
+                kinship: entry.querySelector('[name="guardian_kinship"]').value,
+                contact: entry.querySelector('[name="guardian_contact"]').value,
+            }));
+            const userData = {
+                phone: form.elements.phone.value,
+                date_of_birth: form.elements.date_of_birth.value,
+                guardians: guardians,
+            };
+            let url = '/api/admin/students';
+            let method = 'POST';
+            let response;
+
+            if (studentId) {
+                url = `/api/admin/students/${studentId}`;
+                method = 'PUT';
+                const password = form.elements.password.value;
+                if (password) userData.password = password;
+                response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
+            } else {
+                userData.name = form.elements.name.value;
+                userData.email = form.elements.email.value;
+                const enrollmentsData = [];
+                form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
+                    const detailsDiv = checkbox.closest('.p-2');
+                    enrollmentsData.push({
+                        class_id: checkbox.value,
+                        base_monthly_fee: checkbox.dataset.fee,
+                        discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value || 0,
+                        discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
+                    });
+                });
+                const payload = { user_data: userData, enrollments_data: enrollmentsData };
+                response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+            }
+
+            if (!response.ok) throw await response.json();
+            
+            hideModal();
+            await renderTable(tableContainer); // ATUALIZA APENAS A TABELA
+
+        } catch (error) {
+            showModal('Erro ao Salvar', `<p class="text-red-500">${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Salvar';
+            hideLoading();
+        }
+    };
+
+    const modalBody = document.getElementById('modal-body');
+    const handleModalClick = async (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+        const action = button.dataset.action;
+        const studentId = document.querySelector('#student-form')?.dataset.studentId;
+        
+        if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
+        if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
+        if (action === 'cancel-delete') hideModal();
+
+        if (action === 'confirm-delete') {
+            const studentIdToDelete = button.dataset.studentId;
+            hideModal(); showLoading();
+            try { 
+                const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
+                    throw new Error(errorData.error);
+                }
+                await renderTable(tableContainer); // ATUALIZA APENAS A TABELA
+            } catch (error) { 
+                showModal('Erro', `<p>${error.message}</p>`);
+            } finally { 
+                hideLoading(); 
+            }
+        }
+
+        if (action === 'add-enrollment' || action === 'remove-enrollment') {
+            e.stopPropagation();
+            const isAdding = action === 'add-enrollment';
+            const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
+            const method = isAdding ? 'POST' : 'DELETE';
+            const body = isAdding ? {
+                student_id: studentId,
+                class_id: document.querySelector('[name="new_class_id"]').value,
+                discount_amount: document.querySelector('[name="new_discount"]').value
+            } : null;
+            if (isAdding && !body.class_id) return showModal('Atenção', '<p>Selecione uma turma.</p>');
+            showLoading();
+            try { 
+                const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
+                if (!response.ok) throw await response.json();
+            } catch (error) { 
+                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
+            } finally { 
+                openStudentForm(targetElement, studentId); 
+            }
+        }
+    };
+
+    // --- ANEXAÇÃO DE LISTENERS E CARGA INICIAL ---
+    targetElement.addEventListener('click', handlePageClick);
+    modalBody.addEventListener('submit', handleFormSubmit);
+    modalBody.addEventListener('click', handleModalClick);
     
-    // ---> ALTERAÇÃO 6: A função de limpeza agora remove os listeners corretamente de todos os elementos
+    await renderTable(tableContainer); // Carga inicial dos dados
+    
+    // --- FUNÇÃO DE LIMPEZA ---
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
+        modalBody.removeEventListener('submit', handleFormSubmit);
         modalBody.removeEventListener('click', handleModalClick);
-        modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
+
