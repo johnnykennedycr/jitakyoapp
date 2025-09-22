@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// As funções auxiliares (createDisciplineFieldHtml, openTeacherForm, etc.) permanecem as mesmas
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO (sem alterações) ---
 function createDisciplineFieldHtml(discipline = { discipline_name: '', graduation: '' }) {
     const fieldId = `discipline-${Date.now()}-${Math.random()}`;
     return `
@@ -14,7 +14,7 @@ function createDisciplineFieldHtml(discipline = { discipline_name: '', graduatio
     `;
 }
 
-async function openTeacherForm(targetElement, teacherId = null) {
+async function openTeacherForm(teacherId = null) {
     showLoading();
     try {
         const [teacherRes, usersRes] = await Promise.all([
@@ -65,57 +65,13 @@ async function openTeacherForm(targetElement, teacherId = null) {
     }
 }
 
-async function handleFormSubmit(e, targetElement) {
-    e.preventDefault();
-    const form = e.target;
-    const teacherId = form.dataset.teacherId;
-    hideModal();
-    showLoading();
-    const disciplines = Array.from(form.querySelectorAll('.discipline-entry')).map(entry => ({
-        discipline_name: entry.querySelector('[name="discipline_name"]').value,
-        graduation: entry.querySelector('[name="graduation"]').value,
-    }));
-    let data;
-    let url;
-    let method;
-    if (teacherId) {
-        url = `/api/admin/teachers/${teacherId}`;
-        method = 'PUT';
-        data = {
-            contact_info: { phone: form.elements.phone.value },
-            description: form.elements.description.value,
-            disciplines: disciplines
-        };
-    } else {
-        url = '/api/admin/teachers';
-        method = 'POST';
-        const selectedOption = form.elements.user_id.options[form.elements.user_id.selectedIndex];
-        data = {
-            user_id: form.elements.user_id.value,
-            name: selectedOption.dataset.name,
-            contact_info: { phone: form.elements.phone.value },
-            description: form.elements.description.value,
-            disciplines: disciplines
-        };
-    }
-    try {
-        const response = await fetchWithAuth(url, { method, body: JSON.stringify(data) });
-        if (!response.ok) throw await response.json();
-    } catch (error) {
-        alert(`Erro ao salvar professor: ${error.error || error.message || 'Ocorreu uma falha.'}`);
-    } finally {
-        await renderTeacherList(targetElement);
-        hideLoading();
-    }
-}
-
-async function handleDeleteClick(teacherId, teacherName, targetElement) {
+async function handleDeleteClick(teacherId, teacherName) {
     showModal(
         `Confirmar Exclusão`,
         `<p>Tem certeza que deseja deletar o professor <strong>${teacherName}</strong>?</p>
          <div class="text-right mt-6">
-            <button data-action="cancel-delete" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-400">Cancelar</button>
-            <button data-action="confirm-delete" data-teacher-id="${teacherId}" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Confirmar</button>
+             <button data-action="cancel-delete" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-400">Cancelar</button>
+             <button data-action="confirm-delete" data-teacher-id="${teacherId}" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Confirmar</button>
          </div>`
     );
 }
@@ -132,25 +88,128 @@ export async function renderTeacherList(targetElement) {
         <div id="table-container"><p>Carregando...</p></div>
     `;
 
-    // --- GERENCIADOR DE EVENTOS CENTRAL ---
+    const tableContainer = targetElement.querySelector('#table-container');
+
+    // Função para renderizar apenas a tabela de professores
+    const renderTable = async () => {
+        showLoading();
+        try {
+            const response = await fetchWithAuth('/api/admin/teachers/');
+            const teachers = await response.json();
+            if (teachers.length === 0) {
+                tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>';
+                return;
+            }
+            tableContainer.innerHTML = `
+                <div class="bg-white rounded-md shadow overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modalidades / Graduações</th>
+                                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${teachers.map(teacher => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">${teacher.name || 'N/A'}</div>
+                                        <div class="text-xs text-gray-500">${teacher.contact_info?.phone || 'N/A'}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        ${(Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0)
+                                            ? teacher.disciplines.map(d => `<div><strong>${d.discipline_name}:</strong> ${d.graduation}</div>`).join('')
+                                            : 'Nenhuma'}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <button data-action="edit" data-teacher-id="${teacher.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Professor">
+                                                <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                            <button data-action="delete" data-teacher-id="${teacher.id}" data-teacher-name="${teacher.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Professor">
+                                                <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch (error) {
+            console.error("Erro ao buscar professores:", error);
+            tableContainer.innerHTML = `<p class="text-red-500">Falha ao carregar os professores.</p>`;
+        } finally {
+            hideLoading();
+        }
+    };
+
+    // --- GERENCIADORES DE EVENTOS ---
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
         const teacherId = button.dataset.teacherId;
         const teacherName = button.dataset.teacherName;
-        if (action === 'add') openTeacherForm(targetElement);
-        if (action === 'edit') openTeacherForm(targetElement, teacherId);
-        if (action === 'delete') handleDeleteClick(teacherId, teacherName, targetElement);
+        if (action === 'add') openTeacherForm();
+        if (action === 'edit') openTeacherForm(teacherId);
+        if (action === 'delete') handleDeleteClick(teacherId, teacherName);
     };
-    targetElement.addEventListener('click', handlePageClick);
-    
-    // Listener para o modal
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        if (form.id !== 'teacher-form') return;
+
+        const teacherId = form.dataset.teacherId;
+        const disciplines = Array.from(form.querySelectorAll('.discipline-entry')).map(entry => ({
+            discipline_name: entry.querySelector('[name="discipline_name"]').value,
+            graduation: entry.querySelector('[name="graduation"]').value,
+        }));
+        
+        let data, url, method;
+        if (teacherId) {
+            url = `/api/admin/teachers/${teacherId}`;
+            method = 'PUT';
+            data = {
+                contact_info: { phone: form.elements.phone.value },
+                description: form.elements.description.value,
+                disciplines: disciplines
+            };
+        } else {
+            url = '/api/admin/teachers';
+            method = 'POST';
+            const selectedOption = form.elements.user_id.options[form.elements.user_id.selectedIndex];
+            data = {
+                user_id: form.elements.user_id.value,
+                name: selectedOption.dataset.name,
+                contact_info: { phone: form.elements.phone.value },
+                description: form.elements.description.value,
+                disciplines: disciplines
+            };
+        }
+
+        hideModal();
+        showLoading();
+        try {
+            const response = await fetchWithAuth(url, { method, body: JSON.stringify(data) });
+            if (!response.ok) throw await response.json();
+        } catch (error) {
+            showModal('Erro', `<p>Erro ao salvar professor: ${error.error || error.message || 'Ocorreu uma falha.'}</p>`);
+        } finally {
+            await renderTable();
+            hideLoading();
+        }
+    };
+
     const modalBody = document.getElementById('modal-body');
     const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const action = button.dataset.action;
+
         if (action === 'add-discipline') {
             document.getElementById('disciplines-container').insertAdjacentHTML('beforeend', createDisciplineFieldHtml());
         }
@@ -167,78 +226,26 @@ export async function renderTeacherList(targetElement) {
             try {
                 await fetchWithAuth(`/api/admin/teachers/${teacherId}`, { method: 'DELETE' });
             } catch (error) {
-                alert('Falha ao deletar professor.');
+                showModal('Erro', '<p>Falha ao deletar professor.</p>');
             } finally {
-                await renderTeacherList(targetElement);
+                await renderTable();
                 hideLoading();
             }
         }
     };
-    modalBody.addEventListener('click', handleModalClick);
 
-    const handleModalSubmit = (e) => handleFormSubmit(e, targetElement);
-    modalBody.addEventListener('submit', handleModalSubmit);
-    
+    // Anexar os listeners uma única vez
+    targetElement.addEventListener('click', handlePageClick);
+    modalBody.addEventListener('click', handleModalClick);
+    modalBody.addEventListener('submit', handleFormSubmit);
+
     // Carregamento inicial da tabela
-    showLoading();
-    try {
-        const response = await fetchWithAuth('/api/admin/teachers/');
-        const teachers = await response.json();
-        const tableContainer = targetElement.querySelector('#table-container');
-        if (teachers.length === 0) {
-            tableContainer.innerHTML = '<p>Nenhum professor encontrado.</p>';
-            return;
-        }
-        tableContainer.innerHTML = `
-            <div class="bg-white rounded-md shadow overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modalidades / Graduações</th>
-                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        ${teachers.map(teacher => `
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">${teacher.name || 'N/A'}</div>
-                                    <div class="text-xs text-gray-500">${teacher.contact_info?.phone || 'N/A'}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    ${(Array.isArray(teacher.disciplines) && teacher.disciplines.length > 0)
-                                        ? teacher.disciplines.map(d => `<div><strong>${d.discipline_name}:</strong> ${d.graduation}</div>`).join('')
-                                        : 'Nenhuma'}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div class="flex items-center justify-end space-x-2">
-                                        <button data-action="edit" data-teacher-id="${teacher.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Professor">
-                                            <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                        </button>
-                                        <button data-action="delete" data-teacher-id="${teacher.id}" data-teacher-name="${teacher.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Professor">
-                                            <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    } catch (error) {
-        console.error("Erro ao buscar professores:", error);
-        targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os professores.</p>`;
-    } finally {
-        hideLoading();
-    }
+    await renderTable();
 
     // A função de limpeza que remove os listeners específicos desta página
     return () => {
         targetElement.removeEventListener('click', handlePageClick);
         modalBody.removeEventListener('click', handleModalClick);
-        modalBody.removeEventListener('submit', handleModalSubmit);
+        modalBody.removeEventListener('submit', handleFormSubmit);
     };
 }
-
