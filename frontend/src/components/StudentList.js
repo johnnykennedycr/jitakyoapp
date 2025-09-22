@@ -23,16 +23,13 @@ async function openStudentForm(targetElement, studentId = null) {
             fetchWithAuth('/api/admin/classes/'),
             studentId ? fetchWithAuth(`/api/admin/students/${studentId}/enrollments`) : Promise.resolve(null)
         ]);
-
         const student = studentRes ? await studentRes.json() : null;
         const allClasses = await classesRes.json();
         const currentEnrollments = enrollmentsRes ? await enrollmentsRes.json() : [];
-        
         const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
         const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
         const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
         const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
-
         const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
@@ -68,7 +65,6 @@ async function openStudentForm(targetElement, studentId = null) {
                             <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
                             <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full">
                         </div></div>`).join('')}</div>`;
-        
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
@@ -178,18 +174,18 @@ export async function renderStudentList(targetElement) {
 
         if (action === 'confirm-delete') {
             const studentIdToDelete = button.dataset.studentId;
-            hideModal();
-            showLoading();
-            try {
+            hideModal(); showLoading();
+            try { 
                 const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
                     throw new Error(errorData.error);
                 }
-            } catch (error) {
+            } catch (error) { 
                 alert(`Erro: ${error.message}`);
-            } finally {
-                // Não precisa chamar renderStudentList aqui, pois o authContext já faz isso
+            } finally { 
+                await renderStudentList(targetElement); 
+                hideLoading(); 
             }
         }
 
@@ -205,13 +201,13 @@ export async function renderStudentList(targetElement) {
             } : null;
             if (isAdding && !body.class_id) return alert('Selecione uma turma.');
             showLoading();
-            try {
+            try { 
                 const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
                 if (!response.ok) throw await response.json();
-            } catch (error) {
+            } catch (error) { 
                 alert(`Erro: ${error.error || 'Falha na operação.'}`);
-            } finally {
-                openStudentForm(targetElement, studentId);
+            } finally { 
+                openStudentForm(targetElement, studentId); 
             }
         }
     };
