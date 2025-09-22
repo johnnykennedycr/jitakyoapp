@@ -46,7 +46,16 @@ class UserService:
             if 'password' in user_data:
                 del user_data['password']
 
-            # Cria o documento do usuário no Firestore
+            # Garante que a data de nascimento seja um objeto datetime
+            if 'date_of_birth' in user_data and isinstance(user_data['date_of_birth'], str):
+                try:
+                    user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
+                except ValueError:
+                    del user_data['date_of_birth']
+
+            user_data['created_at'] = datetime.now()
+            user_data['updated_at'] = datetime.now()
+
             self.users_collection.document(auth_user.uid).set(user_data)
             
             # Cria as matrículas, se houver
@@ -70,25 +79,20 @@ class UserService:
         
         except Exception as e:
             print(f"Erro ao criar usuário com matrículas: {e}")
-            # Se a criação no Auth falhou, não há o que reverter.
-            # Se falhou depois, o usuário pode ter sido criado no Auth mas não no Firestore.
-            # Uma lógica de compensação poderia ser adicionada aqui se necessário.
-            raise e # Re-lança a exceção para a rota lidar
+            raise e
 
     def update_user(self, user_id, update_data):
         """Atualiza os dados de um usuário."""
         try:
-            # Se uma nova senha for fornecida, atualiza no Firebase Auth
             if 'password' in update_data and update_data['password']:
                 password = update_data.pop('password')
                 auth.update_user(user_id, password=password)
 
-            # Garante que a data de nascimento seja um objeto datetime
             if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str):
                 try:
                     update_data['date_of_birth'] = datetime.strptime(update_data['date_of_birth'], '%Y-%m-%d')
                 except ValueError:
-                    del update_data['date_of_birth'] # Remove se o formato for inválido
+                    del update_data['date_of_birth']
 
             update_data['updated_at'] = datetime.now()
             self.users_collection.document(user_id).update(update_data)
@@ -100,21 +104,18 @@ class UserService:
     def delete_user(self, user_id):
         """Deleta um usuário do Firestore, suas matrículas e do Firebase Auth."""
         try:
-            # Deleta as matrículas associadas
             if self.enrollment_service:
                 self.enrollment_service.delete_enrollments_by_student_id(user_id)
             
-            # Deleta do Firestore
             self.users_collection.document(user_id).delete()
-            
-            # Deleta do Firebase Authentication
             auth.delete_user(user_id)
             
             print(f"Usuário com UID {user_id} e suas matrículas foram deletados com sucesso.")
             return True
         except Exception as e:
             print(f"Erro ao deletar usuário {user_id}: {e}")
-            return False
+            # Re-lança a exceção para que a rota possa retornar um erro 500
+            raise e
 
     def get_user_by_id(self, user_id):
         try:
@@ -135,12 +136,8 @@ class UserService:
         return users
         
     def search_students_by_name(self, search_term):
-        """Busca por alunos (role 'student') cujo nome começa com o termo de busca."""
         students = []
         try:
-            # Firestore não suporta busca "case-insensitive" ou "starts with" de forma nativa e eficiente.
-            # A abordagem abaixo busca todos e filtra na memória. Para grandes volumes de dados,
-            # uma solução como Algolia ou Elasticsearch seria recomendada.
             all_students = self.get_users_by_role('student')
             if search_term:
                 search_term_lower = search_term.lower()
