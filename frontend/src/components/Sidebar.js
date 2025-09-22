@@ -41,7 +41,7 @@ export function createSidebar() {
         <nav class="hidden md:flex flex-col bg-slate-100 text-gray-800 w-64 h-full p-4 border-r border-gray-300">
             <div class="sidebar-header flex items-center justify-between pb-4 border-b border-gray-300">
                 <div class="flex items-center">
-                    <img src="/assets/logo-horizontal.png" alt="Logo" class="h-24 sidebar-logo">
+                    <img src="/assets/logo.png" alt="Logo" class="h-24 sidebar-logo">
                 </div>
                 <button id="sidebar-toggle-btn" class="p-1 rounded-md hover:bg-slate-200">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-800"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
