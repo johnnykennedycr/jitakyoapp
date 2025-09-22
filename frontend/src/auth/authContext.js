@@ -69,6 +69,8 @@ export async function renderAuthenticatedApp(user, container) {
 }
 
 function setupEventListeners() {
+    // Esta função contém os listeners para os elementos persistentes como a sidebar
+    // e o botão de logout. Como eles não mudam, não precisam de limpeza.
     const logoutDesktop = document.getElementById('logout-button');
     const logoutMobile = document.getElementById('logout-button-mobile');
     const toggleButton = document.getElementById('sidebar-toggle-btn');
