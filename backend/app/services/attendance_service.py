@@ -14,7 +14,7 @@ class AttendanceService:
     def _calculate_possible_days(self, class_schedule, year, semester):
         """
         Calcula o número total de dias de aula possíveis em um semestre 
-        com base no horário da turma.
+        com base no horário da turma de forma robusta.
         """
         weekday_map = {
             'Segunda': 0, 'Terça': 1, 'Quarta': 2, 'Quinta': 3,
@@ -23,9 +23,18 @@ class AttendanceService:
         
         start_month, end_month = (1, 6) if semester == 1 else (7, 12)
         
-        # CORREÇÃO: Acessar o atributo do objeto com .day_of_week em vez de ['day_of_week']
-        training_days = {weekday_map[slot.day_of_week] for slot in class_schedule if slot.day_of_week in weekday_map}
-        
+        training_days = set()
+        for slot in class_schedule:
+            day = None
+            # CORREÇÃO: Verifica se 'slot' é um objeto ou um dicionário antes de acessar
+            if hasattr(slot, 'day_of_week'):
+                day = slot.day_of_week # Acesso como objeto
+            elif isinstance(slot, dict) and 'day_of_week' in slot:
+                day = slot['day_of_week'] # Acesso como dicionário
+            
+            if day and day in weekday_map:
+                training_days.add(weekday_map[day])
+
         if not training_days:
             return 0
             
