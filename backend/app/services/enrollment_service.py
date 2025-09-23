@@ -5,7 +5,8 @@ from app.models.enrollment import Enrollment
 class EnrollmentService:
     def __init__(self, db, user_service=None, training_class_service=None):
         self.db = db
-        self.enrollments_collection = self.db.collection('enrollments')
+        # Padronizando o nome da variável da coleção
+        self.collection = self.db.collection('enrollments')
         self.user_service = user_service
         self.training_class_service = training_class_service
 
@@ -18,7 +19,7 @@ class EnrollmentService:
             raise ValueError("ID do aluno e da turma são obrigatórios.")
 
         # Validação para impedir matrículas duplicadas
-        existing_enrollment_query = self.enrollments_collection.where(
+        existing_enrollment_query = self.collection.where(
             filter=firestore.And(
                 [
                     firestore.FieldFilter('student_id', '==', student_id),
@@ -47,7 +48,7 @@ class EnrollmentService:
             'updated_at': datetime.now()
         }
         
-        doc_ref = self.enrollments_collection.document()
+        doc_ref = self.collection.document()
         doc_ref.set(enrollment_data)
         
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
@@ -56,7 +57,7 @@ class EnrollmentService:
         """Busca todas as matrículas de um aluno específico."""
         enrollments = []
         try:
-            docs = self.enrollments_collection.where('student_id', '==', student_id).stream()
+            docs = self.collection.where('student_id', '==', student_id).stream()
             for doc in docs:
                 enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
@@ -67,7 +68,7 @@ class EnrollmentService:
         """Retorna uma lista de IDs de alunos matriculados em uma turma."""
         student_ids = []
         try:
-            docs = self.enrollments_collection.where('class_id', '==', class_id).stream()
+            docs = self.collection.where('class_id', '==', class_id).stream()
             for doc in docs:
                 student_ids.append(doc.to_dict().get('student_id'))
         except Exception as e:
@@ -77,17 +78,16 @@ class EnrollmentService:
     def delete_enrollment(self, enrollment_id):
         """Deleta uma matrícula pelo seu ID."""
         try:
-            self.enrollments_collection.document(enrollment_id).delete()
+            self.collection.document(enrollment_id).delete()
             return True
         except Exception as e:
             print(f"Erro ao deletar matrícula {enrollment_id}: {e}")
             return False
             
-    # --- MÉTODO ADICIONADO ---
     def delete_enrollments_by_student_id(self, student_id):
         """Deleta todas as matrículas de um aluno específico."""
         try:
-            enrollments_to_delete = self.enrollments_collection.where('student_id', '==', student_id).stream()
+            enrollments_to_delete = self.collection.where('student_id', '==', student_id).stream()
             for doc in enrollments_to_delete:
                 doc.reference.delete()
             print(f"Matrículas do aluno {student_id} deletadas com sucesso.")
@@ -97,24 +97,13 @@ class EnrollmentService:
             return False
 
     def get_enrollments_by_class_id(self, class_id):
-            """Busca todas as matrículas ativas para uma turma específica."""
-            enrollments = []
-            try:
-                docs = self.collection.where('class_id', '==', class_id).where('status', '==', 'active').stream()
-                for doc in docs:
-                    enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
-            except Exception as e:
-                print(f"Erro ao buscar matrículas por ID da turma '{class_id}': {e}")
-            return enrollments
-
-    def delete_enrollments_by_student_id(self, student_id):
-        """Deleta todas as matrículas de um aluno."""
+        """Busca todas as matrículas ativas para uma turma específica."""
+        enrollments = []
         try:
-            docs = self.collection.where('student_id', '==', student_id).stream()
+            docs = self.collection.where('class_id', '==', class_id).where('status', '==', 'active').stream()
             for doc in docs:
-                doc.reference.delete()
-            print(f"Matrículas do aluno {student_id} deletadas com sucesso.")
-            return True
+                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
-            print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
-            raise e
+            print(f"Erro ao buscar matrículas por ID da turma '{class_id}': {e}")
+        return enrollments
+
