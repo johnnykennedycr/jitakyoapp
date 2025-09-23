@@ -46,11 +46,10 @@ def create_app():
     from app.services.payment_service import PaymentService
     
     enrollment_service = EnrollmentService(db)
-    # Passa a instância 'mail' para o UserService
     user_service = UserService(db, enrollment_service, mail)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
-    attendance_service = AttendanceService(db)
+    attendance_service = AttendanceService(db, user_service)
     payment_service = PaymentService(db)
     
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
