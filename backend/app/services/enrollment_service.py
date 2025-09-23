@@ -96,3 +96,25 @@ class EnrollmentService:
             print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             return False
 
+    def get_enrollments_by_class_id(self, class_id):
+            """Busca todas as matrículas ativas para uma turma específica."""
+            enrollments = []
+            try:
+                docs = self.collection.where('class_id', '==', class_id).where('status', '==', 'active').stream()
+                for doc in docs:
+                    enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+            except Exception as e:
+                print(f"Erro ao buscar matrículas por ID da turma '{class_id}': {e}")
+            return enrollments
+
+    def delete_enrollments_by_student_id(self, student_id):
+        """Deleta todas as matrículas de um aluno."""
+        try:
+            docs = self.collection.where('student_id', '==', student_id).stream()
+            for doc in docs:
+                doc.reference.delete()
+            print(f"Matrículas do aluno {student_id} deletadas com sucesso.")
+            return True
+        except Exception as e:
+            print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
+            raise e
