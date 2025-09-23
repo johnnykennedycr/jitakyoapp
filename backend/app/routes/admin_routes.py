@@ -506,76 +506,34 @@ def unenroll_student_from_class(class_id, student_id):
     except Exception as e:
         return jsonify(error=str(e)), 500
 
-# --- Rotas Financeiras (API) ---
-
-@admin_api_bp.route('/financial/dashboard-data')
-@login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def financial_dashboard_data():
-    """Fornece os dados para o dashboard financeiro."""
-    try:
-        today = date.today()
-        
-        total_received = payment_service.get_paid_total_for_month(today.year, today.month)
-        overdue_payments = payment_service.get_overdue_payments()
-        pending_payments = payment_service.get_pending_payments()
-        recent_paid = payment_service.get_recent_paid_payments(limit=5)
-
-        def enrich_payments(payments):
-            # Função auxiliar para adicionar nomes de alunos aos pagamentos
-            return [{
-                'payment': p.to_dict(),
-                'student_name': user_service.get_user_by_id(p.student_id).name or 'Aluno Removido'
-            } for p in payments]
-
-        response_data = {
-            "total_received_this_month": total_received,
-            "overdue": {
-                "count": len(overdue_payments),
-                "total": sum(p.amount for p in overdue_payments if p.amount),
-                "payments": enrich_payments(overdue_payments)
-            },
-            "pending": {
-                "count": len(pending_payments),
-                "total": sum(p.amount for p in pending_payments if p.amount),
-                "payments": enrich_payments(pending_payments)
-            },
-            "recent_paid": enrich_payments(recent_paid)
-        }
-        return jsonify(response_data), 200
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-@admin_api_bp.route('/financial/generate-charges', methods=['POST'])
-@login_required
+# --- ROTAS FINANCEIRAS (FINANCIAL) ---
+@admin_api_bp.route('/financial/status', methods=['GET'])
+@auth_required
 @role_required('admin', 'super_admin')
-def generate_monthly_charges_route():
-    """API para gerar as cobranças mensais."""
+def get_financial_status():
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    if not year or not month:
+        return jsonify({"error": "Ano e mês são obrigatórios"}), 400
     try:
-        data = request.get_json()
-        year = data.get('year')
-        month = data.get('month')
-        summary = payment_service.generate_monthly_charges(year, month)
-        return jsonify(success=True, summary=summary), 200
+        status = payment_service.get_financial_status(year, month)
+        return jsonify(status)
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        return jsonify({"error": f"Erro ao buscar status financeiro: {e}"}), 500
 
-@admin_api_bp.route('/financial/pay/<string:payment_id>', methods=['POST'])
-@login_required
-@role_required('admin', 'super_admin', 'receptionist')
-def mark_payment_as_paid_route(payment_id):
-    """API para marcar um pagamento como pago."""
+@admin_api_bp.route('/payments', methods=['POST'])
+@auth_required
+@role_required('admin', 'super_admin')
+def register_payment():
+    data = request.get_json()
     try:
-        data = request.get_json()
-        payment_method = data.get('payment_method', 'Não especificado')
-        if payment_service.mark_payment_as_paid(payment_id, payment_method):
-            return jsonify(success=True, message='Pagamento registrado com sucesso!'), 200
-        else:
-            return jsonify(success=False, message='Erro ao registrar pagamento.'), 500
+        if payment_service.create_payment(data):
+            return jsonify({"message": "Pagamento registrado com sucesso"}), 201
+        return jsonify({"error": "Falha ao registrar pagamento"}), 500
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        return jsonify({"error": f"Erro interno: {e}"}), 500
 
-# (Outras rotas financeiras como history e student_history seguiriam o mesmo padrão)
+
 
 # --- ROTAS DE GERENCIAMENTO DE USUÁRIOS (API) ---
 

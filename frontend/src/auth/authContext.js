@@ -8,6 +8,7 @@ import { renderAdminDashboard } from "../components/AdminDashboard.js";
 import { renderTeacherList } from "../components/TeacherList.js";
 import { renderStudentList } from "../components/StudentList.js";
 import { renderClassList } from "../components/ClassList.js";
+import { renderFinancialDashboard } from "../components/FinancialDashboard.js"; // <-- ADICIONADO
 
 // Variável para guardar a função de limpeza da página atual
 let currentPageCleanup = () => {};
@@ -30,13 +31,8 @@ export async function renderAuthenticatedApp(user, container) {
         const sidebarHTML = createSidebar(); 
         document.getElementById('sidebar-container').innerHTML = sidebarHTML;
         const mainContent = document.getElementById('main-content');
+        mainContent.classList.add('overflow-y-auto', 'pb-20', 'md:pb-0');
         
-        // --- CORREÇÃO PARA SCROLL RESPONSIVO ---
-        // Adiciona a classe que permite a rolagem vertical na área de conteúdo
-        // quando o conteúdo (como uma lista longa) excede a altura da tela.
-        mainContent.classList.add('overflow-y-auto');
-        // --- FIM DA CORREÇÃO ---
-
         // A função de setup dos listeners da sidebar (que é persistente)
         setupEventListeners();
 
@@ -57,6 +53,7 @@ export async function renderAuthenticatedApp(user, container) {
             '/admin/teachers': () => navigateTo(renderTeacherList),
             '/admin/students': () => navigateTo(renderStudentList),
             '/admin/classes': () => navigateTo(renderClassList),
+            '/admin/financial': () => navigateTo(renderFinancialDashboard), // <-- ADICIONADO
         }).notFound(() => {
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });
@@ -92,6 +89,8 @@ function setupEventListeners() {
         e.preventDefault();
         setUserProfile(null);
         auth.signOut();
+        // Redireciona para a página de login após o logout
+        router.navigate('/login');
     };
 
     if(logoutDesktop) logoutDesktop.addEventListener('click', handleLogout);
@@ -114,3 +113,4 @@ function setupEventListeners() {
         });
     }
 }
+

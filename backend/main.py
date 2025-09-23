@@ -37,34 +37,26 @@ def create_app():
 
     db = firestore.client()
     
-    # --- Importação e Inicialização de Serviços ---
-    from app.services.enrollment_service import EnrollmentService
+    # --- Importação e Inicialização de Serviços (com injeção de dependência) ---
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
+    from app.services.enrollment_service import EnrollmentService
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
-    
-    # 1. Cria todas as instâncias de serviço
-    # Nível 0 (sem dependências de outros serviços)
-    teacher_service = TeacherService(db)
-    training_class_service = TrainingClassService(db)
-    payment_service = PaymentService(db)
-    
-    # Nível 1 (dependem do Nível 0)
-    enrollment_service = EnrollmentService(db, training_class_service)
-    user_service = UserService(db, enrollment_service, mail)
 
-    # Nível 2 (dependem dos níveis anteriores)
-    attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
-    
-    # 2. Seta as dependências entre os serviços DEPOIS que todos foram criados
-    user_service.enrollment_service = enrollment_service
-    enrollment_service.training_class_service = training_class_service
-    attendance_service.user_service = user_service
-    attendance_service.enrollment_service = enrollment_service
-    attendance_service.training_class_service = training_class_service
+    # Ordem de inicialização que respeita as dependências
+    user_service = UserService(db, mail=mail)
+    teacher_service = TeacherService(db, user_service=user_service)
+    training_class_service = TrainingClassService(db, teacher_service=teacher_service)
+    enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
+    payment_service = PaymentService(db, enrollment_service=enrollment_service, user_service=user_service)
+    attendance_service = AttendanceService(db)
 
+    # Seta dependências circulares ou que não puderam ser injetadas no construtor
+    user_service.set_enrollment_service(enrollment_service)
+    attendance_service.set_services(enrollment_service=enrollment_service, training_class_service=training_class_service)
+    
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
