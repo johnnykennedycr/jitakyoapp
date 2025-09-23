@@ -49,7 +49,7 @@ def create_app():
     user_service = UserService(db, enrollment_service, mail)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
-    attendance_service = AttendanceService(db, user_service)
+    attendance_service = AttendanceService(db, user_service, training_class_service, enrollment_service)
     payment_service = PaymentService(db)
     
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
