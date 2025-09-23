@@ -74,7 +74,6 @@ class AttendanceService:
         """
         try:
             # 1. Obter a turma e seu horário
-            # CORREÇÃO: Usar o training_class_service em vez do enrollment_service
             target_class = self.training_class_service.get_class_by_id(class_id)
             if not target_class or not target_class.schedule:
                 return {"total_possible_days": 0, "students": []}
