@@ -49,7 +49,7 @@ def create_app():
     # Nível 0 (sem dependências de outros serviços)
     teacher_service = TeacherService(db)
     training_class_service = TrainingClassService(db)
-    payment_service = PaymentService(db, enrollment_service, user_service)
+    
     
     # Nível 1 (dependem do Nível 0)
     enrollment_service = EnrollmentService(db, training_class_service)
@@ -57,6 +57,7 @@ def create_app():
 
     # Nível 2 (dependem dos níveis anteriores)
     attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
+    payment_service = PaymentService(db, enrollment_service, user_service)
     
     # 2. Seta as dependências entre os serviços DEPOIS que todos foram criados
     user_service.enrollment_service = enrollment_service
