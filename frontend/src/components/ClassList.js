@@ -149,42 +149,18 @@ async function openTakeAttendanceModal(classId, className) {
         const students = await response.json();
         const today = new Date().toISOString().split('T')[0];
 
-        // Estilos para o toggle switch
-        const toggleStyle = `
-            <style>
-                .toggle-checkbox:checked {
-                    background-color: #34D399; /* green-400 */
-                    border-color: #34D399;
-                }
-                .toggle-checkbox:checked + .toggle-label .toggle-dot {
-                    transform: translateX(100%);
-                    background-color: white;
-                }
-                .toggle-checkbox {
-                    transition: background-color 0.2s ease-in-out;
-                }
-                .toggle-dot {
-                    transition: transform 0.2s ease-in-out;
-                }
-            </style>
-        `;
-
         const studentsHtml = students.length > 0
             ? students.map(s => `
-                <div class="flex items-center justify-between p-3 border-b hover:bg-gray-50">
-                    <span class="text-sm text-gray-800">${s.name}</span>
-                    <label for="student-${s.id}" class="flex items-center cursor-pointer">
-                        <div class="relative">
-                            <input type="checkbox" id="student-${s.id}" name="present_students" value="${s.id}" class="sr-only toggle-checkbox" checked>
-                            <div class="toggle-label block w-12 h-6 rounded-full bg-red-400"></div>
-                            <div class="toggle-dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
-                        </div>
+                <div class="flex items-center justify-between p-3 border-b last:border-b-0 hover:bg-gray-50">
+                    <span class="text-sm font-medium text-gray-800">${s.name}</span>
+                    <label class="inline-flex relative items-center cursor-pointer">
+                        <input type="checkbox" value="${s.id}" name="present_students" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-red-400 rounded-full peer peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                     </label>
                 </div>`).join('')
             : '<p class="p-4 text-sm text-gray-500">Nenhum aluno matriculado para registrar presença.</p>';
 
         const formHtml = `
-            ${toggleStyle}
             <form id="take-attendance-form" data-class-id="${classId}">
                 <div class="mb-4">
                     <label for="attendance-date" class="block text-sm font-medium text-gray-700">Data da Chamada</label>
@@ -217,10 +193,10 @@ async function openAttendanceHistoryModal(classId, className) {
 
         for (let i = 0; i < 5; i++) { // Gera opções para os últimos 5 semestres
             options += `<option value="${year}-${semester}">${year}/${semester}</option>`;
-            if (semester === 2) {
-                semester = 1;
-            } else {
+            if (semester === 1) {
                 semester = 2;
+            } else {
+                semester = 1;
                 year--;
             }
         }
@@ -298,7 +274,6 @@ async function openAttendanceHistoryModal(classId, className) {
     };
 
     filterElement.addEventListener('change', fetchAndRenderHistory);
-    // Carga inicial
     fetchAndRenderHistory();
 }
 

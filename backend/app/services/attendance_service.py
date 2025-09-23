@@ -16,29 +16,23 @@ class AttendanceService:
         Calcula o número total de dias de aula possíveis em um semestre 
         com base no horário da turma.
         """
-        # Mapeia nomes de dias da semana para os números do módulo 'calendar' (Segunda=0)
         weekday_map = {
             'Segunda': 0, 'Terça': 1, 'Quarta': 2, 'Quinta': 3,
             'Sexta': 4, 'Sábado': 5, 'Domingo': 6
         }
         
-        # Determina o intervalo de meses para o semestre
         start_month, end_month = (1, 6) if semester == 1 else (7, 12)
         
-        # Obtém os dias de treino da turma (em formato numérico)
         training_days = {weekday_map[slot['day_of_week']] for slot in class_schedule if slot['day_of_week'] in weekday_map}
         
         if not training_days:
             return 0
             
         total_days = 0
-        # Itera sobre cada mês do semestre
         for month in range(start_month, end_month + 1):
-            # Obtém uma matriz para o mês (semanas x dias)
             month_calendar = calendar.monthcalendar(year, month)
             for week in month_calendar:
                 for day_weekday in training_days:
-                    # Se o dia da semana existe na semana (não é 0), conta como um dia de aula
                     if week[day_weekday] != 0:
                         total_days += 1
                         
@@ -80,6 +74,7 @@ class AttendanceService:
         """
         try:
             # 1. Obter a turma e seu horário
+            # CORREÇÃO: Usar o training_class_service em vez do enrollment_service
             target_class = self.training_class_service.get_class_by_id(class_id)
             if not target_class or not target_class.schedule:
                 return {"total_possible_days": 0, "students": []}
@@ -122,7 +117,6 @@ class AttendanceService:
                         "percentage": percentage
                     })
             
-            # Ordenar por nome do aluno
             student_stats.sort(key=lambda x: x['name'])
 
             return {
