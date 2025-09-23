@@ -456,6 +456,18 @@ def save_attendance():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --- NOVA ROTA ---
+@admin_api_bp.route('/classes/<class_id>/attendance-semesters', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_attendance_semesters(class_id):
+    try:
+        semesters = attendance_service.get_available_semesters(class_id)
+        return jsonify(semesters), 200
+    except Exception as e:
+        logging.error(f"Erro ao buscar semestres de chamada para a turma {class_id}: {e}")
+        return jsonify({"error": "Falha ao carregar semestres."}), 500
+
 @admin_api_bp.route('/classes/<class_id>/attendance-history', methods=['GET'])
 @login_required
 @role_required('admin', 'super_admin')

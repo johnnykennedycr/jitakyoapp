@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO (sem alterações) ---
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
 function createScheduleFieldHtml(slot = { day_of_week: '', start_time: '', end_time: '' }) {
     const fieldId = `schedule-${Date.now()}-${Math.random()}`;
     return `
@@ -41,17 +41,17 @@ async function openClassForm(classId = null) {
                     <div><label class="block text-sm font-medium">Modalidade</label><input type="text" name="discipline" value="${trainingClass?.discipline || ''}" class="p-2 border rounded-md w-full" required></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div><label class="block text-sm font-medium">Professor</label>
-                         <select name="teacher_id" class="p-2 border rounded-md w-full" required>
-                             <option value="">Selecione um professor</option>
-                             ${teachers.map(t => `<option value="${t.id}" ${trainingClass?.teacher_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
-                         </select></div>
-                     <div><label class="block text-sm font-medium">Capacidade</label><input type="number" name="capacity" value="${trainingClass?.capacity || ''}" class="p-2 border rounded-md w-full" required></div>
+                    <div><label class="block text-sm font-medium">Professor</label>
+                        <select name="teacher_id" class="p-2 border rounded-md w-full" required>
+                            <option value="">Selecione um professor</option>
+                            ${teachers.map(t => `<option value="${t.id}" ${trainingClass?.teacher_id === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
+                        </select></div>
+                    <div><label class="block text-sm font-medium">Capacidade</label><input type="number" name="capacity" value="${trainingClass?.capacity || ''}" class="p-2 border rounded-md w-full" required></div>
                 </div>
                  <div class="mb-4">
-                     <label class="block text-sm font-medium">Mensalidade Padrão (R$)</label>
-                     <input type="number" step="0.01" name="default_monthly_fee" value="${trainingClass?.default_monthly_fee || ''}" class="p-2 border rounded-md w-full" required>
-                 </div>
+                    <label class="block text-sm font-medium">Mensalidade Padrão (R$)</label>
+                    <input type="number" step="0.01" name="default_monthly_fee" value="${trainingClass?.default_monthly_fee || ''}" class="p-2 border rounded-md w-full" required>
+                </div>
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Horários</h4>
                     <button type="button" data-action="add-schedule" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
@@ -64,83 +64,6 @@ async function openClassForm(classId = null) {
     finally { hideLoading(); }
 }
 
-async function openEnrollStudentModal(classId, className) {
-    const modalBodyHtml = `
-        <form id="enroll-student-form" data-class-id="${classId}">
-            <div class="mb-4">
-                <label class="block text-sm font-medium">Buscar Aluno por Nome</label>
-                <input type="text" id="student-search-input" placeholder="Digite para buscar..." class="p-2 border rounded-md w-full">
-                <div id="student-search-results" class="mt-2 border rounded-md max-h-40 overflow-y-auto"></div>
-                <input type="hidden" name="student_id">
-            </div>
-             <div class="mb-4">
-                <label class="block text-sm font-medium">Desconto (R$)</label>
-                <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
-            </div>
-            <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
-        </form>
-    `;
-    showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
-
-    const searchInput = document.getElementById('student-search-input');
-    const searchResults = document.getElementById('student-search-results');
-    const studentIdInput = document.querySelector('[name="student_id"]');
-    let debounceTimer;
-
-    searchInput.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-            const searchTerm = searchInput.value;
-            if (searchTerm.length < 2) {
-                searchResults.innerHTML = '';
-                return;
-            }
-            const response = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
-            const students = await response.json();
-            searchResults.innerHTML = students.length > 0 ?
-                students.map(s => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-student-id="${s.id}" data-student-name="${s.name}">${s.name}</div>`).join('') :
-                `<div class="p-2 text-gray-500">Nenhum aluno encontrado.</div>`;
-        }, 300);
-    });
-
-    searchResults.addEventListener('click', (e) => {
-        const target = e.target;
-        if (target.dataset.studentId) {
-            studentIdInput.value = target.dataset.studentId;
-            searchInput.value = target.dataset.studentName;
-            searchResults.innerHTML = '';
-        }
-    });
-}
-
-async function openEnrolledStudentsModal(classId, className) {
-    showLoading();
-    try {
-        const response = await fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`);
-        if (!response.ok) {
-            throw new Error('Falha ao buscar alunos matriculados.');
-        }
-        const students = await response.json();
-        const studentsHtml = students.length > 0
-            ? `<ul class="list-disc pl-5 space-y-1">${students.map(s => `<li>${s.name}</li>`).join('')}</ul>`
-            : '<p>Nenhum aluno matriculado nesta turma.</p>';
-        showModal(`Alunos em ${className}`, studentsHtml);
-    } catch (error) {
-        console.error("Erro ao buscar alunos matriculados:", error);
-        showModal('Erro', '<p>Não foi possível carregar a lista de alunos.</p>');
-    } finally {
-        hideLoading();
-    }
-}
-
-async function handleDeleteClick(classId, className) {
-    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar a turma <strong>${className}</strong>?</p>
-         <div class="text-right mt-6">
-             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-             <button data-action="confirm-delete" data-class-id="${classId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
-}
-
-// --- NOVAS FUNÇÕES PARA CHAMADA ---
 async function openTakeAttendanceModal(classId, className) {
     showLoading();
     try {
@@ -184,97 +107,98 @@ async function openTakeAttendanceModal(classId, className) {
 }
 
 async function openAttendanceHistoryModal(classId, className) {
-    const generateSemesterOptions = () => {
-        let options = '';
-        const today = new Date();
-        let year = today.getFullYear();
-        let month = today.getMonth() + 1;
-        let semester = month <= 6 ? 1 : 2;
+    showLoading();
+    try {
+        const semestersRes = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-semesters`);
+        if (!semestersRes.ok) throw new Error('Falha ao buscar semestres.');
+        const availableSemesters = await semestersRes.json();
 
-        for (let i = 0; i < 5; i++) { // Gera opções para os últimos 5 semestres
-            options += `<option value="${year}-${semester}">${year}/${semester}</option>`;
-            if (semester === 1) {
-                semester = 2;
-            } else {
-                semester = 1;
-                year--;
-            }
+        if (availableSemesters.length === 0) {
+            showModal(`Histórico de ${className}`, '<p>Nenhum registro de chamada encontrado para esta turma.</p>');
+            return;
         }
-        return options;
-    };
 
-    const modalHtml = `
-        <div class="mb-4">
-            <label for="semester-filter" class="block text-sm font-medium text-gray-700">Selecionar Semestre</label>
-            <select id="semester-filter" class="mt-1 block w-full p-2 border rounded-md">
-                ${generateSemesterOptions()}
-            </select>
-        </div>
-        <div id="attendance-history-content">
-            <p>Carregando dados do semestre...</p>
-        </div>
-    `;
-    showModal(`Histórico de Presença - ${className}`, modalHtml);
+        const semesterOptions = availableSemesters
+            .map(s => `<option value="${s.year}-${s.semester}">${s.year}/${s.semester}</option>`)
+            .join('');
 
-    const filterElement = document.getElementById('semester-filter');
-    const contentElement = document.getElementById('attendance-history-content');
+        const modalHtml = `
+            <div class="mb-4">
+                <label for="semester-filter" class="block text-sm font-medium text-gray-700">Selecionar Semestre</label>
+                <select id="semester-filter" class="mt-1 block w-full p-2 border rounded-md">
+                    ${semesterOptions}
+                </select>
+            </div>
+            <div id="attendance-history-content">
+                <p>Carregando dados do semestre...</p>
+            </div>
+        `;
+        showModal(`Histórico de Presença - ${className}`, modalHtml);
 
-    const fetchAndRenderHistory = async () => {
-        contentElement.innerHTML = `<p>Buscando dados...</p>`;
-        const [year, semester] = filterElement.value.split('-');
-        try {
-            const response = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-history?year=${year}&semester=${semester}`);
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || 'Falha ao buscar histórico de chamadas.');
-            }
-            const historyData = await response.json();
-            
-            if (!historyData.students || historyData.students.length === 0) {
-                 contentElement.innerHTML = '<p>Nenhum aluno matriculado ou registro de presença encontrado para este semestre.</p>';
-                 return;
-            }
-            
-            const totalDays = historyData.total_possible_days;
-            const tableHtml = `
-                <p class="text-sm text-gray-600 mb-2">Total de aulas no semestre: <strong>${totalDays}</strong></p>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
-                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Presenças</th>
-                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">%</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${historyData.students.map(student => {
-                                const percentage = student.percentage.toFixed(1);
-                                let bgColor = 'bg-red-100';
-                                if (percentage >= 75) bgColor = 'bg-green-100';
-                                else if (percentage >= 50) bgColor = 'bg-yellow-100';
+        const filterElement = document.getElementById('semester-filter');
+        const contentElement = document.getElementById('attendance-history-content');
 
-                                return `
-                                <tr class="${bgColor}">
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center">${student.presence_count} / ${totalDays}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center font-semibold">${percentage}%</td>
+        const fetchAndRenderHistory = async () => {
+            contentElement.innerHTML = `<p>Buscando dados...</p>`;
+            const [year, semester] = filterElement.value.split('-');
+            try {
+                const response = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-history?year=${year}&semester=${semester}`);
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Falha ao buscar histórico de chamadas.');
+                }
+                const historyData = await response.json();
+                
+                if (!historyData.students || historyData.students.length === 0) {
+                     contentElement.innerHTML = '<p>Nenhum aluno matriculado ou registro de presença encontrado para este semestre.</p>';
+                     return;
+                }
+                
+                const totalDays = historyData.total_possible_days;
+                const tableHtml = `
+                    <p class="text-sm text-gray-600 mb-2">Total de aulas no semestre: <strong>${totalDays}</strong></p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Presenças</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">%</th>
                                 </tr>
-                                `
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-            contentElement.innerHTML = tableHtml;
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${historyData.students.map(student => {
+                                    const percentage = student.percentage.toFixed(1);
+                                    let bgColor = 'bg-red-100';
+                                    if (percentage >= 75) bgColor = 'bg-green-100';
+                                    else if (percentage >= 50) bgColor = 'bg-yellow-100';
 
-        } catch (error) {
-            contentElement.innerHTML = `<p class="text-red-500">${error.message}</p>`;
-        }
-    };
+                                    return `
+                                    <tr class="${bgColor}">
+                                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center">${student.presence_count} / ${totalDays}</td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center font-semibold">${percentage}%</td>
+                                    </tr>
+                                    `
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                contentElement.innerHTML = tableHtml;
 
-    filterElement.addEventListener('change', fetchAndRenderHistory);
-    fetchAndRenderHistory();
+            } catch (error) {
+                contentElement.innerHTML = `<p class="text-red-500">${error.message}</p>`;
+            }
+        };
+
+        filterElement.addEventListener('change', fetchAndRenderHistory);
+        fetchAndRenderHistory();
+    } catch(error) {
+        showModal('Erro', `<p>${error.message}</p>`);
+    } finally {
+        hideLoading();
+    }
 }
 
 
@@ -318,12 +242,12 @@ export async function renderClassList(targetElement) {
                                  <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
                                      <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                                  </button>
-                                 <button data-action="take-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Fazer Chamada">
+                                <button data-action="take-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Fazer Chamada">
                                     <svg class="w-5 h-5 text-blue-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zM9 16l2 2 4-4"></path></svg>
-                                 </button>
-                                 <button data-action="view-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Histórico de Chamadas">
-                                     <svg class="w-5 h-5 text-purple-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                 </button>
+                                </button>
+                                <button data-action="view-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Histórico de Chamadas">
+                                    <svg class="w-5 h-5 text-purple-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </button>
                                 <button data-action="edit" data-class-id="${c.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Turma">
                                     <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                 </button>

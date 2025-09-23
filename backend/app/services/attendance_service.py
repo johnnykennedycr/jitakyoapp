@@ -4,13 +4,38 @@ from app.models.attendance import Attendance
 import calendar
 
 class AttendanceService:
-    # CORREÇÃO: O construtor agora recebe todas as dependências necessárias
     def __init__(self, db, user_service, enrollment_service, training_class_service):
         self.db = db
         self.user_service = user_service
         self.enrollment_service = enrollment_service
         self.training_class_service = training_class_service
         self.collection = self.db.collection('attendance')
+
+    # --- NOVO MÉTODO ---
+    def get_available_semesters(self, class_id):
+        """
+        Busca e retorna uma lista de anos e semestres únicos que possuem
+        registros de chamada para uma turma específica.
+        """
+        try:
+            docs = self.collection.where('class_id', '==', class_id).stream()
+            semesters = set()
+            for doc in docs:
+                record_data = doc.to_dict()
+                # Garante que o campo 'date' é um objeto datetime
+                if isinstance(record_data.get('date'), datetime):
+                    record_date = record_data.get('date').date()
+                    year = record_date.year
+                    semester = 1 if record_date.month <= 6 else 2
+                    semesters.add((year, semester))
+            
+            # Ordena a lista para que o mais recente apareça primeiro
+            sorted_semesters = sorted(list(semesters), key=lambda x: (x[0], x[1]), reverse=True)
+            return [{"year": year, "semester": semester} for year, semester in sorted_semesters]
+        except Exception as e:
+            print(f"Erro ao buscar semestres disponíveis para a turma {class_id}: {e}")
+            return []
+
 
     def _calculate_possible_days(self, class_schedule, year, semester):
         """
