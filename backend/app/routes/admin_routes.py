@@ -444,7 +444,8 @@ def get_un_enrolled_students(class_id):
 # --- NOVAS ROTAS PARA CHAMADA (ATTENDANCE) ---
 
 @admin_api_bp.route('/attendance', methods=['POST'])
-@admin_required
+@login_required
+@role_required('admin', 'super_admin')
 def save_attendance():
     """Salva um registro de chamada para uma turma em uma data."""
     data = request.get_json()
@@ -458,7 +459,8 @@ def save_attendance():
         return jsonify({"error": str(e)}), 500
 
 @admin_api_bp.route('/classes/<class_id>/attendance-history', methods=['GET'])
-@admin_required
+@login_required
+@role_required('admin', 'super_admin')
 def get_attendance_history(class_id):
     """Busca o histórico de chamadas para uma turma específica."""
     try:
