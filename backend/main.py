@@ -46,12 +46,17 @@ def create_app():
     from app.services.payment_service import PaymentService
     
     # 1. Cria todas as instâncias de serviço
-    enrollment_service = EnrollmentService(db)
-    training_class_service = TrainingClassService(db) # Movido para cima
-    user_service = UserService(db, enrollment_service, mail)
+    # Nível 0 (sem dependências de outros serviços)
     teacher_service = TeacherService(db)
-    attendance_service = AttendanceService(db, user_service, training_class_service, enrollment_service)
+    training_class_service = TrainingClassService(db)
     payment_service = PaymentService(db)
+    
+    # Nível 1 (dependem do Nível 0)
+    enrollment_service = EnrollmentService(db, training_class_service)
+    user_service = UserService(db, enrollment_service, mail)
+
+    # Nível 2 (dependem dos níveis anteriores)
+    attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
     
     # 2. Seta as dependências entre os serviços DEPOIS que todos foram criados
     user_service.enrollment_service = enrollment_service

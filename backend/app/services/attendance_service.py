@@ -4,6 +4,7 @@ from app.models.attendance import Attendance
 import calendar
 
 class AttendanceService:
+    # CORREÇÃO: O construtor agora recebe todas as dependências necessárias
     def __init__(self, db, user_service, enrollment_service, training_class_service):
         self.db = db
         self.user_service = user_service
@@ -26,11 +27,10 @@ class AttendanceService:
         training_days = set()
         for slot in class_schedule:
             day = None
-            # CORREÇÃO: Verifica se 'slot' é um objeto ou um dicionário antes de acessar
             if hasattr(slot, 'day_of_week'):
-                day = slot.day_of_week # Acesso como objeto
+                day = slot.day_of_week
             elif isinstance(slot, dict) and 'day_of_week' in slot:
-                day = slot['day_of_week'] # Acesso como dicionário
+                day = slot['day_of_week']
             
             if day and day in weekday_map:
                 training_days.add(weekday_map[day])
@@ -60,13 +60,16 @@ class AttendanceService:
             if not class_id or not date_str:
                 raise ValueError("class_id e date são obrigatórios.")
 
-            attendance_date = datetime.strptime(date_str, '%Y-%m-%d')
+            attendance_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             doc_id = f"{class_id}_{date_str}"
             doc_ref = self.collection.document(doc_id)
 
+            # Convertendo a data para um objeto datetime para salvar no Firestore
+            attendance_datetime = datetime.combine(attendance_date, datetime.min.time())
+
             attendance_data = {
                 'class_id': class_id,
-                'date': attendance_date,
+                'date': attendance_datetime,
                 'present_student_ids': present_student_ids,
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
@@ -117,7 +120,7 @@ class AttendanceService:
                         "id": student_id,
                         "name": user.name,
                         "presence_count": count,
-                        "percentage": percentage
+                        "percentage": round(percentage, 2)
                     })
             
             student_stats.sort(key=lambda x: x['name'])
