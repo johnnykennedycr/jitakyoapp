@@ -23,7 +23,8 @@ class AttendanceService:
         
         start_month, end_month = (1, 6) if semester == 1 else (7, 12)
         
-        training_days = {weekday_map[slot['day_of_week']] for slot in class_schedule if slot['day_of_week'] in weekday_map}
+        # CORREÇÃO: Acessar o atributo do objeto com .day_of_week em vez de ['day_of_week']
+        training_days = {weekday_map[slot.day_of_week] for slot in class_schedule if slot.day_of_week in weekday_map}
         
         if not training_days:
             return 0
@@ -73,21 +74,17 @@ class AttendanceService:
         para um semestre específico.
         """
         try:
-            # 1. Obter a turma e seu horário
             target_class = self.training_class_service.get_class_by_id(class_id)
             if not target_class or not target_class.schedule:
                 return {"total_possible_days": 0, "students": []}
 
-            # 2. Calcular o total de dias de aula possíveis no semestre
             total_possible_days = self._calculate_possible_days(target_class.schedule, year, semester)
             if total_possible_days == 0:
                 return {"total_possible_days": 0, "students": []}
 
-            # 3. Obter todos os alunos matriculados na turma
             enrollments = self.enrollment_service.get_enrollments_by_class_id(class_id)
             enrolled_student_ids = {e.student_id for e in enrollments}
             
-            # 4. Buscar os registros de chamada para a turma no período do semestre
             start_month, end_month = (1, 6) if semester == 1 else (7, 12)
             start_date = datetime(year, start_month, 1)
             end_date = datetime(year, end_month, calendar.monthrange(year, end_month)[1])
@@ -95,7 +92,6 @@ class AttendanceService:
             query = self.collection.where('class_id', '==', class_id).where('date', '>=', start_date).where('date', '<=', end_date)
             docs = query.stream()
 
-            # 5. Contar as presenças de cada aluno
             presence_counts = {student_id: 0 for student_id in enrolled_student_ids}
             for doc in docs:
                 record = doc.to_dict()
@@ -103,7 +99,6 @@ class AttendanceService:
                     if student_id in presence_counts:
                         presence_counts[student_id] += 1
             
-            # 6. Montar a resposta final com nomes e percentuais
             student_stats = []
             for student_id, count in presence_counts.items():
                 user = self.user_service.get_user_by_id(student_id)
