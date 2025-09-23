@@ -64,6 +64,84 @@ async function openClassForm(classId = null) {
     finally { hideLoading(); }
 }
 
+// --- FUNÇÕES RESTAURADAS ---
+async function openEnrollStudentModal(classId, className) {
+    const modalBodyHtml = `
+        <form id="enroll-student-form" data-class-id="${classId}">
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Buscar Aluno por Nome</label>
+                <input type="text" id="student-search-input" placeholder="Digite para buscar..." class="p-2 border rounded-md w-full">
+                <div id="student-search-results" class="mt-2 border rounded-md max-h-40 overflow-y-auto"></div>
+                <input type="hidden" name="student_id">
+            </div>
+             <div class="mb-4">
+                <label class="block text-sm font-medium">Desconto (R$)</label>
+                <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
+            </div>
+            <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
+        </form>
+    `;
+    showModal(`Matricular Aluno em ${className}`, modalBodyHtml);
+
+    const searchInput = document.getElementById('student-search-input');
+    const searchResults = document.getElementById('student-search-results');
+    const studentIdInput = document.querySelector('[name="student_id"]');
+    let debounceTimer;
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            const searchTerm = searchInput.value;
+            if (searchTerm.length < 2) {
+                searchResults.innerHTML = '';
+                return;
+            }
+            const response = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
+            const students = await response.json();
+            searchResults.innerHTML = students.length > 0 ?
+                students.map(s => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-student-id="${s.id}" data-student-name="${s.name}">${s.name}</div>`).join('') :
+                `<div class="p-2 text-gray-500">Nenhum aluno encontrado.</div>`;
+        }, 300);
+    });
+
+    searchResults.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.dataset.studentId) {
+            studentIdInput.value = target.dataset.studentId;
+            searchInput.value = target.dataset.studentName;
+            searchResults.innerHTML = '';
+        }
+    });
+}
+
+async function openEnrolledStudentsModal(classId, className) {
+    showLoading();
+    try {
+        const response = await fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`);
+        if (!response.ok) {
+            throw new Error('Falha ao buscar alunos matriculados.');
+        }
+        const students = await response.json();
+        const studentsHtml = students.length > 0
+            ? `<ul class="list-disc pl-5 space-y-1">${students.map(s => `<li>${s.name}</li>`).join('')}</ul>`
+            : '<p>Nenhum aluno matriculado nesta turma.</p>';
+        showModal(`Alunos em ${className}`, studentsHtml);
+    } catch (error) {
+        console.error("Erro ao buscar alunos matriculados:", error);
+        showModal('Erro', '<p>Não foi possível carregar la lista de alunos.</p>');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function handleDeleteClick(classId, className) {
+    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar a turma <strong>${className}</strong>?</p>
+         <div class="text-right mt-6">
+              <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+              <button data-action="confirm-delete" data-class-id="${classId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+}
+
+
 async function openTakeAttendanceModal(classId, className) {
     showLoading();
     try {
