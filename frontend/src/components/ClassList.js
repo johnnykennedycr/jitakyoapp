@@ -140,6 +140,92 @@ async function handleDeleteClick(classId, className) {
              <button data-action="confirm-delete" data-class-id="${classId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
+// --- NOVAS FUNÇÕES PARA CHAMADA ---
+async function openTakeAttendanceModal(classId, className) {
+    showLoading();
+    try {
+        const response = await fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`);
+        if (!response.ok) throw new Error('Falha ao buscar alunos matriculados.');
+        const students = await response.json();
+        const today = new Date().toISOString().split('T')[0];
+        const studentsHtml = students.length > 0
+            ? students.map(s => `
+                <label class="flex items-center p-2 border-b hover:bg-gray-50">
+                    <input type="checkbox" name="present_students" value="${s.id}" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="ml-3 text-sm text-gray-700">${s.name}</span>
+                </label>`).join('')
+            : '<p class="p-4 text-sm text-gray-500">Nenhum aluno matriculado para registrar presença.</p>';
+
+        const formHtml = `
+            <form id="take-attendance-form" data-class-id="${classId}">
+                <div class="mb-4">
+                    <label for="attendance-date" class="block text-sm font-medium text-gray-700">Data da Chamada</label>
+                    <input type="date" id="attendance-date" name="attendance_date" value="${today}" class="mt-1 block w-full p-2 border rounded-md" required>
+                </div>
+                <h4 class="text-lg font-medium text-gray-800 mb-2">Alunos Matriculados</h4>
+                <div class="max-h-60 overflow-y-auto border rounded-md">
+                    ${studentsHtml}
+                </div>
+                <div class="text-right mt-6">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md" ${students.length === 0 ? 'disabled' : ''}>Salvar Chamada</button>
+                </div>
+            </form>
+        `;
+        showModal(`Chamada para ${className}`, formHtml);
+    } catch (error) {
+        showModal('Erro', `<p>${error.message}</p>`);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function openAttendanceHistoryModal(classId, className) {
+    showLoading();
+    try {
+        const response = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-history`);
+        if (!response.ok) throw new Error('Falha ao buscar histórico de chamadas. (Endpoint a ser criado no backend)');
+        const history = await response.json(); 
+
+        const groupedBySemester = history.reduce((acc, record) => {
+            const date = new Date(record.date);
+            const year = date.getUTCFullYear();
+            const month = date.getUTCMonth() + 1;
+            const semester = month <= 6 ? 1 : 2;
+            const key = `${year}/${semester}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(record);
+            return acc;
+        }, {});
+
+        const sortedSemesters = Object.keys(groupedBySemester).sort((a, b) => b.localeCompare(a));
+        let historyHtml = '<div class="space-y-4">';
+
+        if (sortedSemesters.length > 0) {
+            historyHtml += sortedSemesters.map(semesterKey => {
+                const records = groupedBySemester[semesterKey];
+                records.sort((a, b) => new Date(b.date) - new Date(a.date));
+                const recordsHtml = records.map(rec => {
+                    const displayDate = new Date(rec.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                    const studentList = rec.present_student_names.length > 0
+                        ? `<ul>${rec.present_student_names.map(name => `<li class="ml-4 list-disc">${name}</li>`).join('')}</ul>`
+                        : '<p class="text-sm text-gray-500">Nenhum aluno presente.</p>';
+                    return `<div class="p-2 border-b"><p class="font-semibold">${displayDate}</p>${studentList}</div>`;
+                }).join('');
+                return `<details class="bg-gray-50 rounded-lg p-2"><summary class="font-semibold cursor-pointer">Semestre ${semesterKey}</summary><div class="mt-2 pl-4">${recordsHtml}</div></details>`;
+            }).join('');
+        } else {
+            historyHtml += '<p>Nenhum registro de chamada encontrado para esta turma.</p>';
+        }
+        historyHtml += '</div>';
+        showModal(`Histórico de Chamadas - ${className}`, historyHtml);
+    } catch (error) {
+        showModal('Erro', `<p>${error.message}</p>`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// --- RENDERIZAÇÃO PRINCIPAL E EVENTOS ---
 export async function renderClassList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -167,19 +253,24 @@ export async function renderClassList(targetElement) {
                             <p class="text-sm text-gray-500 mb-4">${c.discipline}</p>
                             <div class="space-y-2 text-sm text-gray-700 flex-grow">
                                 <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
-                                <p><strong>Capacidade:</strong> ${c.capacity} Alunos</p>
-                                <p><strong>Mensalidade: R$</strong> ${c.default_monthly_fee}</p>
+                                <p><strong>Capacidade:</strong> ${c.capacity}</p>
                                 <div><strong>Horários:</strong><div class="pl-2">
                                     ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
                                         <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
                                 </div></div></div>
-                            <div class="mt-6 pt-4 border-t flex justify-end space-x-2">
+                            <div class="mt-6 pt-4 border-t flex justify-end flex-wrap space-x-2">
                                  <button data-action="view-students" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Alunos Matriculados">
                                      <svg class="w-5 h-5 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                  </button>
                                  <button data-action="enroll" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Matricular Aluno">
                                      <svg class="w-5 h-5 text-green-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-                                </button>
+                                 </button>
+                                 <button data-action="take-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Fazer Chamada">
+                                    <svg class="w-5 h-5 text-blue-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zM9 16l2 2 4-4"></path></svg>
+                                 </button>
+                                 <button data-action="view-attendance" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Histórico de Chamadas">
+                                     <svg class="w-5 h-5 text-purple-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                 </button>
                                 <button data-action="edit" data-class-id="${c.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Turma">
                                     <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                 </button>
@@ -204,6 +295,8 @@ export async function renderClassList(targetElement) {
         if (action === 'add') openClassForm();
         if (action === 'enroll') openEnrollStudentModal(classId, className);
         if (action === 'view-students') openEnrolledStudentsModal(classId, className);
+        if (action === 'take-attendance') openTakeAttendanceModal(classId, className);
+        if (action === 'view-attendance') openAttendanceHistoryModal(classId, className);
         if (action === 'edit') openClassForm(classId);
         if (action === 'delete') handleDeleteClick(classId, className);
     };
@@ -235,7 +328,38 @@ export async function renderClassList(targetElement) {
     const handleModalSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
-        if (form.id === 'enroll-student-form') {
+
+        if (form.id === 'take-attendance-form') {
+            const classId = form.dataset.classId;
+            const attendanceDate = form.elements.attendance_date.value;
+            const presentStudentIds = Array.from(form.querySelectorAll('input[name="present_students"]:checked')).map(cb => cb.value);
+    
+        if (!attendanceDate) {
+            showModal('Atenção', '<p>Por favor, selecione uma data para a chamada.</p>');
+            return;
+        }
+    
+        hideModal();
+        showLoading();
+        try {
+            const payload = {
+                class_id: classId,
+                date: attendanceDate,
+                present_student_ids: presentStudentIds
+            };
+            const response = await fetchWithAuth('/api/admin/attendance', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw await response.json();
+            
+        } catch (error) {
+            showModal('Erro', `<p>Erro ao salvar chamada: ${error.error || 'Ocorreu uma falha.'}</p>`);
+        } finally {
+            hideLoading();
+        }
+
+        } else if (form.id === 'enroll-student-form') {
             const classId = form.dataset.classId;
             const studentId = form.elements.student_id.value;
             const discount = form.elements.discount_amount.value;

@@ -441,95 +441,32 @@ def get_un_enrolled_students(class_id):
         print(f"Erro em get_un_enrolled_students: {e}")
         return jsonify(error=str(e)), 500
 
-# --- ROTAS PARA LISTA DE PRESENÇA (API) ---
+# --- NOVAS ROTAS PARA CHAMADA (ATTENDANCE) ---
 
-@admin_api_bp.route('/classes/<string:class_id>/attendance', methods=['GET'])
-@login_required
-@role_required('admin', 'super_admin', 'teacher', 'receptionist')
-def get_attendance_list(class_id):
-    """API para buscar os dados para a página de chamada."""
+@admin_api_bp.route('/attendance', methods=['POST'])
+@admin_required
+def save_attendance():
+    """Salva um registro de chamada para uma turma em uma data."""
+    data = request.get_json()
+    if not data or 'class_id' not in data or 'date' not in data:
+        return jsonify({"error": "Dados de chamada inválidos"}), 400
     try:
-        training_class = training_class_service.get_class_by_id(class_id)
-        if not training_class:
-            return jsonify(error="Turma não encontrada."), 404
-
-        selected_date_str = request.args.get('date', date.today().isoformat())
-        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
-        
-        enrollments = enrollment_service.get_enrollments_by_class(class_id) or []
-        
-        students_raw = [user_service.get_user_by_id(e.student_id) for e in enrollments]
-        students = [s.to_dict() for s in students_raw if s]
-
-        attendance_record = attendance_service.get_attendance_by_class_and_date(class_id, selected_date)
-
-        student_attendance_map = {}
-        if attendance_record and attendance_record.students:
-            for record in attendance_record.students:
-                student_id = record.get('student_id')
-                status = record.get('status')
-                if student_id:
-                    student_attendance_map[student_id] = (status == 'present')
-        
-        response_data = {
-            "class": training_class.to_dict(),
-            "students": students,
-            "selected_date": selected_date.isoformat(),
-            "attendance_map": student_attendance_map
-        }
-        return jsonify(response_data), 200
+        if attendance_service.create_or_update_attendance(data):
+            return jsonify({"success": True, "message": "Chamada salva com sucesso."}), 201
+        return jsonify({"error": "Não foi possível salvar a chamada"}), 500
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        return jsonify({"error": str(e)}), 500
 
-
-@admin_api_bp.route('/classes/<string:class_id>/attendance', methods=['POST'])
-@login_required
-@role_required('admin', 'super_admin', 'teacher', 'receptionist')
-def save_attendance(class_id):
-    """API para salvar o registro de presença."""
+@admin_api_bp.route('/classes/<class_id>/attendance-history', methods=['GET'])
+@admin_required
+def get_attendance_history(class_id):
+    """Busca o histórico de chamadas para uma turma específica."""
     try:
-        data = request.get_json()
-        selected_date_str = data.get('date')
-        attendance_data = data.get('attendance') # Espera uma lista de {'student_id': '...', 'status': '...'}
-
-        if not selected_date_str or not attendance_data:
-            return jsonify(success=False, message="Dados de data e presença são obrigatórios."), 400
-
-        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
-        selected_datetime = datetime.combine(selected_date, time.min)
-
-        if attendance_service.save_attendance_record(class_id, selected_datetime, attendance_data):
-            return jsonify(success=True, message="Lista de presença salva com sucesso!"), 200
-        else:
-            return jsonify(success=False, message="Erro ao salvar a lista de presença."), 500
-    
+        history = attendance_service.get_attendance_history_for_class(class_id)
+        return jsonify([h.to_dict() for h in history]), 200
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        return jsonify({"error": str(e)}), 500
 
-@admin_api_bp.route('/classes/<string:class_id>/attendance-summary')
-@login_required
-@role_required('admin', 'super_admin', 'teacher', 'receptionist')
-def get_attendance_summary(class_id):
-    """API para buscar o resumo de presença (all_calls)."""
-    try:
-        training_class = training_class_service.get_class_by_id(class_id)
-        if not training_class:
-            return jsonify(error="Turma não encontrada."), 404
-
-        # Sua lógica de cálculo de resumo de presença permanece a mesma
-        # ... (cálculo de total_classes, student_summary_dict, etc.)
-        
-        # Exemplo simplificado do retorno
-        student_summary = [] # Você deve preencher com sua lógica
-        
-        # Retorna o resumo como JSON
-        response_data = {
-            "class": training_class.to_dict(),
-            "student_summary": student_summary # Sua lista de resumos aqui
-        }
-        return jsonify(response_data), 200
-    except Exception as e:
-        return jsonify(error=str(e)), 500
 
 
 @admin_api_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
