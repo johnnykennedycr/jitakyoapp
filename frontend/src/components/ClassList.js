@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO (sem alterações) ---
 function createScheduleFieldHtml(slot = { day_of_week: '', start_time: '', end_time: '' }) {
     const fieldId = `schedule-${Date.now()}-${Math.random()}`;
     return `
@@ -148,22 +148,50 @@ async function openTakeAttendanceModal(classId, className) {
         if (!response.ok) throw new Error('Falha ao buscar alunos matriculados.');
         const students = await response.json();
         const today = new Date().toISOString().split('T')[0];
+
+        // Estilos para o toggle switch
+        const toggleStyle = `
+            <style>
+                .toggle-checkbox:checked {
+                    background-color: #34D399; /* green-400 */
+                    border-color: #34D399;
+                }
+                .toggle-checkbox:checked + .toggle-label .toggle-dot {
+                    transform: translateX(100%);
+                    background-color: white;
+                }
+                .toggle-checkbox {
+                    transition: background-color 0.2s ease-in-out;
+                }
+                .toggle-dot {
+                    transition: transform 0.2s ease-in-out;
+                }
+            </style>
+        `;
+
         const studentsHtml = students.length > 0
             ? students.map(s => `
-                <label class="flex items-center p-2 border-b hover:bg-gray-50">
-                    <input type="checkbox" name="present_students" value="${s.id}" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    <span class="ml-3 text-sm text-gray-700">${s.name}</span>
-                </label>`).join('')
+                <div class="flex items-center justify-between p-3 border-b hover:bg-gray-50">
+                    <span class="text-sm text-gray-800">${s.name}</span>
+                    <label for="student-${s.id}" class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="student-${s.id}" name="present_students" value="${s.id}" class="sr-only toggle-checkbox" checked>
+                            <div class="toggle-label block w-12 h-6 rounded-full bg-red-400"></div>
+                            <div class="toggle-dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full"></div>
+                        </div>
+                    </label>
+                </div>`).join('')
             : '<p class="p-4 text-sm text-gray-500">Nenhum aluno matriculado para registrar presença.</p>';
 
         const formHtml = `
+            ${toggleStyle}
             <form id="take-attendance-form" data-class-id="${classId}">
                 <div class="mb-4">
                     <label for="attendance-date" class="block text-sm font-medium text-gray-700">Data da Chamada</label>
                     <input type="date" id="attendance-date" name="attendance_date" value="${today}" class="mt-1 block w-full p-2 border rounded-md" required>
                 </div>
                 <h4 class="text-lg font-medium text-gray-800 mb-2">Alunos Matriculados</h4>
-                <div class="max-h-60 overflow-y-auto border rounded-md">
+                <div class="max-h-60 overflow-y-auto border rounded-md bg-white">
                     ${studentsHtml}
                 </div>
                 <div class="text-right mt-6">
@@ -180,50 +208,100 @@ async function openTakeAttendanceModal(classId, className) {
 }
 
 async function openAttendanceHistoryModal(classId, className) {
-    showLoading();
-    try {
-        const response = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-history`);
-        if (!response.ok) throw new Error('Falha ao buscar histórico de chamadas. (Endpoint a ser criado no backend)');
-        const history = await response.json(); 
+    const generateSemesterOptions = () => {
+        let options = '';
+        const today = new Date();
+        let year = today.getFullYear();
+        let month = today.getMonth() + 1;
+        let semester = month <= 6 ? 1 : 2;
 
-        const groupedBySemester = history.reduce((acc, record) => {
-            const date = new Date(record.date);
-            const year = date.getUTCFullYear();
-            const month = date.getUTCMonth() + 1;
-            const semester = month <= 6 ? 1 : 2;
-            const key = `${year}/${semester}`;
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(record);
-            return acc;
-        }, {});
-
-        const sortedSemesters = Object.keys(groupedBySemester).sort((a, b) => b.localeCompare(a));
-        let historyHtml = '<div class="space-y-4">';
-
-        if (sortedSemesters.length > 0) {
-            historyHtml += sortedSemesters.map(semesterKey => {
-                const records = groupedBySemester[semesterKey];
-                records.sort((a, b) => new Date(b.date) - new Date(a.date));
-                const recordsHtml = records.map(rec => {
-                    const displayDate = new Date(rec.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-                    const studentList = rec.present_student_names.length > 0
-                        ? `<ul>${rec.present_student_names.map(name => `<li class="ml-4 list-disc">${name}</li>`).join('')}</ul>`
-                        : '<p class="text-sm text-gray-500">Nenhum aluno presente.</p>';
-                    return `<div class="p-2 border-b"><p class="font-semibold">${displayDate}</p>${studentList}</div>`;
-                }).join('');
-                return `<details class="bg-gray-50 rounded-lg p-2"><summary class="font-semibold cursor-pointer">Semestre ${semesterKey}</summary><div class="mt-2 pl-4">${recordsHtml}</div></details>`;
-            }).join('');
-        } else {
-            historyHtml += '<p>Nenhum registro de chamada encontrado para esta turma.</p>';
+        for (let i = 0; i < 5; i++) { // Gera opções para os últimos 5 semestres
+            options += `<option value="${year}-${semester}">${year}/${semester}</option>`;
+            if (semester === 2) {
+                semester = 1;
+            } else {
+                semester = 2;
+                year--;
+            }
         }
-        historyHtml += '</div>';
-        showModal(`Histórico de Chamadas - ${className}`, historyHtml);
-    } catch (error) {
-        showModal('Erro', `<p>${error.message}</p>`);
-    } finally {
-        hideLoading();
-    }
+        return options;
+    };
+
+    const modalHtml = `
+        <div class="mb-4">
+            <label for="semester-filter" class="block text-sm font-medium text-gray-700">Selecionar Semestre</label>
+            <select id="semester-filter" class="mt-1 block w-full p-2 border rounded-md">
+                ${generateSemesterOptions()}
+            </select>
+        </div>
+        <div id="attendance-history-content">
+            <p>Carregando dados do semestre...</p>
+        </div>
+    `;
+    showModal(`Histórico de Presença - ${className}`, modalHtml);
+
+    const filterElement = document.getElementById('semester-filter');
+    const contentElement = document.getElementById('attendance-history-content');
+
+    const fetchAndRenderHistory = async () => {
+        contentElement.innerHTML = `<p>Buscando dados...</p>`;
+        const [year, semester] = filterElement.value.split('-');
+        try {
+            const response = await fetchWithAuth(`/api/admin/classes/${classId}/attendance-history?year=${year}&semester=${semester}`);
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Falha ao buscar histórico de chamadas.');
+            }
+            const historyData = await response.json();
+            
+            if (!historyData.students || historyData.students.length === 0) {
+                 contentElement.innerHTML = '<p>Nenhum aluno matriculado ou registro de presença encontrado para este semestre.</p>';
+                 return;
+            }
+            
+            const totalDays = historyData.total_possible_days;
+            const tableHtml = `
+                <p class="text-sm text-gray-600 mb-2">Total de aulas no semestre: <strong>${totalDays}</strong></p>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
+                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Presenças</th>
+                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">%</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${historyData.students.map(student => {
+                                const percentage = student.percentage.toFixed(1);
+                                let bgColor = 'bg-red-100';
+                                if (percentage >= 75) bgColor = 'bg-green-100';
+                                else if (percentage >= 50) bgColor = 'bg-yellow-100';
+
+                                return `
+                                <tr class="${bgColor}">
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center">${student.presence_count} / ${totalDays}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-center font-semibold">${percentage}%</td>
+                                </tr>
+                                `
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            contentElement.innerHTML = tableHtml;
+
+        } catch (error) {
+            contentElement.innerHTML = `<p class="text-red-500">${error.message}</p>`;
+        }
+    };
+
+    filterElement.addEventListener('change', fetchAndRenderHistory);
+    // Carga inicial
+    fetchAndRenderHistory();
 }
+
 
 // --- RENDERIZAÇÃO PRINCIPAL E EVENTOS ---
 export async function renderClassList(targetElement) {
@@ -258,7 +336,7 @@ export async function renderClassList(targetElement) {
                                     ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
                                         <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
                                 </div></div></div>
-                            <div class="mt-6 pt-4 border-t flex justify-end flex-wrap space-x-2">
+                            <div class="mt-6 pt-4 border-t flex justify-end flex-wrap gap-1">
                                  <button data-action="view-students" data-class-id="${c.id}" data-class-name="${c.name}" class="p-2 rounded-full hover:bg-gray-200" title="Ver Alunos Matriculados">
                                      <svg class="w-5 h-5 text-gray-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                  </button>

@@ -1,17 +1,52 @@
-from datetime import datetime
+from datetime import datetime, date
 from firebase_admin import firestore
 from app.models.attendance import Attendance
+import calendar
 
 class AttendanceService:
-    def __init__(self, db, user_service):
+    def __init__(self, db, user_service, enrollment_service, training_class_service):
         self.db = db
         self.user_service = user_service
+        self.enrollment_service = enrollment_service
+        self.training_class_service = training_class_service
         self.collection = self.db.collection('attendance')
+
+    def _calculate_possible_days(self, class_schedule, year, semester):
+        """
+        Calcula o número total de dias de aula possíveis em um semestre 
+        com base no horário da turma.
+        """
+        # Mapeia nomes de dias da semana para os números do módulo 'calendar' (Segunda=0)
+        weekday_map = {
+            'Segunda': 0, 'Terça': 1, 'Quarta': 2, 'Quinta': 3,
+            'Sexta': 4, 'Sábado': 5, 'Domingo': 6
+        }
+        
+        # Determina o intervalo de meses para o semestre
+        start_month, end_month = (1, 6) if semester == 1 else (7, 12)
+        
+        # Obtém os dias de treino da turma (em formato numérico)
+        training_days = {weekday_map[slot['day_of_week']] for slot in class_schedule if slot['day_of_week'] in weekday_map}
+        
+        if not training_days:
+            return 0
+            
+        total_days = 0
+        # Itera sobre cada mês do semestre
+        for month in range(start_month, end_month + 1):
+            # Obtém uma matriz para o mês (semanas x dias)
+            month_calendar = calendar.monthcalendar(year, month)
+            for week in month_calendar:
+                for day_weekday in training_days:
+                    # Se o dia da semana existe na semana (não é 0), conta como um dia de aula
+                    if week[day_weekday] != 0:
+                        total_days += 1
+                        
+        return total_days
 
     def create_or_update_attendance(self, data):
         """
         Cria ou atualiza um registro de chamada para uma turma em uma data específica.
-        Esta operação é 'upsert' (update or insert) para evitar duplicatas.
         """
         try:
             class_id = data.get('class_id')
@@ -21,10 +56,7 @@ class AttendanceService:
             if not class_id or not date_str:
                 raise ValueError("class_id e date são obrigatórios.")
 
-            # Converte a string de data para um objeto datetime para o Firestore
             attendance_date = datetime.strptime(date_str, '%Y-%m-%d')
-
-            # O ID do documento será uma combinação da turma e da data para garantir unicidade
             doc_id = f"{class_id}_{date_str}"
             doc_ref = self.collection.document(doc_id)
 
@@ -35,40 +67,69 @@ class AttendanceService:
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
 
-            # Usar 'set' com 'merge=True' efetivamente cria um 'upsert'
-            # Ele cria o documento se não existir, ou atualiza se já existir.
             doc_ref.set(attendance_data, merge=True)
-            
-            print(f"Chamada para a turma {class_id} na data {date_str} salva com sucesso.")
             return True
         except Exception as e:
             print(f"Erro ao salvar chamada: {e}")
             raise e
 
-    def get_attendance_history_for_class(self, class_id):
+    def get_attendance_history_for_class(self, class_id, year, semester):
         """
-        Busca o histórico de chamadas para uma turma, enriquecendo com os nomes dos alunos.
+        Busca o histórico de chamadas e calcula o percentual de presença dos alunos
+        para um semestre específico.
         """
         try:
-            query = self.collection.where('class_id', '==', class_id).order_by('date', direction=firestore.Query.DESCENDING)
-            docs = query.stream()
+            # 1. Obter a turma e seu horário
+            target_class = self.training_class_service.get_class_by_id(class_id)
+            if not target_class or not target_class.schedule:
+                return {"total_possible_days": 0, "students": []}
+
+            # 2. Calcular o total de dias de aula possíveis no semestre
+            total_possible_days = self._calculate_possible_days(target_class.schedule, year, semester)
+            if total_possible_days == 0:
+                return {"total_possible_days": 0, "students": []}
+
+            # 3. Obter todos os alunos matriculados na turma
+            enrollments = self.enrollment_service.get_enrollments_by_class_id(class_id)
+            enrolled_student_ids = {e.student_id for e in enrollments}
             
-            history = []
+            # 4. Buscar os registros de chamada para a turma no período do semestre
+            start_month, end_month = (1, 6) if semester == 1 else (7, 12)
+            start_date = datetime(year, start_month, 1)
+            end_date = datetime(year, end_month, calendar.monthrange(year, end_month)[1])
+
+            query = self.collection.where('class_id', '==', class_id).where('date', '>=', start_date).where('date', '<=', end_date)
+            docs = query.stream()
+
+            # 5. Contar as presenças de cada aluno
+            presence_counts = {student_id: 0 for student_id in enrolled_student_ids}
             for doc in docs:
-                record_data = doc.to_dict()
-                present_ids = record_data.get('present_student_ids', [])
-                
-                # Busca os nomes dos alunos presentes
-                present_student_names = []
-                for student_id in present_ids:
-                    user = self.user_service.get_user_by_id(student_id)
-                    if user and user.name:
-                        present_student_names.append(user.name)
+                record = doc.to_dict()
+                for student_id in record.get('present_student_ids', []):
+                    if student_id in presence_counts:
+                        presence_counts[student_id] += 1
+            
+            # 6. Montar a resposta final com nomes e percentuais
+            student_stats = []
+            for student_id, count in presence_counts.items():
+                user = self.user_service.get_user_by_id(student_id)
+                if user:
+                    percentage = (count / total_possible_days) * 100 if total_possible_days > 0 else 0
+                    student_stats.append({
+                        "id": student_id,
+                        "name": user.name,
+                        "presence_count": count,
+                        "percentage": percentage
+                    })
+            
+            # Ordenar por nome do aluno
+            student_stats.sort(key=lambda x: x['name'])
 
-                record_data['present_student_names'] = present_student_names
-                history.append(Attendance.from_dict(record_data, doc.id))
-
-            return history
+            return {
+                "total_possible_days": total_possible_days,
+                "students": student_stats
+            }
         except Exception as e:
             print(f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}")
             raise e
+

@@ -441,13 +441,11 @@ def get_un_enrolled_students(class_id):
         print(f"Erro em get_un_enrolled_students: {e}")
         return jsonify(error=str(e)), 500
 
-# --- NOVAS ROTAS PARA CHAMADA (ATTENDANCE) ---
-
+# --- ROTAS PARA CHAMADA (ATTENDANCE) ---
 @admin_api_bp.route('/attendance', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def save_attendance():
-    """Salva um registro de chamada para uma turma em uma data."""
     data = request.get_json()
     if not data or 'class_id' not in data or 'date' not in data:
         return jsonify({"error": "Dados de chamada inválidos"}), 400
@@ -462,10 +460,17 @@ def save_attendance():
 @login_required
 @role_required('admin', 'super_admin')
 def get_attendance_history(class_id):
-    """Busca o histórico de chamadas para uma turma específica."""
     try:
-        history = attendance_service.get_attendance_history_for_class(class_id)
-        return jsonify([h.to_dict() for h in history]), 200
+        year = request.args.get('year', type=int)
+        semester = request.args.get('semester', type=int)
+
+        if not year or not semester:
+            today = datetime.utcnow()
+            year = today.year
+            semester = 1 if today.month <= 6 else 2
+
+        history = attendance_service.get_attendance_history_for_class(class_id, year, semester)
+        return jsonify(history), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
