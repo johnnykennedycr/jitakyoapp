@@ -45,13 +45,21 @@ def create_app():
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     
+    # 1. Cria todas as instâncias de serviço
     enrollment_service = EnrollmentService(db)
+    training_class_service = TrainingClassService(db) # Movido para cima
     user_service = UserService(db, enrollment_service, mail)
     teacher_service = TeacherService(db)
-    training_class_service = TrainingClassService(db)
     attendance_service = AttendanceService(db, user_service, training_class_service, enrollment_service)
     payment_service = PaymentService(db)
     
+    # 2. Seta as dependências entre os serviços DEPOIS que todos foram criados
+    user_service.enrollment_service = enrollment_service
+    enrollment_service.training_class_service = training_class_service
+    attendance_service.user_service = user_service
+    attendance_service.enrollment_service = enrollment_service
+    attendance_service.training_class_service = training_class_service
+
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
