@@ -429,8 +429,8 @@ export async function renderClassList(targetElement) {
         } else if (form.id === 'enroll-student-form') {
             const classId = form.dataset.classId;
             const studentId = form.elements.student_id.value;
-            const discount = form.elements.discount_amount.value;
-            const due_day = form.elements.due_day.value;
+            const discount = form.elements.discount_amount.value || '0';
+            const due_day = form.elements.due_day.value || null;
             if(!studentId) {
                 showModal('Atenção', '<p>Você precisa selecionar um aluno da lista.</p>');
                 return;
