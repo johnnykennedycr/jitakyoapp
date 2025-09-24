@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from firebase_admin import firestore
 from app.models.payment import Payment
+import calendar
 
 class PaymentService:
     def __init__(self, db, enrollment_service, user_service):
@@ -35,12 +36,15 @@ class PaymentService:
             payment = self.get_payment_for_student(student.id, year, month)
             
             due_day = student.enrollments[0].due_day if student.enrollments else 10
-            due_date = date(year, month, due_day)
+            
+            # --- CORREÇÃO: Garante que o dia de vencimento é válido para o mês (ex: dia 31 em Setembro) ---
+            last_day_of_month = calendar.monthrange(year, month)[1]
+            actual_due_day = min(due_day, last_day_of_month)
+            due_date = date(year, month, actual_due_day)
             
             status = 'pending'
             if payment:
                 status = 'paid'
-                # --- CORREÇÃO: Garante que o valor do pagamento é um número antes de somar ---
                 payment_amount = float(getattr(payment, 'amount', 0) or 0)
                 summary['paid'] += payment_amount
             elif today > due_date:
