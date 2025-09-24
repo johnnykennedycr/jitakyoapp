@@ -13,7 +13,6 @@ class PaymentService:
         """
         Calcula e retorna o status financeiro para um determinado mês e ano.
         """
-        # CORREÇÃO: Usa o novo método para buscar alunos já com suas matrículas.
         students = self.user_service.get_students_with_enrollments()
         
         student_statuses = []
@@ -21,19 +20,22 @@ class PaymentService:
         today = date.today()
         
         for student in students:
-            # Pula alunos sem matrícula, pois não geram cobrança.
             if not student.enrollments:
                 continue
 
-            monthly_total = sum(e.get_final_monthly_fee() for e in student.enrollments)
+            # --- CORREÇÃO: Cálculo robusto da mensalidade ---
+            monthly_total = 0
+            for enrollment in student.enrollments:
+                # Garante que os valores sejam numéricos e padrão para 0 se ausentes ou nulos.
+                base_fee = float(getattr(enrollment, 'base_monthly_fee', 0) or 0)
+                discount = float(getattr(enrollment, 'discount_amount', 0) or 0)
+                monthly_total += (base_fee - discount)
             
-            # Pula alunos com mensalidade zerada (isentos, etc.).
-            if monthly_total == 0:
+            if monthly_total <= 0:
                 continue
 
             payment = self.get_payment_for_student(student.id, year, month)
             
-            # Lógica de Status (simplificada, pode ser ajustada com o dia de vencimento de cada aluno)
             due_day = student.enrollments[0].due_day if student.enrollments else 10
             due_date = date(year, month, due_day)
             
@@ -56,7 +58,6 @@ class PaymentService:
                 'due_day': due_day
             })
 
-        # Ordena a lista de alunos por nome para uma exibição consistente.
         student_statuses.sort(key=lambda x: x['name'])
         
         return {'summary': summary, 'students': student_statuses}
@@ -83,7 +84,6 @@ class PaymentService:
             if not all([student_id, year, month]):
                 raise ValueError("ID do aluno, ano e mês são obrigatórios.")
             
-            # Verifica se o pagamento para este período já existe para evitar duplicidade.
             if self.get_payment_for_student(student_id, year, month):
                 raise ValueError("Pagamento para este mês e ano já foi registrado para este aluno.")
 
