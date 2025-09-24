@@ -1,53 +1,54 @@
-from datetime import datetime, date
+from datetime import datetime
 from firebase_admin import firestore, auth
-from flask_mail import Message
 from app.models.user import User
 import string
 import secrets
+from flask_mail import Message
 
 class UserService:
-    def __init__(self, db, enrollment_service=None, mail=None):
+    def __init__(self, db, mail=None):
+        """Inicializa o serviço com dependências diretas."""
         self.db = db
         self.mail = mail
-        self.enrollment_service = enrollment_service
+        self.enrollment_service = None  # Será definido depois para evitar dependência circular
         self.users_collection = self.db.collection('users')
+
+    def set_enrollment_service(self, enrollment_service):
+        """
+        Define o serviço de matrícula após a inicialização.
+        Este método é crucial para resolver a dependência circular com EnrollmentService.
+        """
+        self.enrollment_service = enrollment_service
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
         """
-        Cria um novo usuário e suas matrículas de forma transacional.
+        Cria um novo usuário e suas matrículas.
         Gera uma senha aleatória e envia por e-mail.
         """
         email = user_data.get('email')
         if not email:
             raise ValueError("O e-mail é obrigatório.")
 
-        # --- Validação Anti-Duplicidade ---
         try:
             auth.get_user_by_email(email)
-            # Se o usuário já existe no Firebase Auth, não podemos continuar.
             raise ValueError(f"O e-mail {email} já está em uso.")
         except auth.UserNotFoundError:
-            # O e-mail está disponível, podemos continuar.
-            pass
+            pass  # O e-mail está disponível.
 
-        # Gera uma senha segura
         alphabet = string.ascii_letters + string.digits
         password = ''.join(secrets.choice(alphabet) for i in range(10))
 
         try:
-            # Cria o usuário no Firebase Authentication
             auth_user = auth.create_user(
                 email=email,
                 password=password,
                 display_name=user_data.get('name')
             )
             
-            # Prepara os dados para o Firestore
             user_data['role'] = 'student'
             if 'password' in user_data:
                 del user_data['password']
 
-            # Garante que a data de nascimento seja um objeto datetime
             if 'date_of_birth' in user_data and isinstance(user_data['date_of_birth'], str):
                 try:
                     user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
@@ -59,21 +60,18 @@ class UserService:
 
             self.users_collection.document(auth_user.uid).set(user_data)
             
-            # Cria as matrículas, se houver
             if self.enrollment_service and enrollments_data:
                 for enrollment_info in enrollments_data:
                     enrollment_info['student_id'] = auth_user.uid
                     self.enrollment_service.create_enrollment(enrollment_info)
             
-            # --- CORREÇÃO: ATIVA O ENVIO DE E-MAIL ---
             if self.mail:
                 try:
                     msg = Message("Bem-vindo ao JitaKyoApp!", recipients=[email])
                     msg.body = f"Olá {user_data.get('name')},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password}\n\nRecomendamos que você a altere no seu primeiro acesso."
                     self.mail.send(msg)
-                    print(f"INFO: E-mail de boas-vindas para {email} enviado com sucesso.")
+                    print(f"INFO: E-mail de boas-vindas para {email} enviado.")
                 except Exception as e:
-                    # Mesmo se o e-mail falhar, o usuário foi criado. Apenas registramos o erro.
                     print(f"AVISO: Usuário {email} criado, mas o e-mail de boas-vindas falhou: {e}")
 
             return self.get_user_by_id(auth_user.uid)
@@ -103,34 +101,26 @@ class UserService:
             return False
 
     def delete_user(self, user_id):
-        """
-        Deleta um usuário do Firebase Auth, do Firestore e suas matrículas.
-        É resiliente a casos onde o usuário já foi deletado do Auth (dado órfão).
-        """
+        """Deleta um usuário, suas matrículas e do Firebase Auth."""
         try:
-            # 1. Tenta deletar o usuário do Firebase Authentication.
+            # Tenta deletar do Firebase Auth primeiro
             try:
                 auth.delete_user(user_id)
             except auth.UserNotFoundError:
-                # Se o usuário não for encontrado no Auth, é um dado órfão.
-                # Apenas registramos um aviso e continuamos para limpar o Firestore.
-                print(f"AVISO: Usuário com UID {user_id} não encontrado no Firebase Auth. Prosseguindo com a limpeza do Firestore.")
-                pass # Ignora o erro e continua
-
-            # 2. Deleta as matrículas do aluno.
+                print(f"AVISO: Usuário {user_id} não encontrado no Firebase Auth, mas a limpeza continuará.")
+            
+            # Deleta as matrículas associadas
             if self.enrollment_service:
                 self.enrollment_service.delete_enrollments_by_student_id(user_id)
-                print(f"Matrículas do aluno {user_id} deletadas com sucesso.")
-
-            # 3. Deleta o documento do usuário no Firestore.
+            
+            # Deleta o registro do usuário do Firestore
             self.users_collection.document(user_id).delete()
             
             print(f"Usuário com UID {user_id} e seus dados foram deletados com sucesso.")
             return True
         except Exception as e:
-            # Captura qualquer outro erro inesperado durante o processo.
-            print(f"Erro inesperado ao deletar usuário {user_id}: {e}")
-            raise e # Re-lança para a rota retornar 500.
+            print(f"Erro ao deletar usuário {user_id}: {e}")
+            raise e
 
     def get_user_by_id(self, user_id):
         try:
@@ -150,18 +140,11 @@ class UserService:
             print(f"Erro ao buscar usuários por role '{role}': {e}")
         return users
         
-    def search_students_by_name(self, search_term):
-        students = []
-        try:
-            all_students = self.get_users_by_role('student')
-            if search_term:
-                search_term_lower = search_term.lower()
-                for student in all_students:
-                    if student.name and student.name.lower().startswith(search_term_lower):
-                        students.append(student)
-            else:
-                students = all_students
-        except Exception as e:
-            print(f"Erro ao buscar alunos por nome: {e}")
-        return students
+    def get_available_users_for_promotion(self):
+        """Retorna usuários que ainda não são professores."""
+        # Esta é uma abordagem simples. Para performance em larga escala,
+        # seria melhor buscar todos os user_ids da coleção de professores e
+        # usar um filtro 'not-in' na query de usuários.
+        all_users = self.get_users_by_role('student') # Simplificação: considera apenas alunos
+        return all_users
 
