@@ -4,27 +4,43 @@ from app.models.training_class import TrainingClass
 from app.models.schedule_slot import ScheduleSlot
 
 class TrainingClassService:
-    def __init__(self, db):
+    def __init__(self, db, teacher_service):
         self.db = db
+        self.teacher_service = teacher_service
         self.collection = self.db.collection('classes')
 
     def get_all_classes(self):
-        """Busca todas as turmas do Firestore."""
+        """Busca todas as turmas e enriquece com o nome do professor."""
         classes = []
         try:
+            # Etapa 1: Busca todos os professores e cria um mapa para consulta eficiente.
+            all_teachers = self.teacher_service.get_all_teachers()
+            teacher_map = {teacher.id: teacher.name for teacher in all_teachers}
+            
+            # Etapa 2: Busca todas as turmas.
             docs = self.collection.stream()
             for doc in docs:
-                classes.append(TrainingClass.from_dict(doc.to_dict(), doc.id))
+                class_obj = TrainingClass.from_dict(doc.to_dict(), doc.id)
+                # Etapa 3: Enriquece o objeto da turma com o nome do professor.
+                class_obj.teacher_name = teacher_map.get(class_obj.teacher_id, 'N/A')
+                classes.append(class_obj)
         except Exception as e:
             print(f"Erro ao buscar todas as turmas: {e}")
         return classes
 
     def get_class_by_id(self, class_id):
-        """Busca uma turma específica pelo seu ID."""
+        """Busca uma turma específica e enriquece com o nome do professor."""
         try:
             doc = self.collection.document(class_id).get()
             if doc.exists:
-                return TrainingClass.from_dict(doc.to_dict(), doc.id)
+                class_obj = TrainingClass.from_dict(doc.to_dict(), class_id)
+                if class_obj.teacher_id:
+                    # Busca o professor específico para obter o nome.
+                    teacher = self.teacher_service.get_teacher_by_id(class_obj.teacher_id)
+                    class_obj.teacher_name = teacher.name if teacher else 'N/A'
+                else:
+                    class_obj.teacher_name = 'N/A'
+                return class_obj
             return None
         except Exception as e:
             print(f"Erro ao buscar turma por ID '{class_id}': {e}")
@@ -43,7 +59,6 @@ class TrainingClassService:
                 'description': data.get('description'),
                 'default_monthly_fee': data.get('default_monthly_fee'),
                 'schedule': schedule_objects,
-                # CORREÇÃO: Usar o sentinel value do Firestore diretamente.
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
@@ -53,17 +68,14 @@ class TrainingClassService:
             return self.get_class_by_id(doc_ref.id)
         except Exception as e:
             print(f"Erro ao criar turma: {e}")
-            # Re-lança a exceção para que a rota possa capturá-la e retornar um erro apropriado.
             raise e
 
     def update_class(self, class_id, data):
         """Atualiza uma turma existente."""
         try:
-            # Garante que os horários sejam convertidos para dicionários
             if 'schedule' in data:
                 data['schedule'] = [ScheduleSlot(**s).to_dict() for s in data.get('schedule', [])]
             
-            # CORREÇÃO: Usar o sentinel value do Firestore diretamente.
             data['updated_at'] = firestore.SERVER_TIMESTAMP
             self.collection.document(class_id).update(data)
             return True
@@ -74,8 +86,10 @@ class TrainingClassService:
     def delete_class(self, class_id):
         """Deleta uma turma pelo seu ID."""
         try:
+            # Adicional: verificar e deletar matrículas associadas antes de deletar a turma.
             self.collection.document(class_id).delete()
             return True
         except Exception as e:
             print(f"Erro ao deletar turma com ID '{class_id}': {e}")
             return False
+
