@@ -89,9 +89,9 @@ async function openStudentForm(studentId = null) {
 
 async function handleDeleteClick(studentId, studentName) {
     showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-         <div class="text-right mt-6">
-              <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-              <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+             <div class="text-right mt-6">
+                   <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                   <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
 export async function renderStudentList(targetElement) {
@@ -214,9 +214,10 @@ export async function renderStudentList(targetElement) {
                     enrollmentsData.push({
                         class_id: checkbox.value,
                         base_monthly_fee: checkbox.dataset.fee,
-                        discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value || 0,
+                        // --- CORREÇÃO APLICADA AQUI ---
+                        discount_amount: parseFloat(detailsDiv.querySelector('[name="discount_amount"]').value) || 0,
                         discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
-                        due_day: detailsDiv.querySelector('[name="due_day"]').value || null, // Adicionado
+                        due_day: parseInt(detailsDiv.querySelector('[name="due_day"]').value) || null,
                     });
                 });
                 const payload = { user_data: userData, enrollments_data: enrollmentsData };
@@ -266,11 +267,12 @@ export async function renderStudentList(targetElement) {
             const isAdding = action === 'add-enrollment';
             const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
             const method = isAdding ? 'POST' : 'DELETE';
+            // --- CORREÇÃO APLICADA AQUI ---
             const body = isAdding ? {
                 student_id: studentId,
                 class_id: document.querySelector('[name="new_class_id"]').value,
-                discount_amount: document.querySelector('[name="new_discount"]').value,
-                due_day: document.querySelector('[name="new_due_day"]').value || null, // Adicionado
+                discount_amount: parseFloat(document.querySelector('[name="new_discount"]').value) || 0,
+                due_day: parseInt(document.querySelector('[name="new_due_day"]').value) || null,
             } : null;
             if (isAdding && !body.class_id) {
                 showModal('Atenção', '<p>Selecione uma turma para matricular.</p>');
@@ -300,4 +302,3 @@ export async function renderStudentList(targetElement) {
         modalBody.removeEventListener('submit', handleFormSubmit);
     };
 }
-
