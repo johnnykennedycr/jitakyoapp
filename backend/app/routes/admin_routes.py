@@ -1,3 +1,4 @@
+import logging
 import os
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, current_app, g
 from datetime import datetime, date, time, timedelta 
@@ -508,7 +509,7 @@ def unenroll_student_from_class(class_id, student_id):
 
 # --- ROTAS FINANCEIRAS (FINANCIAL) ---
 @admin_api_bp.route('/financial/status', methods=['GET'])
-@auth_required
+@login_required
 @role_required('admin', 'super_admin')
 def get_financial_status():
     year = request.args.get('year', type=int)
@@ -522,7 +523,7 @@ def get_financial_status():
         return jsonify({"error": f"Erro ao buscar status financeiro: {e}"}), 500
 
 @admin_api_bp.route('/payments', methods=['POST'])
-@auth_required
+@login_required
 @role_required('admin', 'super_admin')
 def register_payment():
     data = request.get_json()
