@@ -33,7 +33,6 @@ class PaymentService:
                         [
                             firestore.FieldFilter('student_id', '==', student_id),
                             firestore.FieldFilter('enrollment_id', '==', enrollment_id),
-                            # --- CORREÇÃO APLICADA AQUI: Garantindo que ano e mês são inteiros ---
                             firestore.FieldFilter('reference_year', '==', int(year)),
                             firestore.FieldFilter('reference_month', '==', int(month))
                         ]
@@ -67,8 +66,9 @@ class PaymentService:
                 }
                 self.collection.add(payment_data)
                 generated_count += 1
-
-            return {"generated": generated_count, "existing": existing_count}
+            
+            # --- CORREÇÃO APLICADA AQUI: A chave 'existing' foi alterada para 'skipped' ---
+            return {"generated": generated_count, "skipped": existing_count}
 
         except Exception as e:
             logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
@@ -85,7 +85,7 @@ class PaymentService:
         today = date.today()
 
         try:
-            # --- CORREÇÃO APLICADA AQUI: Consulta atualizada para a sintaxe moderna ---
+            # Consulta atualizada para a sintaxe moderna
             payments_query = self.collection.where(filter=firestore.And(
                 [
                     firestore.FieldFilter('reference_year', '==', int(year)),
