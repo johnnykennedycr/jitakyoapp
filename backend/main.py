@@ -51,8 +51,7 @@ def create_app():
     
     # Nível 0: Serviços sem dependências de outros serviços.
     user_service = UserService(db, mail=mail)
-    attendance_service = AttendanceService(db)
-
+    
     # Nível 1: Serviços que dependem do Nível 0.
     teacher_service = TeacherService(db, user_service=user_service)
 
@@ -62,12 +61,12 @@ def create_app():
     # Nível 3: Serviços que dependem dos níveis anteriores.
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
 
-    # Nível 4: O serviço de pagamento depende de vários outros.
+    # Nível 4: Serviços que dependem de todos os outros.
+    attendance_service = AttendanceService(db, user_service=user_service, enrollment_service=enrollment_service, training_class_service=training_class_service)
     payment_service = PaymentService(db, enrollment_service=enrollment_service, user_service=user_service)
 
-    # Nível Final: Seta dependências que poderiam ser circulares após todos os serviços terem sido criados.
+    # Nível Final: Seta dependências que poderiam ser circulares (se houver).
     user_service.set_enrollment_service(enrollment_service)
-    attendance_service.set_services(enrollment_service=enrollment_service, training_class_service=training_class_service)
     
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
