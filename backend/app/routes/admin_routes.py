@@ -5,10 +5,8 @@ from datetime import datetime, date, time, timedelta
 from werkzeug.utils import secure_filename
 from firebase_admin import auth
 
-# NOVAS IMPORTAÇÕES DE DECORADORES
 from app.utils.decorators import login_required, role_required
 
-# As importações de Services permanecem as mesmas
 from app.services.user_service import UserService
 from app.services.teacher_service import TeacherService
 from app.services.training_class_service import TrainingClassService
@@ -18,7 +16,6 @@ from app.services.payment_service import PaymentService
 
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
-# A inicialização de serviços permanece a mesma
 user_service = None
 teacher_service = None
 training_class_service = None
@@ -47,32 +44,32 @@ def dashboard_data():
         days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
         time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
 
+        # O serviço já retorna os dados enriquecidos
         all_classes = training_class_service.get_all_classes()
-        teachers_map = {t.id: t.name for t in teacher_service.get_all_teachers()}
         scheduled_events = []
         
         for training_class in all_classes:
-            if training_class.schedule:
-                for slot in training_class.schedule:
-                    if slot.day_of_week in days_order:
-                        start_h, start_m = map(int, slot.start_time.split(':'))
-                        end_h, end_m = map(int, slot.end_time.split(':'))
-                        grid_col = days_order.index(slot.day_of_week) + 2
+            if training_class.get('schedule'):
+                for slot in training_class['schedule']:
+                    if slot.get('day_of_week') in days_order:
+                        start_h, start_m = map(int, slot['start_time'].split(':'))
+                        end_h, end_m = map(int, slot['end_time'].split(':'))
+                        grid_col = days_order.index(slot['day_of_week']) + 2
                         grid_row_start = ((start_h - 5) * 2) + (start_m // 30) + 2
                         duration_slots = ((end_h * 60 + end_m) - (start_h * 60 + start_m)) // 30
                         
                         if duration_slots > 0:
                             scheduled_events.append({
-                                'id': training_class.id,
-                                'name': training_class.name,
-                                'time': f"{slot.start_time} - {slot.end_time}",
-                                'teacher': teachers_map.get(training_class.teacher_id, 'N/A'),
+                                'id': training_class['id'],
+                                'name': training_class['name'],
+                                'time': f"{slot['start_time']} - {slot['end_time']}",
+                                'teacher': training_class.get('teacher_name', 'N/A'),
                                 'style': (
                                     f"grid-column: {grid_col}; "
                                     f"grid-row: {grid_row_start} / span {duration_slots};"
                                 )
                             })
-        
+    
         data = {
             'days_order': days_order,
             'time_slots': time_slots,
@@ -98,6 +95,7 @@ def get_available_users():
     except Exception as e:
         print(f"Erro em get_available_users: {e}")
         return jsonify(error=str(e)), 500
+
 # --- Rotas de Gerenciamento de Professores ---
 
 @admin_api_bp.route('/teachers/<string:teacher_id>', methods=['GET'])
@@ -135,16 +133,20 @@ def add_teacher():
     """API para adicionar um novo professor."""
     try:
         data = request.get_json()
-        if not data.get('user_id'):
-            return jsonify(success=False, message='ID de usuário é obrigatório.'), 400
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify(error='ID de usuário é obrigatório.'), 400
         
+        existing_teacher = teacher_service.get_teacher_by_user_id(user_id)
+        if existing_teacher:
+            return jsonify(error='Este usuário já está vinculado a um professor.'), 409
+
+        # O serviço agora espera um único dicionário 'data'
         new_teacher = teacher_service.create_teacher(data)
         if new_teacher:
-            return jsonify(success=True, teacher=new_teacher.to_dict()), 201
+            return jsonify(new_teacher.to_dict()), 201
         else:
-            return jsonify(success=False, message='Erro ao criar professor.'), 500
-    except ValueError as ve:
-        return jsonify(error=str(ve)), 409 # Conflict for existing teacher
+            return jsonify(error='Erro ao criar professor.'), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -159,7 +161,7 @@ def edit_teacher(teacher_id):
         if teacher_service.update_teacher(teacher_id, data):
             return jsonify(success=True), 200
         else:
-            return jsonify(success=False, message='Erro ao atualizar professor.'), 500
+            return jsonify(error='Erro ao atualizar professor.'), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -173,7 +175,7 @@ def delete_teacher(teacher_id):
         if teacher_service.delete_teacher(teacher_id):
             return jsonify(success=True), 200
         else:
-            return jsonify(success=False, message='Erro ao deletar professor.'), 500
+            return jsonify(error='Erro ao deletar professor.'), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -182,9 +184,10 @@ def delete_teacher(teacher_id):
 @admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
 def list_classes():
+    """API para listar todas as turmas (já enriquecidas pelo serviço)."""
     try:
-        classes = training_class_service.get_all_classes()
-        classes_data = [c.to_dict() for c in classes]
+        # A função get_all_classes já retorna uma lista de dicionários prontos para a API.
+        classes_data = training_class_service.get_all_classes()
         return jsonify(classes_data), 200
     except Exception as e:
         print(f"Erro em list_classes: {e}")
@@ -214,9 +217,10 @@ def add_class():
     """API para criar uma nova turma."""
     try:
         data = request.get_json()
-        new_class = training_class_service.create_class(data)
-        if new_class:
-            return jsonify(new_class.to_dict()), 201
+        # O serviço agora retorna um dicionário, não um objeto.
+        new_class_dict = training_class_service.create_class(data)
+        if new_class_dict:
+            return jsonify(new_class_dict), 201
         return jsonify(error="Falha ao criar turma."), 500
     except Exception as e:
         return jsonify(error=str(e)), 500
@@ -281,8 +285,22 @@ def search_students():
 def list_students():
     """API para listar todos os alunos com suas matrículas e nomes de turmas."""
     try:
-        students_data = user_service.get_students_with_enrollments()
-        return jsonify([s.to_dict() for s in students_data]), 200
+        students = user_service.get_users_by_role('student')
+        all_classes_dicts = training_class_service.get_all_classes()
+        class_map = {c['id']: c['name'] for c in all_classes_dicts}
+        
+        students_data = []
+        for student in students:
+            student_dict = student.to_dict()
+            enrollments = enrollment_service.get_enrollments_by_student_id(student.id)
+            
+            student_dict['enrollments'] = [
+                {**enrollment.to_dict(), 'class_name': class_map.get(enrollment.class_id, 'Turma Desconhecida')}
+                for enrollment in enrollments
+            ]
+            students_data.append(student_dict)
+            
+        return jsonify(students_data), 200
     except Exception as e:
         print(f"Erro em list_students: {e}")
         return jsonify(error=str(e)), 500
@@ -301,13 +319,14 @@ def add_student_with_enrollments():
             return jsonify(error="Nome e email são obrigatórios."), 400
 
         new_user = user_service.create_user_with_enrollments(user_data, enrollments_data)
-        return jsonify(new_user.to_dict()), 201
+        if new_user:
+            return jsonify(new_user.to_dict()), 201
+        else:
+            raise Exception("Falha ao criar usuário no serviço.")
             
-    except ValueError as ve:
-        return jsonify(error=str(ve)), 400
     except Exception as e:
         print(f"Erro em add_student_with_enrollments: {e}")
-        return jsonify(error="Erro interno ao criar aluno."), 500
+        return jsonify(error=str(e)), 400
 
 @admin_api_bp.route('/students/<string:student_id>', methods=['GET'])
 @login_required
@@ -338,12 +357,12 @@ def update_student(student_id):
 @role_required('admin', 'super_admin')
 def delete_student(student_id):
     """API para deletar um aluno."""
-    try:
-        if user_service.delete_user(student_id):
-            return jsonify(success=True), 200
-        return jsonify(error="Aluno não encontrado ou falha ao deletar."), 404
-    except Exception as e:
-        return jsonify(error=str(e)), 500
+    if user_service.delete_user(student_id):
+        return jsonify(success=True), 200
+    return jsonify(error="Aluno não encontrado."), 404
+
+
+
 
 # --- Rotas de Gerenciamento de Matrículas ---
 
@@ -366,7 +385,8 @@ def add_enrollment():
     try:
         data = request.get_json()
         new_enrollment = enrollment_service.create_enrollment(data)
-        return jsonify(new_enrollment.to_dict()), 201
+        if new_enrollment:
+            return jsonify(new_enrollment.to_dict()), 201
     except ValueError as ve: 
         return jsonify(error=str(ve)), 400
     except Exception as e:
@@ -402,7 +422,7 @@ def get_un_enrolled_students(class_id):
 # --- ROTAS PARA CHAMADA (ATTENDANCE) ---
 @admin_api_bp.route('/attendance', methods=['POST'])
 @login_required
-@role_required('admin', 'super_admin', 'teacher')
+@role_required('admin', 'super_admin')
 def save_attendance():
     data = request.get_json()
     if not data or 'class_id' not in data or 'date' not in data:
@@ -444,6 +464,26 @@ def get_attendance_history(class_id):
         logging.error(f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}")
         return jsonify({"error": f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}"}), 500
 
+
+
+@admin_api_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def unenroll_student_from_class(class_id, student_id):
+    """API para desmatricular um aluno (agora usando POST para seguir o padrão)."""
+    try:
+        enrollments_to_delete = enrollment_service.get_enrollments_by_student_and_class(student_id, class_id)
+        
+        if enrollments_to_delete:
+            if enrollment_service.delete_enrollment(enrollments_to_delete[0].id):
+                return jsonify(success=True, message="Aluno desmatriculado com sucesso!"), 200
+            else:
+                return jsonify(success=False, message="Erro ao desmatricular aluno."), 500
+        else:
+            return jsonify(success=False, message="Matrícula não encontrada."), 404
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
 # --- ROTAS FINANCEIRAS (FINANCIAL) ---
 @admin_api_bp.route('/financial/status', methods=['GET'])
 @login_required
@@ -457,8 +497,9 @@ def get_financial_status():
         status = payment_service.get_financial_status(year, month)
         return jsonify(status)
     except Exception as e:
-        logging.error(f"Erro ao obter status financeiro: {e}")
-        return jsonify({"error": f"Erro ao obter status financeiro: {e}"}), 500
+        # Usando logging para capturar o traceback completo nos logs do servidor
+        logging.error(f"Erro ao obter status financeiro: {e}", exc_info=True)
+        return jsonify({"error": f"Erro ao buscar status financeiro: {e}"}), 500
 
 @admin_api_bp.route('/payments', methods=['POST'])
 @login_required
@@ -466,11 +507,140 @@ def get_financial_status():
 def register_payment():
     data = request.get_json()
     try:
-        new_payment = payment_service.record_payment(data)
-        return jsonify(new_payment.to_dict()), 201
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        if payment_service.record_payment(data):
+            return jsonify({"message": "Pagamento registrado com sucesso"}), 201
+        return jsonify({"error": "Falha ao registrar pagamento"}), 500
     except Exception as e:
-        logging.error(f"Erro ao registrar pagamento: {e}")
         return jsonify({"error": f"Erro interno: {e}"}), 500
+
+
+
+# --- ROTAS DE GERENCIAMENTO DE USUÁRIOS (API) ---
+
+@admin_api_bp.route('/users', methods=['GET'])
+@login_required
+@role_required('super_admin')
+def list_all_users():
+    """API para listar todos os usuários do sistema."""
+    try:
+        all_users = user_service.get_all_users()
+        return jsonify([u.to_dict() for u in all_users]), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+@admin_api_bp.route('/users', methods=['POST'])
+@login_required
+@role_required('super_admin')
+def add_user():
+    """API para criar um novo usuário (qualquer role)."""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        email = data.get('email')
+        role = data.get('role')
+        password = data.get('password')
+
+        if not all([name, email, role, password]):
+            return jsonify(success=False, message="Nome, email, role e senha são obrigatórios."), 400
+
+        firebase_user = auth.create_user(email=email, password=password, display_name=name)
+        
+        user_in_db = user_service.create_user(
+            user_id=firebase_user.uid, name=name, email=email, role=role
+        )
+
+        if user_in_db:
+            return jsonify(success=True, user=user_in_db.to_dict()), 201
+        else:
+            auth.delete_user(firebase_user.uid)
+            return jsonify(success=False, message="Erro ao salvar usuário no Firestore."), 500
+            
+    except Exception as e:
+        return jsonify(error=str(e)), 400
+
+@admin_api_bp.route('/users/<string:user_id>', methods=['PUT'])
+@login_required
+@role_required('super_admin')
+def edit_user(user_id):
+    """API para editar um usuário."""
+    try:
+        data = request.get_json()
+        
+        password = data.get('password')
+        if password:
+            auth.update_user(user_id, password=password)
+            data.pop('password', None)
+
+        if user_service.update_user(user_id, data):
+            return jsonify(success=True), 200
+        else:
+            return jsonify(success=False, message="Erro ao atualizar usuário."), 500
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@admin_api_bp.route('/users/<string:user_id>', methods=['DELETE'])
+@login_required
+@role_required('super_admin')
+def delete_user(user_id):
+    """API para deletar um usuário (do Auth e do Firestore)."""
+    current_user = g.user
+    if user_id == current_user.id:
+        return jsonify(success=False, message="Você não pode deletar a si mesmo."), 403
+
+    try:
+        user_to_delete = user_service.get_user_by_id(user_id)
+        if not user_to_delete:
+            return jsonify(success=False, message="Usuário não encontrado."), 404
+
+        if user_service.delete_user(user_id):
+            return jsonify(success=True), 200
+        else:
+            return jsonify(success=False, message="Erro ao deletar usuário."), 500
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+# --- Rota de Configurações (API) ---
+
+@admin_api_bp.route('/settings/branding', methods=['GET'])
+@login_required
+@role_required('super_admin')
+def get_branding_settings():
+    """API para buscar as configurações de identidade visual."""
+    try:
+        settings_doc = db.collection('settings').document('branding').get()
+        settings = settings_doc.to_dict() if settings_doc.exists else {}
+        return jsonify(settings), 200
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+@admin_api_bp.route('/settings/branding', methods=['POST'])
+@login_required
+@role_required('super_admin')
+def update_branding_settings():
+    """API para atualizar as configurações de identidade, incluindo o upload do logo."""
+    try:
+        academy_name = request.form.get('academy_name')
+        logo_path = request.form.get('current_logo_path') 
+        
+        if 'academy_logo' in request.files:
+            file = request.files['academy_logo']
+            if file and file.filename != '':
+                filename = secure_filename(file.filename)
+                
+                upload_folder = os.path.join(current_app.root_path, 'static', 'uploads')
+                os.makedirs(upload_folder, exist_ok=True)
+                file.save(os.path.join(upload_folder, filename))
+                logo_path = f'uploads/{filename}'
+
+        settings_ref = db.collection('settings').document('branding')
+        settings_ref.set({
+            'academy_name': academy_name,
+            'logo_path': logo_path
+        })
+        
+        return jsonify(success=True, message="Configurações salvas com sucesso!"), 200
+    except Exception as e:
+        print(f"Erro ao salvar configurações: {e}")
+        return jsonify(error=str(e)), 500
 
