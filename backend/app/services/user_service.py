@@ -122,10 +122,21 @@ class UserService:
             print(f"Erro ao deletar usuário {user_id}: {e}")
             raise e
 
-    def get_user_by_id(self, user_id):
+    def get_user_by_id(self, user_id, enrich_with_enrollments=False):
+        """Busca um usuário por ID, opcionalmente enriquecendo com suas matrículas."""
         try:
             doc = self.users_collection.document(user_id).get()
-            return User.from_dict(doc.to_dict(), doc.id) if doc.exists else None
+            if not doc.exists:
+                return None
+            
+            user = User.from_dict(doc.to_dict(), doc.id)
+            
+            if enrich_with_enrollments and self.enrollment_service:
+                user.enrollments = self.enrollment_service.get_enrollments_by_student_id(user.id)
+            else:
+                user.enrollments = [] # Garante que o atributo sempre exista
+
+            return user
         except Exception as e:
             print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
             return None
@@ -140,6 +151,27 @@ class UserService:
             print(f"Erro ao buscar usuários por role '{role}': {e}")
         return users
         
+    def get_students_with_enrollments(self):
+        """
+        Busca todos os usuários com a role 'student' e enriquece cada objeto
+        com a lista de suas matrículas ativas.
+        """
+        students = []
+        try:
+            student_docs = self.users_collection.where('role', '==', 'student').stream()
+            for doc in student_docs:
+                student = User.from_dict(doc.to_dict(), doc.id)
+                
+                if self.enrollment_service:
+                    student.enrollments = self.enrollment_service.get_enrollments_by_student_id(student.id)
+                else:
+                    student.enrollments = []
+                    
+                students.append(student)
+        except Exception as e:
+            print(f"Erro ao buscar alunos com matrículas: {e}")
+        return students
+
     def get_available_users_for_promotion(self):
         """Retorna usuários que ainda não são professores."""
         # Esta é uma abordagem simples. Para performance em larga escala,
@@ -147,4 +179,5 @@ class UserService:
         # usar um filtro 'not-in' na query de usuários.
         all_users = self.get_users_by_role('student') # Simplificação: considera apenas alunos
         return all_users
+
 
