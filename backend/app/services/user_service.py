@@ -9,13 +9,18 @@ class UserService:
     def __init__(self, db, mail=None):
         self.db = db
         self.mail = mail
+        self.enrollment_service = None # Será injetado depois para evitar dependência circular
         self.users_collection = self.db.collection('users')
-        self.enrollment_service = None 
-
+    
     def set_enrollment_service(self, enrollment_service):
+        """Injeta o EnrollmentService após a inicialização para quebrar dependências circulares."""
         self.enrollment_service = enrollment_service
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
+        """
+        Cria um novo usuário e suas matrículas de forma transacional.
+        Gera uma senha aleatória e envia por e-mail.
+        """
         email = user_data.get('email')
         if not email:
             raise ValueError("O e-mail é obrigatório.")
@@ -43,7 +48,7 @@ class UserService:
             if 'date_of_birth' in user_data and isinstance(user_data['date_of_birth'], str):
                 try:
                     user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
-                except ValueError:
+                except (ValueError, TypeError):
                     del user_data['date_of_birth']
 
             user_data['created_at'] = datetime.now()
@@ -72,6 +77,7 @@ class UserService:
             raise e
 
     def update_user(self, user_id, update_data):
+        """Atualiza os dados de um usuário."""
         try:
             if 'password' in update_data and update_data['password']:
                 password = update_data.pop('password')
@@ -80,7 +86,7 @@ class UserService:
             if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str):
                 try:
                     update_data['date_of_birth'] = datetime.strptime(update_data['date_of_birth'], '%Y-%m-%d')
-                except ValueError:
+                except (ValueError, TypeError):
                     del update_data['date_of_birth']
 
             update_data['updated_at'] = datetime.now()
@@ -91,6 +97,7 @@ class UserService:
             return False
 
     def delete_user(self, user_id):
+        """Deleta um usuário do Firebase Auth, do Firestore e suas matrículas."""
         try:
             try:
                 auth.delete_user(user_id)
@@ -121,7 +128,7 @@ class UserService:
     def get_users_by_role(self, role):
         users = []
         try:
-            docs = self.users_collection.where('role', '==', role).stream()
+            docs = self.users_collection.where(filter=firestore.FieldFilter('role', '==', role)).stream()
             for doc in docs:
                 users.append(User.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
@@ -131,42 +138,33 @@ class UserService:
     def get_students_with_enrollments(self):
         """Busca todos os alunos e enriquece cada um com suas matrículas."""
         students = self.get_users_by_role('student')
-        if not self.enrollment_service:
-            print("AVISO: EnrollmentService não está disponível para buscar matrículas.")
-            return students
-
         for student in students:
-            student.enrollments = self.enrollment_service.get_enrollments_by_student_id(student.id)
+            if self.enrollment_service:
+                student.enrollments = self.enrollment_service.get_enrollments_by_student_id(student.id)
+            else:
+                student.enrollments = []
         return students
 
+    # --- MÉTODO CORRIGIDO ---
     def search_students_by_name(self, search_term):
-        """Busca alunos por nome de forma otimizada no Firestore."""
+        """
+        Busca alunos por um termo no nome, de forma case-insensitive.
+        Retorna apenas alunos que não são professores.
+        """
         students = []
         try:
-            if not search_term:
-                return []
+            all_students = self.get_users_by_role('student')
             
-            # Firestore não suporta busca "case-insensitive" ou "starts-with" de forma nativa e eficiente
-            # sem um campo auxiliar. A abordagem mais simples para um número moderado de usuários
-            # é buscar todos e filtrar na aplicação, mas para escalar, precisaríamos de um campo
-            # 'name_lowercase' no Firestore ou usar um serviço de busca como Algolia.
-            # Por agora, manteremos o filtro na aplicação, mas com uma consulta mais restrita.
+            if search_term:
+                search_term_lower = search_term.lower()
+                for student in all_students:
+                    if student.name and student.name.lower().startswith(search_term_lower):
+                        students.append(student)
+            # Se não houver termo de busca, retorna uma lista vazia,
+            # pois o frontend espera isso para não sobrecarregar a UI.
             
-            search_term_lower = search_term.lower()
-            
-            # Esta consulta é um truque para filtrar "starts-with"
-            query = self.users_collection.where('role', '==', 'student').order_by('name').start_at([search_term]).end_at([search_term + '\uf8ff'])
-            
-            docs = query.stream()
-            
-            for doc in docs:
-                students.append(User.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
             print(f"Erro ao buscar alunos por nome: {e}")
-            # Fallback para o método antigo em caso de erro de índice
-            all_students = self.get_users_by_role('student')
-            search_term_lower = search_term.lower()
-            students = [s for s in all_students if s.name and s.name.lower().startswith(search_term_lower)]
-
+    
         return students
 
