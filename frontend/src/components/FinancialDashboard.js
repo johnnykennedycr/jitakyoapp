@@ -72,24 +72,29 @@ export function renderFinancialDashboard(targetElement) {
     let currentMonth = today.getMonth() + 1;
 
     const mainHtml = `
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <h1 class="text-3xl font-bold text-white">Gestão Financeira</h1>
-            <div class="flex items-center gap-2 bg-white p-2 rounded-md shadow">
-                <label for="month-filter" class="text-sm font-medium">Mês:</label>
-                <select id="month-filter" class="p-1 border rounded-md">
-                    ${Array.from({ length: 12 }, (_, i) => `
-                        <option value="${i + 1}" ${i + 1 === currentMonth ? 'selected' : ''}>
-                            ${new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}
-                        </option>
-                    `).join('')}
-                </select>
-                <select id="year-filter" class="p-1 border rounded-md">
-                    ${Array.from({ length: 5 }, (_, i) => `
-                        <option value="${currentYear - i}" ${currentYear - i === currentYear ? 'selected' : ''}>
-                            ${currentYear - i}
-                        </option>
-                    `).join('')}
-                </select>
+            <div class="flex items-center gap-4">
+                 <div class="flex items-center gap-2 bg-white p-2 rounded-md shadow">
+                    <label for="month-filter" class="text-sm font-medium">Mês:</label>
+                    <select id="month-filter" class="p-1 border rounded-md">
+                        ${Array.from({ length: 12 }, (_, i) => `
+                            <option value="${i + 1}" ${i + 1 === currentMonth ? 'selected' : ''}>
+                                ${new Date(0, i).toLocaleString('pt-BR', { month: 'long' })}
+                            </option>
+                        `).join('')}
+                    </select>
+                    <select id="year-filter" class="p-1 border rounded-md">
+                        ${Array.from({ length: 5 }, (_, i) => `
+                            <option value="${currentYear - i}" ${currentYear - i === currentYear ? 'selected' : ''}>
+                                ${currentYear - i}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                <button id="generate-billings-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+                    Gerar Cobranças
+                </button>
             </div>
         </div>
         <div id="financial-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
@@ -103,6 +108,7 @@ export function renderFinancialDashboard(targetElement) {
     const tableContainer = targetElement.querySelector('#financial-table-container');
     const monthFilter = targetElement.querySelector('#month-filter');
     const yearFilter = targetElement.querySelector('#year-filter');
+    const generateBillingsBtn = targetElement.querySelector('#generate-billings-btn');
 
     const fetchAndRenderData = async () => {
         showLoading();
@@ -115,36 +121,33 @@ export function renderFinancialDashboard(targetElement) {
             const response = await fetchWithAuth(`/api/admin/financial/status?year=${year}&month=${month}`);
             
             if (!response.ok) {
-                 const errorData = await response.json().catch(() => ({error: 'Falha ao carregar dados financeiros.'}));
-                 throw new Error(errorData.error);
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.error || 'Falha ao carregar dados financeiros.');
             }
             
             const data = await response.json();
 
-            // *** NOVA VERIFICAÇÃO DE SEGURANÇA ***
-            if (!data || !data.summary) {
-                throw new Error('A resposta da API está incompleta. Não foi possível carregar o resumo financeiro.');
+            // Renderiza o resumo
+            if (data && data.summary) {
+                summaryContainer.innerHTML = `
+                    <div class="bg-green-100 p-4 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-green-800">Total Arrecadado</h3>
+                        <p class="text-2xl font-bold text-green-900">R$ ${data.summary.total_paid.toFixed(2)}</p>
+                    </div>
+                    <div class="bg-yellow-100 p-4 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-yellow-800">Pendente</h3>
+                        <p class="text-2xl font-bold text-yellow-900">R$ ${data.summary.total_pending.toFixed(2)}</p>
+                    </div>
+                    <div class="bg-red-100 p-4 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-red-800">Em Atraso</h3>
+                        <p class="text-2xl font-bold text-red-900">R$ ${data.summary.total_overdue.toFixed(2)}</p>
+                    </div>
+                `;
             }
 
-            // Renderiza o resumo
-            summaryContainer.innerHTML = `
-                <div class="bg-green-100 p-4 rounded-lg shadow">
-                    <h3 class="text-sm font-medium text-green-800">Total Arrecadado</h3>
-                    <p class="text-2xl font-bold text-green-900">R$ ${data.summary.total_paid.toFixed(2)}</p>
-                </div>
-                <div class="bg-yellow-100 p-4 rounded-lg shadow">
-                    <h3 class="text-sm font-medium text-yellow-800">Pendente</h3>
-                    <p class="text-2xl font-bold text-yellow-900">R$ ${data.summary.total_pending.toFixed(2)}</p>
-                </div>
-                <div class="bg-red-100 p-4 rounded-lg shadow">
-                    <h3 class="text-sm font-medium text-red-800">Em Atraso</h3>
-                    <p class="text-2xl font-bold text-red-900">R$ ${data.summary.total_overdue.toFixed(2)}</p>
-                </div>
-            `;
-
             // Renderiza a tabela
-            if (!data.students || data.students.length === 0) {
-                tableContainer.innerHTML = '<p>Nenhum aluno ativo com pendências ou pagamentos neste período.</p>';
+            if (!data || !data.students || data.students.length === 0) {
+                tableContainer.innerHTML = '<p>Nenhum aluno ativo encontrado para este período.</p>';
                 return;
             }
 
@@ -179,7 +182,6 @@ export function renderFinancialDashboard(targetElement) {
                 </div>
             `;
             
-            // Re-associa os listeners para os novos botões
             tableContainer.querySelectorAll('button[data-action="register-payment"]').forEach(button => {
                 button.addEventListener('click', () => {
                     const studentId = button.dataset.studentId;
@@ -192,8 +194,30 @@ export function renderFinancialDashboard(targetElement) {
 
         } catch (error) {
             console.error("Erro no painel financeiro:", error);
-            summaryContainer.innerHTML = `<div class="md:col-span-3 bg-red-100 p-4 rounded-lg text-red-800">${error.message}</div>`;
-            tableContainer.innerHTML = `<p class="text-gray-500">A lista de alunos não pôde ser carregada devido ao erro acima.</p>`;
+            summaryContainer.innerHTML = `<div class="col-span-3 bg-red-100 p-4 rounded-lg text-red-800">${error.message}</div>`;
+            tableContainer.innerHTML = `<p class="text-red-500">Não foi possível carregar os detalhes.</p>`;
+        } finally {
+            hideLoading();
+        }
+    };
+
+    const handleGenerateBillings = async () => {
+        showLoading();
+        const year = yearFilter.value;
+        const month = monthFilter.value;
+        try {
+            const response = await fetchWithAuth('/api/admin/financial/generate-billings', {
+                method: 'POST',
+                body: JSON.stringify({ year: parseInt(year), month: parseInt(month) })
+            });
+            const result = await response.json();
+            if (!response.ok) throw result;
+            
+            showModal('Sucesso', `<p>${result.message}</p>`);
+            await fetchAndRenderData(); // Recarrega os dados após gerar as cobranças
+
+        } catch (error) {
+            showModal('Erro', `<p>${error.error || 'Falha ao gerar cobranças.'}</p>`);
         } finally {
             hideLoading();
         }
@@ -201,12 +225,14 @@ export function renderFinancialDashboard(targetElement) {
 
     monthFilter.addEventListener('change', fetchAndRenderData);
     yearFilter.addEventListener('change', fetchAndRenderData);
+    generateBillingsBtn.addEventListener('click', handleGenerateBillings);
 
     fetchAndRenderData();
 
     return () => {
         monthFilter.removeEventListener('change', fetchAndRenderData);
         yearFilter.removeEventListener('change', fetchAndRenderData);
+        generateBillingsBtn.removeEventListener('click', handleGenerateBillings);
     };
 }
 
