@@ -10,7 +10,7 @@ class EnrollmentService:
         self.training_class_service = training_class_service
 
     def create_enrollment(self, data):
-        """Cria uma nova matrícula, verificando se já existe."""
+        """Cria uma nova matrícula de forma robusta."""
         student_id = data.get('student_id')
         class_id = data.get('class_id')
 
@@ -33,11 +33,15 @@ class EnrollmentService:
             class_name = training_class.name if training_class else "desconhecida"
             raise ValueError(f"O aluno '{student_name}' já está matriculado na turma '{class_name}'.")
 
-        # --- LÓGICA DE VENCIMENTO ATUALIZADA ---
-        due_day = data.get('due_day')
-        if due_day is None:
+        # Lógica de vencimento segura
+        due_day = 15 # Começa com o padrão do sistema
+        due_day_raw = data.get('due_day')
+        if due_day_raw is not None and str(due_day_raw).strip().isdigit():
+            due_day = int(due_day_raw)
+        else:
             training_class = self.training_class_service.get_class_by_id(class_id)
-            due_day = training_class.default_due_day if training_class and hasattr(training_class, 'default_due_day') else 10
+            if training_class and hasattr(training_class, 'default_due_day') and training_class.default_due_day is not None:
+                due_day = training_class.default_due_day
         
         enrollment_data = {
             'student_id': student_id,
@@ -47,7 +51,7 @@ class EnrollmentService:
             'base_monthly_fee': data.get('base_monthly_fee', 0),
             'discount_amount': data.get('discount_amount', 0),
             'discount_reason': data.get('discount_reason', ''),
-            'due_day': int(due_day),
+            'due_day': due_day,
             'created_at': datetime.now(),
             'updated_at': datetime.now()
         }
@@ -56,6 +60,17 @@ class EnrollmentService:
         doc_ref.set(enrollment_data)
         
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
+
+    def get_all_active_enrollments(self):
+        """Busca todas as matrículas com status 'active'."""
+        enrollments = []
+        try:
+            docs = self.collection.where('status', '==', 'active').stream()
+            for doc in docs:
+                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+        except Exception as e:
+            print(f"Erro ao buscar todas as matrículas ativas: {e}")
+        return enrollments
 
     def get_enrollments_by_student_id(self, student_id):
         """Busca todas as matrículas de um aluno específico."""
