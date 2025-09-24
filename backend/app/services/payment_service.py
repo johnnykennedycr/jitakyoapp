@@ -38,7 +38,6 @@ class PaymentService:
                 # Calcula o valor devido para esta matrícula
                 total_due = float(enrollment.get('base_monthly_fee', 0)) - float(enrollment.get('discount_amount', 0))
                 
-                # Se o valor for zero ou negativo, não gera cobrança
                 if total_due <= 0:
                     continue
 
@@ -50,7 +49,8 @@ class PaymentService:
                     'reference_month': month,
                     'reference_year': year,
                     'due_day': int(enrollment.get('due_day', 15)),
-                    'description': f"Mensalidade - {enrollment.get('class_name', 'N/A')}",
+                    'type': 'Mensalidade', # Campo 'type' adicionado
+                    'class_name': enrollment.get('class_name', 'N/A'), # Campo 'class_name' adicionado
                     'payment_date': None,
                     'payment_method': None,
                     'created_at': datetime.now(),
@@ -78,25 +78,13 @@ class PaymentService:
         try:
             payments_query = self.collection.where('reference_year', '==', year).where('reference_month', '==', month).stream()
             
-            # Otimização: Busca todos os alunos e turmas de uma vez
             all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
-            all_classes = {c['id']: c['name'] for c in self.training_class_service.get_all_classes()}
 
             for doc in payments_query:
                 payment = doc.to_dict()
-                payment['id'] = doc.id # Adiciona o ID do documento ao dicionário
+                payment['id'] = doc.id 
 
-                student_name = all_students.get(payment.get('student_id'), "Aluno Desconhecido")
-                payment['student_name'] = student_name
-
-                # Para pagamentos de mensalidade, busca o nome da turma da matrícula associada
-                if payment.get('enrollment_id'):
-                    enrollment_doc = self.enrollment_service.collection.document(payment['enrollment_id']).get()
-                    if enrollment_doc.exists:
-                        class_id = enrollment_doc.to_dict().get('class_id')
-                        payment['class_name'] = all_classes.get(class_id, "Turma Desconhecida")
-                else:
-                    payment['class_name'] = "N/A"
+                payment['student_name'] = all_students.get(payment.get('student_id'), "Aluno Desconhecido")
                 
                 amount = float(payment.get('amount', 0))
 
@@ -109,7 +97,7 @@ class PaymentService:
                     due_date = date(year, month, due_day)
                     payment['due_date_formatted'] = due_date.strftime('%d/%m/%Y')
 
-                    if due_date < today:
+                    if due_date < today and payment.get('status') != 'paid':
                         summary['total_overdue'] += amount
                         payment['status'] = 'overdue'
                     else:
