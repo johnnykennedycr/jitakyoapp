@@ -4,75 +4,81 @@ from app.models.payment import Payment
 import calendar
 
 class PaymentService:
-    def __init__(self, db, enrollment_service, user_service):
+    def __init__(self, db, enrollment_service, user_service, training_class_service):
         self.db = db
         self.collection = self.db.collection('payments')
         self.enrollment_service = enrollment_service
         self.user_service = user_service
+        self.training_class_service = training_class_service
 
     def get_financial_status(self, year, month):
         """
-        Calcula e retorna o status financeiro para um determinado mês e ano.
+        Calcula o status financeiro com uma lógica invertida e mais robusta,
+        partindo das matrículas ativas.
         """
-        students = self.user_service.get_students_with_enrollments()
-        
-        student_statuses = []
         summary = {'paid': 0, 'pending': 0, 'overdue': 0}
+        student_finances = {} # Dicionário para agregar dados por aluno
         today = date.today()
+
+        all_enrollments = self.enrollment_service.get_all_active_enrollments()
         
-        for student in students:
-            if not hasattr(student, 'enrollments') or not student.enrollments:
+        for enrollment in all_enrollments:
+            student_id = enrollment.student_id
+            
+            # Inicializa o dicionário para o aluno se for a primeira vez
+            if student_id not in student_finances:
+                student = self.user_service.get_user_by_id(student_id)
+                if not student:
+                    continue # Pula matrículas de alunos não encontrados
+                student_finances[student_id] = {
+                    'student_id': student.id,
+                    'name': student.name,
+                    'monthly_fee': 0,
+                    'due_days': [],
+                    'status': 'pending' # Status inicial
+                }
+
+            # Acumula o valor da mensalidade
+            base_fee = float(getattr(enrollment, 'base_monthly_fee', 0) or 0)
+            discount = float(getattr(enrollment, 'discount_amount', 0) or 0)
+            student_finances[student_id]['monthly_fee'] += (base_fee - discount)
+            
+            # Acumula os dias de vencimento
+            if hasattr(enrollment, 'due_day') and str(enrollment.due_day).isdigit():
+                student_finances[student_id]['due_days'].append(int(enrollment.due_day))
+
+        # Processa cada aluno para determinar o status final
+        final_student_list = []
+        for student_id, data in student_finances.items():
+            if data['monthly_fee'] <= 0:
                 continue
 
-            monthly_total = 0
-            for enrollment in student.enrollments:
-                base_fee = float(getattr(enrollment, 'base_monthly_fee', 0) or 0)
-                discount = float(getattr(enrollment, 'discount_amount', 0) or 0)
-                monthly_total += (base_fee - discount)
+            payment = self.get_payment_for_student(student_id, year, month)
             
-            if monthly_total <= 0:
-                continue
-
-            payment = self.get_payment_for_student(student.id, year, month)
-            
-            # --- LÓGICA DE VENCIMENTO AINDA MAIS ROBUSTA ---
-            due_days = []
-            for enrollment in student.enrollments:
-                if hasattr(enrollment, 'due_day') and enrollment.due_day is not None:
-                    try:
-                        due_days.append(int(enrollment.due_day))
-                    except (ValueError, TypeError):
-                        pass # Ignora dias de vencimento inválidos
-
-            effective_due_day = min(due_days) if due_days else 15
-            
+            effective_due_day = min(data['due_days']) if data['due_days'] else 15
             last_day_of_month = calendar.monthrange(year, month)[1]
             actual_due_day = min(effective_due_day, last_day_of_month)
             due_date = date(year, month, actual_due_day)
             
-            status = 'pending'
             if payment:
-                status = 'paid'
+                data['status'] = 'paid'
                 payment_amount = float(getattr(payment, 'amount', 0) or 0)
                 summary['paid'] += payment_amount
+                data['payment_id'] = payment.id
             elif today > due_date:
-                status = 'overdue'
-                summary['overdue'] += monthly_total
+                data['status'] = 'overdue'
+                summary['overdue'] += data['monthly_fee']
             else:
-                summary['pending'] += monthly_total
+                data['status'] = 'pending'
+                summary['pending'] += data['monthly_fee']
 
-            student_statuses.append({
-                'student_id': student.id,
-                'name': student.name,
-                'monthly_fee': monthly_total,
-                'status': status,
-                'payment_id': payment.id if payment else None,
-                'due_day': effective_due_day
-            })
+            data['due_day'] = effective_due_day
+            del data['due_days'] # Limpa o campo auxiliar
+            final_student_list.append(data)
 
-        student_statuses.sort(key=lambda x: x['name'])
+        final_student_list.sort(key=lambda x: x['name'])
         
-        return {'summary': summary, 'students': student_statuses}
+        return {'summary': summary, 'students': final_student_list}
 
     def get_payment_for_student(self, student_id, year, month):
         """Busca um pagamento específico para um aluno em um mês/ano de referência."""

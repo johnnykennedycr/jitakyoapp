@@ -10,7 +10,7 @@ class TrainingClassService:
         self.collection = self.db.collection('classes')
 
     def get_all_classes(self):
-        """Busca todas as turmas e enriquece com o nome do professor."""
+        """Busca todas as turmas e enriquece com dados, garantindo valores padrão."""
         classes = []
         try:
             all_teachers = self.teacher_service.get_all_teachers()
@@ -18,7 +18,10 @@ class TrainingClassService:
             
             docs = self.collection.stream()
             for doc in docs:
-                class_obj = TrainingClass.from_dict(doc.to_dict(), doc.id)
+                class_data = doc.to_dict()
+                # Garante que turmas antigas tenham um valor padrão para o dia do vencimento
+                class_data.setdefault('default_due_day', 15)
+                class_obj = TrainingClass.from_dict(class_data, doc.id)
                 class_obj.teacher_name = teacher_map.get(class_obj.teacher_id, 'N/A')
                 classes.append(class_obj)
         except Exception as e:
@@ -26,11 +29,13 @@ class TrainingClassService:
         return classes
 
     def get_class_by_id(self, class_id):
-        """Busca uma turma específica e enriquece com o nome do professor."""
+        """Busca uma turma específica, garantindo valores padrão."""
         try:
             doc = self.collection.document(class_id).get()
             if doc.exists:
-                class_obj = TrainingClass.from_dict(doc.to_dict(), class_id)
+                class_data = doc.to_dict()
+                class_data.setdefault('default_due_day', 15)
+                class_obj = TrainingClass.from_dict(class_data, class_id)
                 if class_obj.teacher_id:
                     teacher = self.teacher_service.get_teacher_by_id(class_obj.teacher_id)
                     class_obj.teacher_name = teacher.name if teacher else 'N/A'
@@ -43,7 +48,7 @@ class TrainingClassService:
             return None
 
     def create_class(self, data):
-        """Cria uma nova turma no Firestore."""
+        """Cria uma nova turma, definindo o vencimento padrão como dia 15."""
         try:
             schedule_objects = [ScheduleSlot(**s).to_dict() for s in data.get('schedule', [])]
             
@@ -54,7 +59,7 @@ class TrainingClassService:
                 'capacity': data.get('capacity'),
                 'description': data.get('description'),
                 'default_monthly_fee': data.get('default_monthly_fee'),
-                'default_due_day': data.get('default_due_day', 15), # Alterado para 15
+                'default_due_day': data.get('default_due_day', 15), # Padrão definido para 15
                 'schedule': schedule_objects,
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP
