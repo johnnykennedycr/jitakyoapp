@@ -5,8 +5,10 @@ from datetime import datetime, date, time, timedelta
 from werkzeug.utils import secure_filename
 from firebase_admin import auth
 
+# NOVAS IMPORTAÇÕES DE DECORADORES
 from app.utils.decorators import login_required, role_required
 
+# As importações de Services permanecem as mesmas
 from app.services.user_service import UserService
 from app.services.teacher_service import TeacherService
 from app.services.training_class_service import TrainingClassService
@@ -16,6 +18,7 @@ from app.services.payment_service import PaymentService
 
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
+# A inicialização de serviços permanece a mesma
 user_service = None
 teacher_service = None
 training_class_service = None
@@ -44,8 +47,8 @@ def dashboard_data():
         days_order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
         time_slots = [f"{h:02d}:{m:02d}" for h in range(5, 23) for m in (0, 30)]
 
-        # O serviço já retorna os dados enriquecidos
         all_classes = training_class_service.get_all_classes()
+        
         scheduled_events = []
         
         for training_class in all_classes:
@@ -95,7 +98,6 @@ def get_available_users():
     except Exception as e:
         print(f"Erro em get_available_users: {e}")
         return jsonify(error=str(e)), 500
-
 # --- Rotas de Gerenciamento de Professores ---
 
 @admin_api_bp.route('/teachers/<string:teacher_id>', methods=['GET'])
@@ -133,15 +135,6 @@ def add_teacher():
     """API para adicionar um novo professor."""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')
-        if not user_id:
-            return jsonify(error='ID de usuário é obrigatório.'), 400
-        
-        existing_teacher = teacher_service.get_teacher_by_user_id(user_id)
-        if existing_teacher:
-            return jsonify(error='Este usuário já está vinculado a um professor.'), 409
-
-        # O serviço agora espera um único dicionário 'data'
         new_teacher = teacher_service.create_teacher(data)
         if new_teacher:
             return jsonify(new_teacher.to_dict()), 201
@@ -184,9 +177,7 @@ def delete_teacher(teacher_id):
 @admin_api_bp.route('/classes/', methods=['GET'])
 @login_required
 def list_classes():
-    """API para listar todas as turmas (já enriquecidas pelo serviço)."""
     try:
-        # A função get_all_classes já retorna uma lista de dicionários prontos para a API.
         classes_data = training_class_service.get_all_classes()
         return jsonify(classes_data), 200
     except Exception as e:
@@ -217,7 +208,6 @@ def add_class():
     """API para criar uma nova turma."""
     try:
         data = request.get_json()
-        # O serviço agora retorna um dicionário, não um objeto.
         new_class_dict = training_class_service.create_class(data)
         if new_class_dict:
             return jsonify(new_class_dict), 201
@@ -497,9 +487,26 @@ def get_financial_status():
         status = payment_service.get_financial_status(year, month)
         return jsonify(status)
     except Exception as e:
-        # Usando logging para capturar o traceback completo nos logs do servidor
         logging.error(f"Erro ao obter status financeiro: {e}", exc_info=True)
         return jsonify({"error": f"Erro ao buscar status financeiro: {e}"}), 500
+
+@admin_api_bp.route('/financial/generate-billings', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def generate_monthly_billings():
+    """Gera as cobranças do mês corrente ou do mês/ano especificado."""
+    try:
+        today = datetime.utcnow()
+        # A rota pode receber o ano e mês pelo corpo do JSON para testes ou execuções manuais.
+        # Se não receber, usa o mês e ano atuais.
+        year = request.json.get('year', today.year) if request.is_json else today.year
+        month = request.json.get('month', today.month) if request.is_json else today.month
+        
+        result = payment_service.generate_monthly_payments(year, month)
+        return jsonify(success=True, message=f"{result['generated']} cobranças geradas. {result['skipped']} já existiam.", details=result), 201
+    except Exception as e:
+        logging.error(f"Erro ao gerar cobranças: {e}", exc_info=True)
+        return jsonify(error=f"Erro ao gerar cobranças: {e}"), 500
 
 @admin_api_bp.route('/payments', methods=['POST'])
 @login_required
