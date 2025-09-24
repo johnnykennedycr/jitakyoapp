@@ -68,7 +68,7 @@ async function openClassForm(classId = null) {
     finally { hideLoading(); }
 }
 
-// --- FUNÇÕES RESTAURADAS ---
+// --- FUNÇÕES ATUALIZADAS E CORRIGIDAS ---
 async function openEnrollStudentModal(classId, className) {
     const modalBodyHtml = `
         <form id="enroll-student-form" data-class-id="${classId}">
@@ -78,9 +78,15 @@ async function openEnrollStudentModal(classId, className) {
                 <div id="student-search-results" class="mt-2 border rounded-md max-h-40 overflow-y-auto"></div>
                 <input type="hidden" name="student_id">
             </div>
-             <div class="mb-4">
-                <label class="block text-sm font-medium">Desconto (R$)</label>
-                <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium">Desconto (R$)</label>
+                    <input type="number" step="0.01" name="discount_amount" placeholder="0.00" class="p-2 border rounded-md w-full">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Dia do Vencimento</label>
+                    <input type="number" name="due_day" min="1" max="31" placeholder="Padrão da turma" class="p-2 border rounded-md w-full">
+                </div>
             </div>
             <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Matricular Aluno</button></div>
         </form>
@@ -132,7 +138,7 @@ async function openEnrolledStudentsModal(classId, className) {
         showModal(`Alunos em ${className}`, studentsHtml);
     } catch (error) {
         console.error("Erro ao buscar alunos matriculados:", error);
-        showModal('Erro', '<p>Não foi possível carregar la lista de alunos.</p>');
+        showModal('Erro', '<p>Não foi possível carregar a lista de alunos.</p>');
     } finally {
         hideLoading();
     }
@@ -424,6 +430,7 @@ export async function renderClassList(targetElement) {
             const classId = form.dataset.classId;
             const studentId = form.elements.student_id.value;
             const discount = form.elements.discount_amount.value;
+            const due_day = form.elements.due_day.value;
             if(!studentId) {
                 showModal('Atenção', '<p>Você precisa selecionar um aluno da lista.</p>');
                 return;
@@ -432,7 +439,7 @@ export async function renderClassList(targetElement) {
             showLoading();
             try {
                 const response = await fetchWithAuth('/api/admin/enrollments', {
-                    method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount })
+                    method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount, due_day: due_day })
                 });
                 if (!response.ok) throw await response.json();
             } catch (error) {
