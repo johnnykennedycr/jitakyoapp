@@ -113,9 +113,18 @@ export function renderFinancialDashboard(targetElement) {
             const year = yearFilter.value;
             const month = monthFilter.value;
             const response = await fetchWithAuth(`/api/admin/financial/status?year=${year}&month=${month}`);
-            if (!response.ok) throw new Error('Falha ao carregar dados financeiros.');
+            
+            if (!response.ok) {
+                 const errorData = await response.json().catch(() => ({error: 'Falha ao carregar dados financeiros.'}));
+                 throw new Error(errorData.error);
+            }
             
             const data = await response.json();
+
+            // *** NOVA VERIFICAÇÃO DE SEGURANÇA ***
+            if (!data || !data.summary) {
+                throw new Error('A resposta da API está incompleta. Não foi possível carregar o resumo financeiro.');
+            }
 
             // Renderiza o resumo
             summaryContainer.innerHTML = `
@@ -134,8 +143,8 @@ export function renderFinancialDashboard(targetElement) {
             `;
 
             // Renderiza a tabela
-            if (data.students.length === 0) {
-                tableContainer.innerHTML = '<p>Nenhum aluno ativo encontrado para este período.</p>';
+            if (!data.students || data.students.length === 0) {
+                tableContainer.innerHTML = '<p>Nenhum aluno ativo com pendências ou pagamentos neste período.</p>';
                 return;
             }
 
@@ -183,7 +192,8 @@ export function renderFinancialDashboard(targetElement) {
 
         } catch (error) {
             console.error("Erro no painel financeiro:", error);
-            tableContainer.innerHTML = `<p class="text-red-500">${error.message}</p>`;
+            summaryContainer.innerHTML = `<div class="md:col-span-3 bg-red-100 p-4 rounded-lg text-red-800">${error.message}</div>`;
+            tableContainer.innerHTML = `<p class="text-gray-500">A lista de alunos não pôde ser carregada devido ao erro acima.</p>`;
         } finally {
             hideLoading();
         }
@@ -199,3 +209,4 @@ export function renderFinancialDashboard(targetElement) {
         yearFilter.removeEventListener('change', fetchAndRenderData);
     };
 }
+
