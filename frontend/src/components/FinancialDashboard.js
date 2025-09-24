@@ -115,6 +115,8 @@ export function renderFinancialDashboard(targetElement) {
                     </select>
                 </div>
                  <button id="generate-billings-btn" class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700">Gerar Cobranças</button>
+                 <!-- NOVO BOTÃO PARA POPULAR ALUNOS -->
+                 <button id="populate-students-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">Popular Alunos (20)</button>
             </div>
         </div>
         <div id="financial-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
@@ -138,6 +140,7 @@ export function renderFinancialDashboard(targetElement) {
     const monthFilter = targetElement.querySelector('#month-filter');
     const yearFilter = targetElement.querySelector('#year-filter');
     const generateBillingsBtn = targetElement.querySelector('#generate-billings-btn');
+    const populateStudentsBtn = targetElement.querySelector('#populate-students-btn'); // Pega referência do novo botão
 
     const fetchAndRenderData = async () => {
         showLoading();
@@ -181,7 +184,7 @@ export function renderFinancialDashboard(targetElement) {
                 const paidRows = data.paid_payments.map(p => `
                     <tr class="hover:bg-gray-50">
                         <td class="p-3 border-b">${p.student_name}</td>
-                        <td class="p-3 border-b">${p.class_name}</td>
+                        <td class="p-3 border-b">${p.class_name || 'N/A'}</td>
                         <td class="p-3 border-b text-center">R$ ${p.amount.toFixed(2)}</td>
                         <td class="p-3 border-b text-center">${p.type}</td>
                          <td class="p-3 border-b text-center">${p.payment_method}</td>
@@ -214,7 +217,7 @@ export function renderFinancialDashboard(targetElement) {
                  const pendingRows = data.pending_payments.map(p => `
                     <tr class="hover:bg-gray-50">
                         <td class="p-3 border-b">${p.student_name}</td>
-                        <td class="p-3 border-b">${p.class_name}</td>
+                        <td class="p-3 border-b">${p.class_name || 'N/A'}</td>
                         <td class="p-3 border-b text-center">R$ ${p.amount.toFixed(2)}</td>
                         <td class="p-3 border-b text-center">${p.type}</td>
                         <td class="p-3 border-b text-center">${p.due_date_formatted}</td>
@@ -271,6 +274,7 @@ export function renderFinancialDashboard(targetElement) {
         }
     };
     
+    // Lógica para o botão de gerar cobranças
     generateBillingsBtn.addEventListener('click', async () => {
         showLoading();
         try {
@@ -283,7 +287,6 @@ export function renderFinancialDashboard(targetElement) {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Falha ao gerar cobranças');
             
-            // --- CORREÇÃO APLICADA AQUI: Acessando 'details.generated' e 'details.skipped' ---
             showModal('Sucesso', `<p>${result.details.generated} cobranças geradas. ${result.details.skipped} já existiam.</p>`);
             fetchAndRenderData();
         } catch (error) {
@@ -293,13 +296,72 @@ export function renderFinancialDashboard(targetElement) {
         }
     });
 
+    // --- NOVA LÓGICA PARA O BOTÃO DE POPULAR ALUNOS ---
+    const handlePopulateStudents = async () => {
+        showLoading();
+        try {
+            const firstNames = ["Ana", "Bruno", "Carlos", "Daniela", "Eduardo", "Fernanda", "Gabriel", "Helena", "Igor", "Juliana", "Lucas", "Mariana", "Nicolas", "Olivia", "Pedro", "Quintino", "Rafaela", "Sergio", "Tatiana", "Victor"];
+            const lastNames = ["Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Pereira", "Lima", "Gomes", "Costa", "Ribeiro", "Martins", "Carvalho", "Almeida"];
+            
+            const promises = [];
+            for (let i = 0; i < 20; i++) {
+                const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+                const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+                const fullName = `${firstName} ${lastName}`;
+                const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}@jitakyotest.com`;
+                const phone = '119' + Math.floor(10000000 + Math.random() * 90000000).toString();
+                
+                const year = 1980 + Math.floor(Math.random() * 25); // Nascidos entre 1980 e 2004
+                const month = 1 + Math.floor(Math.random() * 12);
+                const day = 1 + Math.floor(Math.random() * 28);
+                const birthDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                const payload = {
+                    name: fullName,
+                    email: email,
+                    password: 'senha123', // Senha padrão para todos
+                    phone: phone,
+                    birth_date: birthDate,
+                    role: 'student',
+                    status: 'active'
+                };
+
+                const promise = fetchWithAuth('/api/admin/users', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                promises.push(promise);
+            }
+
+            const responses = await Promise.all(promises);
+            const failed = responses.filter(res => !res.ok);
+
+            if (failed.length > 0) {
+                throw new Error(`${failed.length} de 20 alunos não puderam ser criados.`);
+            }
+
+            showModal('Sucesso', '<p>20 alunos fictícios foram criados com sucesso! Você pode precisar recarregar a página de Alunos para vê-los.</p>');
+
+        } catch (error) {
+            showModal('Erro', `<p>${error.message}</p>`);
+        } finally {
+            hideLoading();
+        }
+    };
+    
+    populateStudentsBtn.addEventListener('click', handlePopulateStudents);
+
     monthFilter.addEventListener('change', fetchAndRenderData);
     yearFilter.addEventListener('change', fetchAndRenderData);
 
     fetchAndRenderData();
 
+    // Função de limpeza
     return () => {
         monthFilter.removeEventListener('change', fetchAndRenderData);
         yearFilter.removeEventListener('change', fetchAndRenderData);
+        generateBillingsBtn.removeEventListener('click', async () => {});
+        populateStudentsBtn.removeEventListener('click', handlePopulateStudents); // Limpa o listener do novo botão
     };
 }
+
