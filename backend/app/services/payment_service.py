@@ -20,18 +20,23 @@ class PaymentService:
         student_financial_status = {}
         
         # O EnrollmentService agora faz o trabalho pesado de buscar e enriquecer os dados.
-        enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
+        enrollments_list = self.enrollment_service.get_all_active_enrollments_with_details()
 
-        for enroll_data in enrollments:
+        # CORREÇÃO: Organiza as matrículas em um mapa para consulta rápida
+        student_enrollments_map = {}
+        for enroll_data in enrollments_list:
             student_id = enroll_data['student_id']
-            
+            if student_id not in student_enrollments_map:
+                student_enrollments_map[student_id] = []
+            student_enrollments_map[student_id].append(enroll_data)
+
             # Inicializa o status do aluno se ainda não existir
             if student_id not in student_financial_status:
                 student_financial_status[student_id] = {
                     "id": student_id,
                     "name": enroll_data.get('student_name', 'Nome não encontrado'),
                     "total_due": 0,
-                    "status": "pending" # Começa como pendente por padrão
+                    "status": "pending" 
                 }
             
             # Calcula o valor devido para esta matrícula específica
@@ -54,8 +59,10 @@ class PaymentService:
         today = datetime.now().date()
         for student_id, status_info in student_financial_status.items():
             if status_info['status'] != 'paid':
-                # Usa o 'due_day' da matrícula, com fallback para o da turma, e depois para 15
-                due_day = enrollments.get(student_id, {}).get('due_day') or enrollments.get(student_id, {}).get('class_default_due_day') or 15
+                # CORREÇÃO: Busca o dia de vencimento a partir do mapa de matrículas
+                student_enrolls = student_enrollments_map.get(student_id, [])
+                due_days = [e.get('due_day', 15) for e in student_enrolls]
+                due_day = min(due_days) if due_days else 15
                 
                 _, last_day_of_month = calendar.monthrange(year, month)
                 safe_due_day = min(due_day, last_day_of_month)
@@ -76,7 +83,6 @@ class PaymentService:
     def record_payment(self, data):
         """Registra um novo pagamento no Firestore."""
         try:
-            # Garante que os campos de referência sejam números
             data['reference_year'] = int(data['reference_year'])
             data['reference_month'] = int(data['reference_month'])
             data['created_at'] = firestore.SERVER_TIMESTAMP
@@ -93,14 +99,17 @@ class PaymentService:
         generated_count = 0
         skipped_count = 0
         
-        # O serviço já retorna tudo que precisamos
         enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
 
         student_billings = {}
         for enroll_data in enrollments:
             student_id = enroll_data['student_id']
             if student_id not in student_billings:
-                student_billings[student_id] = {'total_due': 0, 'enrollment_ids': [], 'due_day': enroll_data.get('due_day', 15)}
+                student_billings[student_id] = {
+                    'total_due': 0, 
+                    'enrollment_ids': [], 
+                    'due_day': enroll_data.get('due_day', 15)
+                }
 
             fee = enroll_data.get('base_monthly_fee', 0)
             discount = enroll_data.get('discount_amount', 0)
