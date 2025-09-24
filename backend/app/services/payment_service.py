@@ -35,11 +35,18 @@ class PaymentService:
 
             payment = self.get_payment_for_student(student.id, year, month)
             
-            due_day = student.enrollments[0].due_day if student.enrollments else 10
+            # --- LÓGICA DE VENCIMENTO ATUALIZADA ---
+            # Coleta o dia de vencimento de todas as matrículas do aluno.
+            due_days = [
+                enrollment.due_day 
+                for enrollment in student.enrollments 
+                if hasattr(enrollment, 'due_day') and enrollment.due_day is not None
+            ]
+            # Usa o menor dia (o mais cedo no mês) ou um padrão.
+            effective_due_day = min(due_days) if due_days else 10
             
-            # --- CORREÇÃO: Garante que o dia de vencimento é válido para o mês (ex: dia 31 em Setembro) ---
             last_day_of_month = calendar.monthrange(year, month)[1]
-            actual_due_day = min(due_day, last_day_of_month)
+            actual_due_day = min(effective_due_day, last_day_of_month)
             due_date = date(year, month, actual_due_day)
             
             status = 'pending'
@@ -59,7 +66,7 @@ class PaymentService:
                 'monthly_fee': monthly_total,
                 'status': status,
                 'payment_id': payment.id if payment else None,
-                'due_day': due_day
+                'due_day': effective_due_day
             })
 
         student_statuses.sort(key=lambda x: x['name'])

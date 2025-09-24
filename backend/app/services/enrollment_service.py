@@ -5,7 +5,6 @@ from app.models.enrollment import Enrollment
 class EnrollmentService:
     def __init__(self, db, user_service=None, training_class_service=None):
         self.db = db
-        # Padronizando o nome da variável da coleção
         self.collection = self.db.collection('enrollments')
         self.user_service = user_service
         self.training_class_service = training_class_service
@@ -18,7 +17,6 @@ class EnrollmentService:
         if not student_id or not class_id:
             raise ValueError("ID do aluno e da turma são obrigatórios.")
 
-        # Validação para impedir matrículas duplicadas
         existing_enrollment_query = self.collection.where(
             filter=firestore.And(
                 [
@@ -35,6 +33,12 @@ class EnrollmentService:
             class_name = training_class.name if training_class else "desconhecida"
             raise ValueError(f"O aluno '{student_name}' já está matriculado na turma '{class_name}'.")
 
+        # --- LÓGICA DE VENCIMENTO ATUALIZADA ---
+        due_day = data.get('due_day')
+        if due_day is None:
+            training_class = self.training_class_service.get_class_by_id(class_id)
+            due_day = training_class.default_due_day if training_class and hasattr(training_class, 'default_due_day') else 10
+        
         enrollment_data = {
             'student_id': student_id,
             'class_id': class_id,
@@ -43,7 +47,7 @@ class EnrollmentService:
             'base_monthly_fee': data.get('base_monthly_fee', 0),
             'discount_amount': data.get('discount_amount', 0),
             'discount_reason': data.get('discount_reason', ''),
-            'due_day': data.get('due_day', 10),
+            'due_day': int(due_day),
             'created_at': datetime.now(),
             'updated_at': datetime.now()
         }

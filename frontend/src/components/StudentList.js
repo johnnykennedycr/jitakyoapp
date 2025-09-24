@@ -2,7 +2,7 @@ import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO (sem alterações) ---
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -45,32 +45,37 @@ async function openStudentForm(studentId = null) {
             <div id="current-enrollments-container" class="space-y-2">
                 ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
                     <div class="p-2 border rounded flex justify-between items-center">
-                        <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0})</span>
+                        <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0}, Venc: dia ${e.due_day || 'N/A'})</span>
                         <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
                     </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
             </div>
             <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
-            <div class="flex gap-2 items-center">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
                 <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
-                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-32">
-                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar</button>
-            </div>` : `
+                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
+                <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md">
+            </div>
+            <div class="text-right mt-2">
+                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar Matrícula</button>
+            </div>
+            ` : `
             <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
             <div class="space-y-2">
                 ${allClasses.map(c => `
                     <div class="p-2 border rounded">
                         <label class="flex items-center"><input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
                             <span>${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
-                        <div class="enrollment-details hidden mt-2 pl-6 space-y-2">
+                        <div class="enrollment-details hidden mt-2 pl-6 grid grid-cols-1 md:grid-cols-2 gap-2">
                             <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
-                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full">
+                            <input type="number" name="due_day" placeholder="Dia do Vencimento (padrão: ${c.default_due_day || 10})" min="1" max="31" class="p-2 border rounded-md w-full">
+                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full md:col-span-2">
                         </div></div>`).join('')}</div>`;
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
                 ${passwordFieldHtml}
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
                     <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
@@ -85,8 +90,8 @@ async function openStudentForm(studentId = null) {
 async function handleDeleteClick(studentId, studentName) {
     showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
          <div class="text-right mt-6">
-             <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-             <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+              <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+              <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
 export async function renderStudentList(targetElement) {
@@ -130,7 +135,7 @@ export async function renderStudentList(targetElement) {
                                         ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                         ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
+                                        ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div class="flex items-center justify-end space-x-2">
@@ -166,7 +171,7 @@ export async function renderStudentList(targetElement) {
         if (action === 'edit') openStudentForm(studentId);
         if (action === 'delete') handleDeleteClick(studentId, studentName);
     };
- 
+
     const modalBody = document.getElementById('modal-body');
 
     const handleFormSubmit = async (e) => {
@@ -211,6 +216,7 @@ export async function renderStudentList(targetElement) {
                         base_monthly_fee: checkbox.dataset.fee,
                         discount_amount: detailsDiv.querySelector('[name="discount_amount"]').value || 0,
                         discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
+                        due_day: detailsDiv.querySelector('[name="due_day"]').value || null, // Adicionado
                     });
                 });
                 const payload = { user_data: userData, enrollments_data: enrollmentsData };
@@ -263,7 +269,8 @@ export async function renderStudentList(targetElement) {
             const body = isAdding ? {
                 student_id: studentId,
                 class_id: document.querySelector('[name="new_class_id"]').value,
-                discount_amount: document.querySelector('[name="new_discount"]').value
+                discount_amount: document.querySelector('[name="new_discount"]').value,
+                due_day: document.querySelector('[name="new_due_day"]').value || null, // Adicionado
             } : null;
             if (isAdding && !body.class_id) {
                 showModal('Atenção', '<p>Selecione uma turma para matricular.</p>');

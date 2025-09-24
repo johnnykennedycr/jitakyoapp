@@ -13,15 +13,12 @@ class TrainingClassService:
         """Busca todas as turmas e enriquece com o nome do professor."""
         classes = []
         try:
-            # Etapa 1: Busca todos os professores e cria um mapa para consulta eficiente.
             all_teachers = self.teacher_service.get_all_teachers()
             teacher_map = {teacher.id: teacher.name for teacher in all_teachers}
             
-            # Etapa 2: Busca todas as turmas.
             docs = self.collection.stream()
             for doc in docs:
                 class_obj = TrainingClass.from_dict(doc.to_dict(), doc.id)
-                # Etapa 3: Enriquece o objeto da turma com o nome do professor.
                 class_obj.teacher_name = teacher_map.get(class_obj.teacher_id, 'N/A')
                 classes.append(class_obj)
         except Exception as e:
@@ -35,7 +32,6 @@ class TrainingClassService:
             if doc.exists:
                 class_obj = TrainingClass.from_dict(doc.to_dict(), class_id)
                 if class_obj.teacher_id:
-                    # Busca o professor específico para obter o nome.
                     teacher = self.teacher_service.get_teacher_by_id(class_obj.teacher_id)
                     class_obj.teacher_name = teacher.name if teacher else 'N/A'
                 else:
@@ -58,6 +54,7 @@ class TrainingClassService:
                 'capacity': data.get('capacity'),
                 'description': data.get('description'),
                 'default_monthly_fee': data.get('default_monthly_fee'),
+                'default_due_day': data.get('default_due_day', 10), # Adicionado
                 'schedule': schedule_objects,
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP
@@ -86,7 +83,6 @@ class TrainingClassService:
     def delete_class(self, class_id):
         """Deleta uma turma pelo seu ID."""
         try:
-            # Adicional: verificar e deletar matrículas associadas antes de deletar a turma.
             self.collection.document(class_id).delete()
             return True
         except Exception as e:
