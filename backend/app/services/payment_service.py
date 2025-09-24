@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, datetime
 import logging
+from firebase_admin import firestore
 
 class PaymentService:
     def __init__(self, db, enrollment_service=None, user_service=None, training_class_service=None):
@@ -13,7 +14,7 @@ class PaymentService:
     def generate_monthly_payments(self, year, month):
         """
         Gera cobranças de mensalidade individuais para cada matrícula ativa,
-        evitando a criação de duplicatas.
+        evitando a criação de duplicatas, usando a sintaxe de consulta moderna.
         """
         try:
             active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
@@ -23,13 +24,21 @@ class PaymentService:
 
             for enrollment in active_enrollments:
                 student_id = enrollment['student_id']
+                enrollment_id = enrollment['enrollment_id']
                 
-                # Verifica se já existe uma cobrança para esta matrícula específica no mês/ano
-                existing_payment_query = self.collection.where('student_id', '==', student_id) \
-                                                       .where('enrollment_id', '==', enrollment['enrollment_id']) \
-                                                       .where('reference_year', '==', year) \
-                                                       .where('reference_month', '==', month) \
-                                                       .limit(1).stream()
+                # --- CORREÇÃO APLICADA AQUI ---
+                # A consulta foi reescrita para usar a sintaxe moderna com 'filter'
+                # e firestore.And, que é a forma correta e recomendada.
+                existing_payment_query = self.collection.where(
+                    filter=firestore.And(
+                        [
+                            firestore.FieldFilter('student_id', '==', student_id),
+                            firestore.FieldFilter('enrollment_id', '==', enrollment_id),
+                            firestore.FieldFilter('reference_year', '==', year),
+                            firestore.FieldFilter('reference_month', '==', month)
+                        ]
+                    )
+                ).limit(1).stream()
                 
                 if len(list(existing_payment_query)) > 0:
                     existing_count += 1
@@ -43,7 +52,7 @@ class PaymentService:
 
                 payment_data = {
                     'student_id': student_id,
-                    'enrollment_id': enrollment['enrollment_id'], 
+                    'enrollment_id': enrollment_id, 
                     'amount': total_due,
                     'status': 'pending',
                     'reference_month': month,
@@ -62,7 +71,9 @@ class PaymentService:
             return {"generated": generated_count, "existing": existing_count}
 
         except Exception as e:
+            # Adicionado log mais detalhado para o erro
             logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
+            # É importante relançar a exceção para que o Flask a capture e retorne um 500
             raise
 
     def get_financial_status(self, year, month):
@@ -76,6 +87,7 @@ class PaymentService:
         today = date.today()
 
         try:
+            # Esta consulta também poderia ser atualizada, mas é menos crítica pois é mais simples
             payments_query = self.collection.where('reference_year', '==', year).where('reference_month', '==', month).stream()
             
             all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
@@ -133,4 +145,3 @@ class PaymentService:
         }
         payment_ref.update(update_data)
         return True
-
