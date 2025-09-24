@@ -54,7 +54,7 @@ class TrainingClassService:
                 'capacity': data.get('capacity'),
                 'description': data.get('description'),
                 'default_monthly_fee': data.get('default_monthly_fee'),
-                'default_due_day': data.get('default_due_day', 10), # Adicionado
+                'default_due_day': data.get('default_due_day', 15), # Alterado para 15
                 'schedule': schedule_objects,
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP

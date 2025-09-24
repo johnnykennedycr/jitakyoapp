@@ -21,7 +21,7 @@ class PaymentService:
         today = date.today()
         
         for student in students:
-            if not student.enrollments:
+            if not hasattr(student, 'enrollments') or not student.enrollments:
                 continue
 
             monthly_total = 0
@@ -35,15 +35,16 @@ class PaymentService:
 
             payment = self.get_payment_for_student(student.id, year, month)
             
-            # --- LÓGICA DE VENCIMENTO ATUALIZADA ---
-            # Coleta o dia de vencimento de todas as matrículas do aluno.
-            due_days = [
-                enrollment.due_day 
-                for enrollment in student.enrollments 
-                if hasattr(enrollment, 'due_day') and enrollment.due_day is not None
-            ]
-            # Usa o menor dia (o mais cedo no mês) ou um padrão.
-            effective_due_day = min(due_days) if due_days else 10
+            # --- LÓGICA DE VENCIMENTO AINDA MAIS ROBUSTA ---
+            due_days = []
+            for enrollment in student.enrollments:
+                if hasattr(enrollment, 'due_day') and enrollment.due_day is not None:
+                    try:
+                        due_days.append(int(enrollment.due_day))
+                    except (ValueError, TypeError):
+                        pass # Ignora dias de vencimento inválidos
+
+            effective_due_day = min(due_days) if due_days else 15
             
             last_day_of_month = calendar.monthrange(year, month)[1]
             actual_due_day = min(effective_due_day, last_day_of_month)

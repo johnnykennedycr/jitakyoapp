@@ -52,8 +52,8 @@ async function openClassForm(classId = null) {
                     <div><label class="block text-sm font-medium">Mensalidade Padrão (R$)</label>
                         <input type="number" step="0.01" name="default_monthly_fee" value="${trainingClass?.default_monthly_fee || ''}" class="p-2 border rounded-md w-full" required>
                     </div>
-                    <div><label class="block text-sm font-medium">Dia do Vencimento Padrão</label>
-                        <input type="number" name="default_due_day" value="${trainingClass?.default_due_day || 10}" min="1" max="31" class="p-2 border rounded-md w-full" required>
+                    <div><label class="block text-sm font-medium">Vencimento Padrão (Dia)</label>
+                        <input type="number" name="default_due_day" value="${trainingClass?.default_due_day || 15}" min="1" max="31" class="p-2 border rounded-md w-full" required>
                     </div>
                 </div>
                 <hr class="my-4"><div class="flex justify-between items-center mb-2">
@@ -313,6 +313,8 @@ export async function renderClassList(targetElement) {
                             <div class="space-y-2 text-sm text-gray-700 flex-grow">
                                 <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
                                 <p><strong>Capacidade:</strong> ${c.capacity}</p>
+                                <p><strong>Mensalidade:</strong> R$ ${c.default_monthly_fee || 'N/A'}</p>
+                                <p><strong>Venc. Padrão:</strong> Dia ${c.default_due_day || 'N/A'}</p>
                                 <div><strong>Horários:</strong><div class="pl-2">
                                     ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
                                         <div>${s.day_of_week}: ${s.start_time} - ${s.end_time}</div>`).join('') : 'Nenhum'}
@@ -451,7 +453,6 @@ export async function renderClassList(targetElement) {
                 teacher_id: form.elements.teacher_id.value,
                 capacity: parseInt(form.elements.capacity.value),
                 default_monthly_fee: parseFloat(form.elements.default_monthly_fee.value),
-                // --- ADICIONADO ---
                 default_due_day: parseInt(form.elements.default_due_day.value),
                 schedule: schedule,
             };
