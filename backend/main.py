@@ -38,36 +38,28 @@ def create_app():
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
-    # É crucial importar todos os serviços antes de começar a instanciá-los.
+    from app.services.enrollment_service import EnrollmentService
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
     from app.services.training_class_service import TrainingClassService
-    from app.services.enrollment_service import EnrollmentService
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
-
-    # --- Ordem de Instanciação de Serviços ---
-    # A ordem é crítica para resolver as dependências corretamente e evitar erros de inicialização.
     
     # Nível 0: Serviços sem dependências de outros serviços.
     user_service = UserService(db, mail=mail)
+    teacher_service = TeacherService(db, user_service=user_service)
+    training_class_service = TrainingClassService(db, teacher_service=teacher_service)
     
     # Nível 1: Serviços que dependem do Nível 0.
-    teacher_service = TeacherService(db, user_service=user_service)
-
-    # Nível 2: Serviços que dependem do Nível 1.
-    training_class_service = TrainingClassService(db, teacher_service=teacher_service)
-
-    # Nível 3: Serviços que dependem dos níveis anteriores.
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
-
-    # Nível 4: Serviços que dependem de todos os outros.
-    attendance_service = AttendanceService(db, user_service=user_service, enrollment_service=enrollment_service, training_class_service=training_class_service)
-    payment_service = PaymentService(db, enrollment_service=enrollment_service, user_service=user_service)
-
-    # Nível Final: Seta dependências que poderiam ser circulares (se houver).
-    user_service.set_enrollment_service(enrollment_service)
     
+    # Nível 2: Serviços que dependem de níveis anteriores.
+    attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
+    payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
+
+    # Resolução de dependência circular
+    user_service.set_enrollment_service(enrollment_service)
+
     # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
