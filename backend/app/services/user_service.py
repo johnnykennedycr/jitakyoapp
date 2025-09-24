@@ -1,30 +1,21 @@
-from datetime import datetime
+from datetime import datetime, date
 from firebase_admin import firestore, auth
+from flask_mail import Message
 from app.models.user import User
 import string
 import secrets
-from flask_mail import Message
 
 class UserService:
     def __init__(self, db, mail=None):
-        """Inicializa o serviço com dependências diretas."""
         self.db = db
         self.mail = mail
-        self.enrollment_service = None  # Será definido depois para evitar dependência circular
         self.users_collection = self.db.collection('users')
+        self.enrollment_service = None 
 
     def set_enrollment_service(self, enrollment_service):
-        """
-        Define o serviço de matrícula após a inicialização.
-        Este método é crucial para resolver a dependência circular com EnrollmentService.
-        """
         self.enrollment_service = enrollment_service
 
     def create_user_with_enrollments(self, user_data, enrollments_data):
-        """
-        Cria um novo usuário e suas matrículas.
-        Gera uma senha aleatória e envia por e-mail.
-        """
         email = user_data.get('email')
         if not email:
             raise ValueError("O e-mail é obrigatório.")
@@ -33,7 +24,7 @@ class UserService:
             auth.get_user_by_email(email)
             raise ValueError(f"O e-mail {email} já está em uso.")
         except auth.UserNotFoundError:
-            pass  # O e-mail está disponível.
+            pass
 
         alphabet = string.ascii_letters + string.digits
         password = ''.join(secrets.choice(alphabet) for i in range(10))
@@ -70,7 +61,7 @@ class UserService:
                     msg = Message("Bem-vindo ao JitaKyoApp!", recipients=[email])
                     msg.body = f"Olá {user_data.get('name')},\n\nSua conta foi criada com sucesso.\nSua senha temporária é: {password}\n\nRecomendamos que você a altere no seu primeiro acesso."
                     self.mail.send(msg)
-                    print(f"INFO: E-mail de boas-vindas para {email} enviado.")
+                    print(f"INFO: E-mail de boas-vindas para {email} enviado com sucesso.")
                 except Exception as e:
                     print(f"AVISO: Usuário {email} criado, mas o e-mail de boas-vindas falhou: {e}")
 
@@ -81,7 +72,6 @@ class UserService:
             raise e
 
     def update_user(self, user_id, update_data):
-        """Atualiza os dados de um usuário."""
         try:
             if 'password' in update_data and update_data['password']:
                 password = update_data.pop('password')
@@ -101,42 +91,29 @@ class UserService:
             return False
 
     def delete_user(self, user_id):
-        """Deleta um usuário, suas matrículas e do Firebase Auth."""
         try:
-            # Tenta deletar do Firebase Auth primeiro
             try:
                 auth.delete_user(user_id)
             except auth.UserNotFoundError:
-                print(f"AVISO: Usuário {user_id} não encontrado no Firebase Auth, mas a limpeza continuará.")
-            
-            # Deleta as matrículas associadas
+                print(f"AVISO: Usuário com UID {user_id} não encontrado no Firebase Auth. Prosseguindo com a limpeza do Firestore.")
+                pass
+
             if self.enrollment_service:
                 self.enrollment_service.delete_enrollments_by_student_id(user_id)
-            
-            # Deleta o registro do usuário do Firestore
+                print(f"Matrículas do aluno {user_id} deletadas com sucesso.")
+
             self.users_collection.document(user_id).delete()
             
             print(f"Usuário com UID {user_id} e seus dados foram deletados com sucesso.")
             return True
         except Exception as e:
-            print(f"Erro ao deletar usuário {user_id}: {e}")
+            print(f"Erro inesperado ao deletar usuário {user_id}: {e}")
             raise e
 
-    def get_user_by_id(self, user_id, enrich_with_enrollments=False):
-        """Busca um usuário por ID, opcionalmente enriquecendo com suas matrículas."""
+    def get_user_by_id(self, user_id):
         try:
             doc = self.users_collection.document(user_id).get()
-            if not doc.exists:
-                return None
-            
-            user = User.from_dict(doc.to_dict(), doc.id)
-            
-            if enrich_with_enrollments and self.enrollment_service:
-                user.enrollments = self.enrollment_service.get_enrollments_by_student_id(user.id)
-            else:
-                user.enrollments = [] # Garante que o atributo sempre exista
-
-            return user
+            return User.from_dict(doc.to_dict(), doc.id) if doc.exists else None
         except Exception as e:
             print(f"Erro ao buscar usuário por ID '{user_id}': {e}")
             return None
@@ -152,32 +129,44 @@ class UserService:
         return users
         
     def get_students_with_enrollments(self):
-        """
-        Busca todos os usuários com a role 'student' e enriquece cada objeto
-        com a lista de suas matrículas ativas.
-        """
-        students = []
-        try:
-            student_docs = self.users_collection.where('role', '==', 'student').stream()
-            for doc in student_docs:
-                student = User.from_dict(doc.to_dict(), doc.id)
-                
-                if self.enrollment_service:
-                    student.enrollments = self.enrollment_service.get_enrollments_by_student_id(student.id)
-                else:
-                    student.enrollments = []
-                    
-                students.append(student)
-        except Exception as e:
-            print(f"Erro ao buscar alunos com matrículas: {e}")
+        """Busca todos os alunos e enriquece cada um com suas matrículas."""
+        students = self.get_users_by_role('student')
+        if not self.enrollment_service:
+            print("AVISO: EnrollmentService não está disponível para buscar matrículas.")
+            return students
+
+        for student in students:
+            student.enrollments = self.enrollment_service.get_enrollments_by_student_id(student.id)
         return students
 
-    def get_available_users_for_promotion(self):
-        """Retorna usuários que ainda não são professores."""
-        # Esta é uma abordagem simples. Para performance em larga escala,
-        # seria melhor buscar todos os user_ids da coleção de professores e
-        # usar um filtro 'not-in' na query de usuários.
-        all_users = self.get_users_by_role('student') # Simplificação: considera apenas alunos
-        return all_users
+    def search_students_by_name(self, search_term):
+        """Busca alunos por nome de forma otimizada no Firestore."""
+        students = []
+        try:
+            if not search_term:
+                return []
+            
+            # Firestore não suporta busca "case-insensitive" ou "starts-with" de forma nativa e eficiente
+            # sem um campo auxiliar. A abordagem mais simples para um número moderado de usuários
+            # é buscar todos e filtrar na aplicação, mas para escalar, precisaríamos de um campo
+            # 'name_lowercase' no Firestore ou usar um serviço de busca como Algolia.
+            # Por agora, manteremos o filtro na aplicação, mas com uma consulta mais restrita.
+            
+            search_term_lower = search_term.lower()
+            
+            # Esta consulta é um truque para filtrar "starts-with"
+            query = self.users_collection.where('role', '==', 'student').order_by('name').start_at([search_term]).end_at([search_term + '\uf8ff'])
+            
+            docs = query.stream()
+            
+            for doc in docs:
+                students.append(User.from_dict(doc.to_dict(), doc.id))
+        except Exception as e:
+            print(f"Erro ao buscar alunos por nome: {e}")
+            # Fallback para o método antigo em caso de erro de índice
+            all_students = self.get_users_by_role('student')
+            search_term_lower = search_term.lower()
+            students = [s for s in all_students if s.name and s.name.lower().startswith(search_term_lower)]
 
+        return students
 
