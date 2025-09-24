@@ -26,7 +26,6 @@ class PaymentService:
                 student_id = enrollment['student_id']
                 enrollment_id = enrollment['enrollment_id']
                 
-                # --- CORREÇÃO APLICADA AQUI ---
                 # A consulta foi reescrita para usar a sintaxe moderna com 'filter'
                 # e firestore.And, que é a forma correta e recomendada.
                 existing_payment_query = self.collection.where(
@@ -34,8 +33,9 @@ class PaymentService:
                         [
                             firestore.FieldFilter('student_id', '==', student_id),
                             firestore.FieldFilter('enrollment_id', '==', enrollment_id),
-                            firestore.FieldFilter('reference_year', '==', year),
-                            firestore.FieldFilter('reference_month', '==', month)
+                            # --- CORREÇÃO APLICADA AQUI: Garantindo que ano e mês são inteiros ---
+                            firestore.FieldFilter('reference_year', '==', int(year)),
+                            firestore.FieldFilter('reference_month', '==', int(month))
                         ]
                     )
                 ).limit(1).stream()
@@ -55,11 +55,11 @@ class PaymentService:
                     'enrollment_id': enrollment_id, 
                     'amount': total_due,
                     'status': 'pending',
-                    'reference_month': month,
-                    'reference_year': year,
+                    'reference_month': int(month),
+                    'reference_year': int(year),
                     'due_day': int(enrollment.get('due_day', 15)),
-                    'type': 'Mensalidade', # Campo 'type' adicionado
-                    'class_name': enrollment.get('class_name', 'N/A'), # Campo 'class_name' adicionado
+                    'type': 'Mensalidade',
+                    'class_name': enrollment.get('class_name', 'N/A'),
                     'payment_date': None,
                     'payment_method': None,
                     'created_at': datetime.now(),
@@ -71,9 +71,7 @@ class PaymentService:
             return {"generated": generated_count, "existing": existing_count}
 
         except Exception as e:
-            # Adicionado log mais detalhado para o erro
             logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
-            # É importante relançar a exceção para que o Flask a capture e retorne um 500
             raise
 
     def get_financial_status(self, year, month):
@@ -87,8 +85,13 @@ class PaymentService:
         today = date.today()
 
         try:
-            # Esta consulta também poderia ser atualizada, mas é menos crítica pois é mais simples
-            payments_query = self.collection.where('reference_year', '==', year).where('reference_month', '==', month).stream()
+            # --- CORREÇÃO APLICADA AQUI: Consulta atualizada para a sintaxe moderna ---
+            payments_query = self.collection.where(filter=firestore.And(
+                [
+                    firestore.FieldFilter('reference_year', '==', int(year)),
+                    firestore.FieldFilter('reference_month', '==', int(month))
+                ]
+            )).stream()
             
             all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
 
@@ -104,9 +107,9 @@ class PaymentService:
                     summary['total_paid'] += amount
                     paid_payments.append(payment)
                 else:
-                    _, last_day = calendar.monthrange(year, month)
+                    _, last_day = calendar.monthrange(int(year), int(month))
                     due_day = min(int(payment.get('due_day', 15)), last_day)
-                    due_date = date(year, month, due_day)
+                    due_date = date(int(year), int(month), due_day)
                     payment['due_date_formatted'] = due_date.strftime('%d/%m/%Y')
 
                     if due_date < today and payment.get('status') != 'paid':
@@ -145,3 +148,4 @@ class PaymentService:
         }
         payment_ref.update(update_data)
         return True
+
