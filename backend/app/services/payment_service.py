@@ -1,7 +1,6 @@
-from datetime import datetime, date
-from firebase_admin import firestore
-from app.models.payment import Payment
 import calendar
+from datetime import date, datetime
+import logging
 
 class PaymentService:
     def __init__(self, db, enrollment_service=None, user_service=None, training_class_service=None):
@@ -11,140 +10,142 @@ class PaymentService:
         self.user_service = user_service
         self.training_class_service = training_class_service
 
+    def generate_monthly_payments(self, year, month):
+        """
+        Gera as cobranças de mensalidade para todos os alunos com matrículas ativas
+        para um determinado mês e ano, evitando duplicatas.
+        """
+        try:
+            active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
+            
+            # Agrupa matrículas por aluno para consolidar a cobrança
+            student_enrollments = {}
+            for enr in active_enrollments:
+                student_id = enr['student_id']
+                if student_id not in student_enrollments:
+                    student_enrollments[student_id] = []
+                student_enrollments[student_id].append(enr)
+
+            generated_count = 0
+            existing_count = 0
+
+            for student_id, enrollments in student_enrollments.items():
+                # Verifica se já existe uma cobrança de mensalidade para este aluno no mês/ano
+                existing_payment_query = self.collection.where('student_id', '==', student_id) \
+                                                       .where('reference_year', '==', year) \
+                                                       .where('reference_month', '==', month) \
+                                                       .where('description', '==', f"Mensalidade {month:02d}/{year}") \
+                                                       .limit(1).stream()
+                
+                if len(list(existing_payment_query)) > 0:
+                    existing_count += 1
+                    continue
+
+                # Calcula o valor total devido e o vencimento
+                total_due = sum(float(enr.get('base_monthly_fee', 0)) - float(enr.get('discount_amount', 0)) for enr in enrollments)
+                due_day = min(int(enr.get('due_day', 15)) for enr in enrollments)
+
+                payment_data = {
+                    'student_id': student_id,
+                    'amount': total_due,
+                    'status': 'pending',
+                    'reference_month': month,
+                    'reference_year': year,
+                    'due_day': due_day,
+                    'description': f"Mensalidade {month:02d}/{year}",
+                    'payment_date': None,
+                    'payment_method': None,
+                    'created_at': datetime.now(),
+                    'updated_at': datetime.now()
+                }
+                self.collection.add(payment_data)
+                generated_count += 1
+
+            return {"generated": generated_count, "existing": existing_count}
+
+        except Exception as e:
+            logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
+            raise
+
     def get_financial_status(self, year, month):
         """
-        Calcula o status financeiro para um determinado mês e ano usando uma lógica mais direta
-        e robusta, começando pelas matrículas ativas.
+        Retorna um status financeiro detalhado para um mês/ano, separado por
+        pagamentos realizados e pendentes.
         """
-        summary = {"total_paid": 0, "total_pending": 0, "total_overdue": 0}
-        student_financial_status = {}
-        
-        # O EnrollmentService agora faz o trabalho pesado de buscar e enriquecer os dados.
-        enrollments_list = self.enrollment_service.get_all_active_enrollments_with_details()
+        summary = {'total_paid': 0, 'total_pending': 0, 'total_overdue': 0}
+        paid_payments = []
+        pending_payments = []
+        today = date.today()
 
-        # CORREÇÃO: Organiza as matrículas em um mapa para consulta rápida
-        student_enrollments_map = {}
-        for enroll_data in enrollments_list:
-            student_id = enroll_data['student_id']
-            if student_id not in student_enrollments_map:
-                student_enrollments_map[student_id] = []
-            student_enrollments_map[student_id].append(enroll_data)
-
-            # Inicializa o status do aluno se ainda não existir
-            if student_id not in student_financial_status:
-                student_financial_status[student_id] = {
-                    "id": student_id,
-                    "name": enroll_data.get('student_name', 'Nome não encontrado'),
-                    "total_due": 0,
-                    "status": "pending" 
-                }
+        try:
+            # 1. Busca todos os pagamentos do mês de referência
+            payments_query = self.collection.where('reference_year', '==', year).where('reference_month', '==', month).stream()
             
-            # Calcula o valor devido para esta matrícula específica
-            fee = enroll_data.get('base_monthly_fee', 0)
-            discount = enroll_data.get('discount_amount', 0)
-            student_financial_status[student_id]['total_due'] += max(0, fee - discount)
-
-        # Busca os pagamentos já realizados para o mês
-        payments = self.collection.where('reference_year', '==', year).where('reference_month', '==', month).stream()
-        for payment in payments:
-            payment_data = payment.to_dict()
-            student_id = payment_data.get('student_id')
+            all_payments = [p.to_dict() for p in payments_query]
             
-            if student_id in student_financial_status:
-                amount = payment_data.get('amount', 0)
-                summary['total_paid'] += amount
-                student_financial_status[student_id]['status'] = 'paid'
-        
-        # Determina o status (pendente ou atrasado) para quem ainda não pagou
-        today = datetime.now().date()
-        for student_id, status_info in student_financial_status.items():
-            if status_info['status'] != 'paid':
-                # CORREÇÃO: Busca o dia de vencimento a partir do mapa de matrículas
-                student_enrolls = student_enrollments_map.get(student_id, [])
-                due_days = [e.get('due_day', 15) for e in student_enrolls]
-                due_day = min(due_days) if due_days else 15
-                
-                _, last_day_of_month = calendar.monthrange(year, month)
-                safe_due_day = min(due_day, last_day_of_month)
-                due_date = date(year, month, safe_due_day)
+            # Otimização: Busca todos os alunos e turmas de uma vez
+            all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
+            all_classes = {c['id']: c['name'] for c in self.training_class_service.get_all_classes()}
 
-                if today > due_date:
-                    status_info['status'] = 'overdue'
-                    summary['total_overdue'] += status_info['total_due']
+            for payment in all_payments:
+                student_name = all_students.get(payment.get('student_id'), "Aluno Desconhecido")
+                payment['student_name'] = student_name
+
+                # Para pagamentos de mensalidade, busca o nome da turma da matrícula associada
+                if payment.get('enrollment_id'):
+                     # Esta parte pode ser otimizada se necessário
+                    enrollment_doc = self.enrollment_service.collection.document(payment['enrollment_id']).get()
+                    if enrollment_doc.exists:
+                        class_id = enrollment_doc.to_dict().get('class_id')
+                        payment['class_name'] = all_classes.get(class_id, "Turma Desconhecida")
                 else:
-                    status_info['status'] = 'pending'
-                    summary['total_pending'] += status_info['total_due']
-        
-        return {
-            "summary": summary,
-            "students": list(student_financial_status.values())
-        }
+                    payment['class_name'] = "N/A" # Para pagamentos avulsos
+                
+                amount = float(payment.get('amount', 0))
+
+                if payment.get('status') == 'paid':
+                    summary['total_paid'] += amount
+                    paid_payments.append(payment)
+                else:
+                    _, last_day = calendar.monthrange(year, month)
+                    due_day = min(int(payment.get('due_day', 15)), last_day)
+                    due_date = date(year, month, due_day)
+                    payment['due_date_formatted'] = due_date.strftime('%d/%m/%Y')
+
+                    if due_date < today:
+                        summary['total_overdue'] += amount
+                        payment['status'] = 'overdue'
+                    else:
+                        summary['total_pending'] += amount
+                        payment['status'] = 'pending'
+                    
+                    pending_payments.append(payment)
+
+            return {
+                "summary": summary,
+                "paid_payments": paid_payments,
+                "pending_payments": pending_payments
+            }
+        except Exception as e:
+            logging.error(f"Erro ao obter status financeiro para {month}/{year}: {e}", exc_info=True)
+            raise
 
     def record_payment(self, data):
-        """Registra um novo pagamento no Firestore, incluindo a forma de pagamento."""
-        try:
-            # Garante que os campos de referência sejam números
-            data['reference_year'] = int(data.get('reference_year'))
-            data['reference_month'] = int(data.get('reference_month'))
-            
-            # Adiciona os novos campos de forma de pagamento
-            data['payment_method'] = data.get('payment_method')
-            data['payment_method_details'] = data.get('payment_method_details', '') # Detalhes para 'Outros'
-            
-            data['created_at'] = firestore.SERVER_TIMESTAMP
-            data['updated_at'] = firestore.SERVER_TIMESTAMP
-            
-            self.collection.add(data)
-            return True
-        except Exception as e:
-            print(f"Erro ao registrar pagamento: {e}")
-            return False
+        """Registra um pagamento para uma cobrança existente."""
+        payment_id = data.get('payment_id') # Assumimos que o frontend enviará o ID do documento de pagamento
+        if not payment_id:
+            raise ValueError("ID do pagamento é obrigatório.")
 
-    def generate_monthly_payments(self, year, month):
-        """Gera cobranças para matrículas ativas que ainda não têm pagamento no mês."""
-        generated_count = 0
-        skipped_count = 0
+        payment_ref = self.collection.document(payment_id)
         
-        enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
-
-        student_billings = {}
-        for enroll_data in enrollments:
-            student_id = enroll_data['student_id']
-            if student_id not in student_billings:
-                student_billings[student_id] = {
-                    'total_due': 0, 
-                    'enrollment_ids': [], 
-                    'due_day': enroll_data.get('due_day', 15)
-                }
-
-            fee = enroll_data.get('base_monthly_fee', 0)
-            discount = enroll_data.get('discount_amount', 0)
-            student_billings[student_id]['total_due'] += max(0, fee - discount)
-            student_billings[student_id]['enrollment_ids'].append(enroll_data['enrollment_id'])
-
-        for student_id, billing_info in student_billings.items():
-            existing_payment_query = self.collection.where('student_id', '==', student_id).where('reference_year', '==', year).where('reference_month', '==', month).limit(1).stream()
-            
-            if len(list(existing_payment_query)) == 0:
-                _, last_day_of_month = calendar.monthrange(year, month)
-                safe_due_day = min(billing_info['due_day'], last_day_of_month)
-                
-                payment_doc = {
-                    "student_id": student_id,
-                    "amount": billing_info['total_due'],
-                    "status": "pending",
-                    "reference_year": year,
-                    "reference_month": month,
-                    "due_date": datetime(year, month, safe_due_day),
-                    "description": f"Mensalidade de {datetime(year, month, 1).strftime('%B/%Y')}",
-                    "created_at": firestore.SERVER_TIMESTAMP,
-                    "updated_at": firestore.SERVER_TIMESTAMP,
-                    "enrollment_ids": billing_info['enrollment_ids']
-                }
-                self.collection.add(payment_doc)
-                generated_count += 1
-            else:
-                skipped_count += 1
-                
-        return {"generated": generated_count, "skipped": skipped_count}
+        update_data = {
+            'status': 'paid',
+            'amount': float(data.get('amount')),
+            'payment_date': datetime.strptime(data.get('payment_date'), '%Y-%m-%d'),
+            'payment_method': data.get('payment_method'),
+            'payment_method_details': data.get('payment_method_details', ''),
+            'updated_at': datetime.now()
+        }
+        payment_ref.update(update_data)
+        return True
 
