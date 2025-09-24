@@ -81,10 +81,16 @@ class PaymentService:
         }
 
     def record_payment(self, data):
-        """Registra um novo pagamento no Firestore."""
+        """Registra um novo pagamento no Firestore, incluindo a forma de pagamento."""
         try:
-            data['reference_year'] = int(data['reference_year'])
-            data['reference_month'] = int(data['reference_month'])
+            # Garante que os campos de referência sejam números
+            data['reference_year'] = int(data.get('reference_year'))
+            data['reference_month'] = int(data.get('reference_month'))
+            
+            # Adiciona os novos campos de forma de pagamento
+            data['payment_method'] = data.get('payment_method')
+            data['payment_method_details'] = data.get('payment_method_details', '') # Detalhes para 'Outros'
+            
             data['created_at'] = firestore.SERVER_TIMESTAMP
             data['updated_at'] = firestore.SERVER_TIMESTAMP
             

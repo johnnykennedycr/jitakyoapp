@@ -20,14 +20,34 @@ function openRegisterPaymentModal(student, month, year, onSave) {
     const modalHtml = `
         <form id="register-payment-form" data-student-id="${student.id}">
             <p class="mb-4">Registrando pagamento para <strong>${student.name}</strong> referente a <strong>${month}/${year}</strong>.</p>
-            <div class="mb-4">
-                <label class="block text-sm font-medium">Valor Pago (R$)</label>
-                <input type="number" step="0.01" name="amount" value="${student.total_due}" class="p-2 border rounded-md w-full" required>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium">Valor Pago (R$)</label>
+                    <input type="number" step="0.01" name="amount" value="${student.total_due.toFixed(2)}" class="p-2 border rounded-md w-full" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Data do Pagamento</label>
+                    <input type="date" name="payment_date" value="${today}" class="p-2 border rounded-md w-full" required>
+                </div>
             </div>
+
             <div class="mb-4">
-                <label class="block text-sm font-medium">Data do Pagamento</label>
-                <input type="date" name="payment_date" value="${today}" class="p-2 border rounded-md w-full" required>
+                <label class="block text-sm font-medium">Forma de Pagamento</label>
+                <select name="payment_method" class="p-2 border rounded-md w-full">
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Cartão de Débito">Cartão de Débito</option>
+                    <option value="Outros">Outros</option>
+                </select>
             </div>
+            
+            <div id="payment-details-container" class="mb-4 hidden">
+                 <label class="block text-sm font-medium">Detalhes</label>
+                 <input type="text" name="payment_method_details" placeholder="Especifique a forma de pagamento" class="p-2 border rounded-md w-full">
+            </div>
+
             <div class="text-right mt-6">
                 <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Confirmar Pagamento</button>
             </div>
@@ -36,7 +56,14 @@ function openRegisterPaymentModal(student, month, year, onSave) {
     showModal('Registrar Pagamento', modalHtml);
 
     const form = document.getElementById('register-payment-form');
-    form.addEventListener('submit', async (e) => {
+    const paymentMethodSelect = form.querySelector('[name="payment_method"]');
+    const detailsContainer = form.querySelector('#payment-details-container');
+
+    paymentMethodSelect.addEventListener('change', () => {
+        detailsContainer.classList.toggle('hidden', paymentMethodSelect.value !== 'Outros');
+    });
+
+    const formSubmitHandler = async (e) => {
         e.preventDefault();
         const submitButton = form.querySelector('button[type="submit"]');
         submitButton.disabled = true;
@@ -47,7 +74,9 @@ function openRegisterPaymentModal(student, month, year, onSave) {
             amount: parseFloat(form.elements.amount.value),
             payment_date: form.elements.payment_date.value,
             reference_month: month,
-            reference_year: year
+            reference_year: year,
+            payment_method: form.elements.payment_method.value,
+            payment_method_details: form.elements.payment_method_details.value
         };
 
         try {
@@ -57,13 +86,15 @@ function openRegisterPaymentModal(student, month, year, onSave) {
             });
             if (!response.ok) throw await response.json();
             hideModal();
-            onSave(); // Chama a função para recarregar a tabela
+            onSave(); 
         } catch (error) {
-            alert(`Erro: ${error.error || 'Falha ao registrar pagamento.'}`);
             submitButton.disabled = false;
             submitButton.textContent = 'Confirmar Pagamento';
+            showModal('Erro', `<p>${error.error || 'Falha ao registrar pagamento.'}</p>`);
         }
-    });
+    };
+    
+    form.addEventListener('submit', formSubmitHandler);
 }
 
 export function renderFinancialDashboard(targetElement) {
@@ -72,10 +103,10 @@ export function renderFinancialDashboard(targetElement) {
     let currentMonth = today.getMonth() + 1;
 
     const mainHtml = `
-        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
             <h1 class="text-3xl font-bold text-white">Gestão Financeira</h1>
             <div class="flex items-center gap-4">
-                 <div class="flex items-center gap-2 bg-white p-2 rounded-md shadow">
+                <div class="flex items-center gap-2 bg-white p-2 rounded-md shadow">
                     <label for="month-filter" class="text-sm font-medium">Mês:</label>
                     <select id="month-filter" class="p-1 border rounded-md">
                         ${Array.from({ length: 12 }, (_, i) => `
@@ -92,7 +123,7 @@ export function renderFinancialDashboard(targetElement) {
                         `).join('')}
                     </select>
                 </div>
-                <button id="generate-billings-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+                <button id="generate-billings-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 shadow">
                     Gerar Cobranças
                 </button>
             </div>
@@ -121,32 +152,32 @@ export function renderFinancialDashboard(targetElement) {
             const response = await fetchWithAuth(`/api/admin/financial/status?year=${year}&month=${month}`);
             
             if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.error || 'Falha ao carregar dados financeiros.');
+                 const errorData = await response.json().catch(() => ({ error: 'Falha ao carregar dados financeiros.' }));
+                 throw new Error(errorData.error);
             }
             
             const data = await response.json();
-
-            // Renderiza o resumo
-            if (data && data.summary) {
-                summaryContainer.innerHTML = `
-                    <div class="bg-green-100 p-4 rounded-lg shadow">
-                        <h3 class="text-sm font-medium text-green-800">Total Arrecadado</h3>
-                        <p class="text-2xl font-bold text-green-900">R$ ${data.summary.total_paid.toFixed(2)}</p>
-                    </div>
-                    <div class="bg-yellow-100 p-4 rounded-lg shadow">
-                        <h3 class="text-sm font-medium text-yellow-800">Pendente</h3>
-                        <p class="text-2xl font-bold text-yellow-900">R$ ${data.summary.total_pending.toFixed(2)}</p>
-                    </div>
-                    <div class="bg-red-100 p-4 rounded-lg shadow">
-                        <h3 class="text-sm font-medium text-red-800">Em Atraso</h3>
-                        <p class="text-2xl font-bold text-red-900">R$ ${data.summary.total_overdue.toFixed(2)}</p>
-                    </div>
-                `;
+            
+            if (!data || !data.summary) {
+                throw new Error("Resposta da API inválida.");
             }
 
-            // Renderiza a tabela
-            if (!data || !data.students || data.students.length === 0) {
+            summaryContainer.innerHTML = `
+                <div class="bg-green-100 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-medium text-green-800">Total Arrecadado</h3>
+                    <p class="text-2xl font-bold text-green-900">R$ ${data.summary.total_paid.toFixed(2)}</p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-medium text-yellow-800">Pendente</h3>
+                    <p class="text-2xl font-bold text-yellow-900">R$ ${data.summary.total_pending.toFixed(2)}</p>
+                </div>
+                <div class="bg-red-100 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-medium text-red-800">Em Atraso</h3>
+                    <p class="text-2xl font-bold text-red-900">R$ ${data.summary.total_overdue.toFixed(2)}</p>
+                </div>
+            `;
+
+            if (data.students.length === 0) {
                 tableContainer.innerHTML = '<p>Nenhum aluno ativo encontrado para este período.</p>';
                 return;
             }
@@ -194,7 +225,7 @@ export function renderFinancialDashboard(targetElement) {
 
         } catch (error) {
             console.error("Erro no painel financeiro:", error);
-            summaryContainer.innerHTML = `<div class="col-span-3 bg-red-100 p-4 rounded-lg text-red-800">${error.message}</div>`;
+            summaryContainer.innerHTML = `<div class="col-span-3 bg-red-100 text-red-800 p-4 rounded-lg shadow"><p>${error.message}</p></div>`;
             tableContainer.innerHTML = `<p class="text-red-500">Não foi possível carregar os detalhes.</p>`;
         } finally {
             hideLoading();
@@ -203,21 +234,21 @@ export function renderFinancialDashboard(targetElement) {
 
     const handleGenerateBillings = async () => {
         showLoading();
-        const year = yearFilter.value;
-        const month = monthFilter.value;
         try {
+            const year = yearFilter.value;
+            const month = monthFilter.value;
             const response = await fetchWithAuth('/api/admin/financial/generate-billings', {
                 method: 'POST',
                 body: JSON.stringify({ year: parseInt(year), month: parseInt(month) })
             });
             const result = await response.json();
-            if (!response.ok) throw result;
-            
-            showModal('Sucesso', `<p>${result.message}</p>`);
-            await fetchAndRenderData(); // Recarrega os dados após gerar as cobranças
-
+            if (!response.ok) {
+                 throw new Error(result.error || "Falha ao gerar cobranças.");
+            }
+            showModal('Sucesso', `<p>${result.generated} cobranças geradas. ${result.skipped} já existiam.</p>`);
+            await fetchAndRenderData();
         } catch (error) {
-            showModal('Erro', `<p>${error.error || 'Falha ao gerar cobranças.'}</p>`);
+            showModal('Erro', `<p>${error.message}</p>`);
         } finally {
             hideLoading();
         }
