@@ -23,10 +23,8 @@ class PaymentService:
             if not student.enrollments:
                 continue
 
-            # --- CORREÇÃO: Cálculo robusto da mensalidade ---
             monthly_total = 0
             for enrollment in student.enrollments:
-                # Garante que os valores sejam numéricos e padrão para 0 se ausentes ou nulos.
                 base_fee = float(getattr(enrollment, 'base_monthly_fee', 0) or 0)
                 discount = float(getattr(enrollment, 'discount_amount', 0) or 0)
                 monthly_total += (base_fee - discount)
@@ -42,7 +40,9 @@ class PaymentService:
             status = 'pending'
             if payment:
                 status = 'paid'
-                summary['paid'] += payment.amount
+                # --- CORREÇÃO: Garante que o valor do pagamento é um número antes de somar ---
+                payment_amount = float(getattr(payment, 'amount', 0) or 0)
+                summary['paid'] += payment_amount
             elif today > due_date:
                 status = 'overdue'
                 summary['overdue'] += monthly_total
