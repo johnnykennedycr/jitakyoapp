@@ -10,28 +10,31 @@ class TrainingClassService:
         self.collection = self.db.collection('classes')
 
     def get_all_classes(self):
-        """Busca todas as turmas e enriquece com o nome do professor e vencimento padrão."""
-        classes = []
+        """
+        Busca todas as turmas e retorna uma lista de dicionários prontos para a API,
+        já enriquecidos com o nome do professor e o vencimento padrão.
+        """
+        classes_data = []
         try:
             all_teachers = self.teacher_service.get_all_teachers()
             teacher_map = {teacher.id: teacher.name for teacher in all_teachers}
             
             docs = self.collection.stream()
             for doc in docs:
-                class_data = doc.to_dict()
-                class_obj = TrainingClass.from_dict(class_data, doc.id)
+                class_dict = doc.to_dict()
+                class_dict['id'] = doc.id
                 
                 # Enriquece com o nome do professor
-                class_obj.teacher_name = teacher_map.get(class_obj.teacher_id, 'N/A')
+                class_dict['teacher_name'] = teacher_map.get(class_dict.get('teacher_id'), 'N/A')
                 
                 # Garante que o vencimento padrão exista para compatibilidade com dados antigos
-                if 'default_due_day' not in class_data:
-                    class_obj.default_due_day = 15  # Padrão do sistema
+                if 'default_due_day' not in class_dict or not class_dict['default_due_day']:
+                    class_dict['default_due_day'] = 15
                 
-                classes.append(class_obj)
+                classes_data.append(class_dict)
         except Exception as e:
             print(f"Erro ao buscar todas as turmas: {e}")
-        return classes
+        return classes_data
 
     def get_class_by_id(self, class_id):
         """Busca uma turma específica e enriquece com dados."""
@@ -49,7 +52,7 @@ class TrainingClassService:
                     class_obj.teacher_name = 'N/A'
                 
                 # Garante que o vencimento padrão exista
-                if 'default_due_day' not in class_data:
+                if 'default_due_day' not in class_data or not class_data['default_due_day']:
                     class_obj.default_due_day = 15
 
                 return class_obj
@@ -67,9 +70,9 @@ class TrainingClassService:
                 'name': data.get('name'),
                 'discipline': data.get('discipline'),
                 'teacher_id': data.get('teacher_id'),
-                'capacity': data.get('capacity'),
+                'capacity': int(data.get('capacity', 0)),
                 'description': data.get('description'),
-                'default_monthly_fee': data.get('default_monthly_fee'),
+                'default_monthly_fee': float(data.get('default_monthly_fee', 0)),
                 'default_due_day': int(data.get('default_due_day', 15)),
                 'schedule': schedule_objects,
                 'created_at': firestore.SERVER_TIMESTAMP,
@@ -78,7 +81,11 @@ class TrainingClassService:
             
             doc_ref = self.collection.document()
             doc_ref.set(class_data)
-            return self.get_class_by_id(doc_ref.id)
+            
+            # Após criar, buscamos novamente para retornar o objeto completo e enriquecido
+            created_class_obj = self.get_class_by_id(doc_ref.id)
+            return created_class_obj.to_dict()
+            
         except Exception as e:
             print(f"Erro ao criar turma: {e}")
             raise e

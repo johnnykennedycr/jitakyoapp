@@ -313,7 +313,7 @@ export async function renderClassList(targetElement) {
                             <div class="space-y-2 text-sm text-gray-700 flex-grow">
                                 <p><strong>Professor:</strong> ${c.teacher_name || 'N/A'}</p>
                                 <p><strong>Capacidade:</strong> ${c.capacity}</p>
-                                <p><strong>Mensalidade:</strong> R$ ${c.default_monthly_fee || 'N/A'}</p>
+                                <p><strong>Mensalidade:</strong> R$ ${c.default_monthly_fee != null ? c.default_monthly_fee.toFixed(2) : 'N/A'}</p>
                                 <p><strong>Venc. Padrão:</strong> Dia ${c.default_due_day || 'N/A'}</p>
                                 <div><strong>Horários:</strong><div class="pl-2">
                                     ${(c.schedule && c.schedule.length > 0) ? c.schedule.map(s => `
