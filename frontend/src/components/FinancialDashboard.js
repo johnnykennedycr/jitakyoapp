@@ -17,9 +17,10 @@ function getStatusBadge(status) {
 
 function openRegisterPaymentModal(payment, onSave) {
     const today = new Date().toISOString().split('T')[0];
+    // --- CORREÇÃO APLICADA AQUI: Usando 'type' em vez de 'description' no título do modal ---
     const modalHtml = `
         <form id="register-payment-form" data-payment-id="${payment.id}">
-            <p class="mb-4">Registrando pagamento para <strong>${payment.student_name}</strong> referente a ${payment.description}.</p>
+            <p class="mb-4">Registrando pagamento para <strong>${payment.student_name}</strong> referente a ${payment.type}.</p>
             <div class="mb-4">
                 <label class="block text-sm font-medium">Valor Pago (R$)</label>
                 <input type="number" step="0.01" name="amount" value="${payment.amount}" class="p-2 border rounded-md w-full" required>
@@ -182,7 +183,7 @@ export function renderFinancialDashboard(targetElement) {
                         <td class="p-3 border-b">${p.student_name}</td>
                         <td class="p-3 border-b">${p.class_name}</td>
                         <td class="p-3 border-b text-center">R$ ${p.amount.toFixed(2)}</td>
-                        <td class="p-3 border-b text-center">${p.description}</td>
+                        <td class="p-3 border-b text-center">${p.type}</td>
                          <td class="p-3 border-b text-center">${p.payment_method}</td>
                         <td class="p-3 border-b text-center">-</td>
                     </tr>
@@ -215,7 +216,7 @@ export function renderFinancialDashboard(targetElement) {
                         <td class="p-3 border-b">${p.student_name}</td>
                         <td class="p-3 border-b">${p.class_name}</td>
                         <td class="p-3 border-b text-center">R$ ${p.amount.toFixed(2)}</td>
-                        <td class="p-3 border-b text-center">${p.description}</td>
+                        <td class="p-3 border-b text-center">${p.type}</td>
                         <td class="p-3 border-b text-center">${p.due_date_formatted}</td>
                         <td class="p-3 border-b text-center">${getStatusBadge(p.status)}</td>
                         <td class="p-3 border-b text-center">
@@ -245,14 +246,14 @@ export function renderFinancialDashboard(targetElement) {
                 `;
                  // Re-associa listeners para os botões de registrar pagamento
                  pendingTableContainer.querySelectorAll('button[data-action="register-payment"]').forEach(button => {
-                    button.addEventListener('click', () => {
-                        const paymentId = button.dataset.paymentId;
-                        const payment = data.pending_payments.find(p => p.id === paymentId);
-                        if (payment) {
-                            openRegisterPaymentModal(payment, fetchAndRenderData);
-                        }
-                    });
-                });
+                     button.addEventListener('click', () => {
+                         const paymentId = button.dataset.paymentId;
+                         const payment = data.pending_payments.find(p => p.id === paymentId);
+                         if (payment) {
+                             openRegisterPaymentModal(payment, fetchAndRenderData);
+                         }
+                     });
+                 });
             }
 
         } catch (error) {
@@ -277,12 +278,13 @@ export function renderFinancialDashboard(targetElement) {
             const month = monthFilter.value;
             const response = await fetchWithAuth('/api/admin/financial/generate-billings', {
                 method: 'POST',
-                body: JSON.stringify({ year, month })
+                body: JSON.stringify({ year: parseInt(year), month: parseInt(month) })
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Falha ao gerar cobranças');
             
-            showModal('Sucesso', `<p>${result.generated} cobranças geradas. ${result.existing} já existiam.</p>`);
+            // --- CORREÇÃO APLICADA AQUI: Acessando 'details.generated' e 'details.skipped' ---
+            showModal('Sucesso', `<p>${result.details.generated} cobranças geradas. ${result.details.skipped} já existiam.</p>`);
             fetchAndRenderData();
         } catch (error) {
             showModal('Erro', `<p>${error.message}</p>`);
@@ -301,4 +303,3 @@ export function renderFinancialDashboard(targetElement) {
         yearFilter.removeEventListener('change', fetchAndRenderData);
     };
 }
-
