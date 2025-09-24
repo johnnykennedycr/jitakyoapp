@@ -2,6 +2,27 @@ from datetime import datetime
 from firebase_admin import firestore
 from app.models.enrollment import Enrollment
 
+def _clean_enrollment_data(data):
+    """Função auxiliar para limpar e garantir a tipagem dos dados de uma matrícula."""
+    try:
+        # Garante que os campos numéricos sejam de fato números, tratando strings e Nones.
+        for field in ['base_monthly_fee', 'discount_amount', 'due_day']:
+            if field in data:
+                try:
+                    # Tenta converter para float/int, se falhar, usa um padrão seguro.
+                    if data[field] is not None:
+                        data[field] = int(float(data[field])) if field == 'due_day' else float(data[field])
+                    else:
+                        # Se o campo for None, atribui um padrão
+                        data[field] = 15 if field == 'due_day' else 0.0
+                except (ValueError, TypeError):
+                    # Se a conversão falhar (ex: texto "abc"), usa um padrão seguro.
+                    data[field] = 15 if field == 'due_day' else 0.0
+    except Exception as e:
+        print(f"Erro ao limpar dados da matrícula: {e}")
+    return data
+
+
 class EnrollmentService:
     def __init__(self, db, user_service=None, training_class_service=None):
         self.db = db
@@ -48,8 +69,8 @@ class EnrollmentService:
             'class_id': class_id,
             'enrollment_date': datetime.now(),
             'status': 'active',
-            'base_monthly_fee': data.get('base_monthly_fee', 0),
-            'discount_amount': data.get('discount_amount', 0),
+            'base_monthly_fee': float(data.get('base_monthly_fee', 0) or 0),
+            'discount_amount': float(data.get('discount_amount', 0) or 0),
             'discount_reason': data.get('discount_reason', ''),
             'due_day': due_day,
             'created_at': datetime.now(),
@@ -62,23 +83,25 @@ class EnrollmentService:
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
 
     def get_all_active_enrollments(self):
-        """Busca todas as matrículas com status 'active'."""
+        """Busca todas as matrículas com status 'active' e limpa os dados."""
         enrollments = []
         try:
             docs = self.collection.where('status', '==', 'active').stream()
             for doc in docs:
-                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+                cleaned_data = _clean_enrollment_data(doc.to_dict())
+                enrollments.append(Enrollment.from_dict(cleaned_data, doc.id))
         except Exception as e:
             print(f"Erro ao buscar todas as matrículas ativas: {e}")
         return enrollments
 
     def get_enrollments_by_student_id(self, student_id):
-        """Busca todas as matrículas de um aluno específico."""
+        """Busca todas as matrículas de um aluno específico e limpa os dados."""
         enrollments = []
         try:
             docs = self.collection.where('student_id', '==', student_id).stream()
             for doc in docs:
-                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+                cleaned_data = _clean_enrollment_data(doc.to_dict())
+                enrollments.append(Enrollment.from_dict(cleaned_data, doc.id))
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
         return enrollments
@@ -116,12 +139,13 @@ class EnrollmentService:
             return False
 
     def get_enrollments_by_class_id(self, class_id):
-        """Busca todas as matrículas ativas para uma turma específica."""
+        """Busca todas as matrículas ativas para uma turma específica e limpa os dados."""
         enrollments = []
         try:
             docs = self.collection.where('class_id', '==', class_id).where('status', '==', 'active').stream()
             for doc in docs:
-                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+                cleaned_data = _clean_enrollment_data(doc.to_dict())
+                enrollments.append(Enrollment.from_dict(cleaned_data, doc.id))
         except Exception as e:
             print(f"Erro ao buscar matrículas por ID da turma '{class_id}': {e}")
         return enrollments
