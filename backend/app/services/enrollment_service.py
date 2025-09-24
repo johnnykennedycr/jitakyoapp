@@ -89,7 +89,10 @@ class EnrollmentService:
             
             for enrollment_doc in active_enrollments:
                 enrollment_data = enrollment_doc.to_dict()
-                enrollment_data['id'] = enrollment_doc.id
+                
+                # --- CORREÇÃO APLICADA AQUI ---
+                # A chave agora é 'enrollment_id' para corresponder ao que o payment_service espera.
+                enrollment_data['enrollment_id'] = enrollment_doc.id
                 
                 student_info = all_students.get(enrollment_data['student_id'])
                 class_info = all_classes.get(enrollment_data['class_id'])
@@ -132,4 +135,3 @@ class EnrollmentService:
         except Exception as e:
             print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             raise e
-
