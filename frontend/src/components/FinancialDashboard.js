@@ -257,7 +257,6 @@ export function renderFinancialDashboard(targetElement) {
 
         } catch (error) {
             console.error("Erro no painel financeiro:", error);
-            const errorMessage = `<strong>Erro ${error.status || '500'}:</strong><br>${error.message || 'Não foi possível carregar os detalhes.'}`;
             const errorHtml = `
                 <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                     <strong class="font-bold">Erro!</strong>
@@ -300,7 +299,6 @@ export function renderFinancialDashboard(targetElement) {
     return () => {
         monthFilter.removeEventListener('change', fetchAndRenderData);
         yearFilter.removeEventListener('change', fetchAndRenderData);
-        // Não é preciso remover o listener do botão de gerar cobranças pois ele é recriado
     };
 }
 
