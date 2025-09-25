@@ -114,8 +114,8 @@ export function renderFinancialDashboard(targetElement) {
                     </select>
                 </div>
                  <button id="generate-billings-btn" class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700">Gerar Cobranças</button>
-                 <!-- NOVO BOTÃO PARA POPULAR ALUNOS -->
-                 <button id="populate-students-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">Popular Alunos (20)</button>
+                 
+                 
             </div>
         </div>
         <div id="financial-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>

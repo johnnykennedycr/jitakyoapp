@@ -29,7 +29,6 @@ class EnrollmentService:
         if len(list(existing_enrollment_query)) > 0:
             raise ValueError("O aluno já está matriculado nesta turma.")
 
-        # Busca o vencimento padrão da turma como fallback
         training_class_dict = self.training_class_service.get_class_by_id_as_dict(class_id)
         default_due_day = training_class_dict.get('default_due_day', 15) if training_class_dict else 15
 
@@ -55,7 +54,7 @@ class EnrollmentService:
         """Busca todas as matrículas de um aluno específico."""
         enrollments = []
         try:
-            docs = self.collection.where('student_id', '==', student_id).stream()
+            docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
             for doc in docs:
                 enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
@@ -66,7 +65,10 @@ class EnrollmentService:
         """Retorna uma lista de IDs de alunos matriculados em uma turma."""
         student_ids = []
         try:
-            docs = self.collection.where('class_id', '==', class_id).where('status', '==', 'active').stream()
+            docs = self.collection.where(filter=firestore.And([
+                firestore.FieldFilter('class_id', '==', class_id),
+                firestore.FieldFilter('status', '==', 'active')
+            ])).stream()
             for doc in docs:
                 student_ids.append(doc.to_dict().get('student_id'))
         except Exception as e:
@@ -76,37 +78,35 @@ class EnrollmentService:
     def get_all_active_enrollments_with_details(self):
         """
         Busca todas as matrículas ativas e as enriquece com detalhes do aluno e da turma.
-        Esta versão é otimizada para minimizar as consultas ao banco de dados.
+        Esta versão é otimizada para minimizar as consultas ao banco de dados e usa o valor
+        atual da mensalidade da turma.
         """
         enrollments_details = []
         try:
-            # 1. Busca todos os alunos e turmas de uma vez para criar mapas de consulta eficientes.
             all_students = {s.id: s for s in self.user_service.get_users_by_role('student')}
             all_classes = {c['id']: c for c in self.training_class_service.get_all_classes()}
             
-            # 2. Busca todas as matrículas ativas
-            active_enrollments = self.collection.where('status', '==', 'active').stream()
+            active_enrollments = self.collection.where(filter=firestore.FieldFilter('status', '==', 'active')).stream()
             
             for enrollment_doc in active_enrollments:
                 enrollment_data = enrollment_doc.to_dict()
-                
-                # --- CORREÇÃO APLICADA AQUI ---
-                # A chave agora é 'enrollment_id' para corresponder ao que o payment_service espera.
                 enrollment_data['enrollment_id'] = enrollment_doc.id
                 
                 student_info = all_students.get(enrollment_data['student_id'])
                 class_info = all_classes.get(enrollment_data['class_id'])
 
-                # Pula matrículas órfãs (apontando para aluno/turma que não existe mais)
                 if not student_info or not class_info:
                     continue
                 
-                # Enriquece o dicionário com os detalhes necessários
                 enrollment_data['student_name'] = student_info.name
                 enrollment_data['class_name'] = class_info.get('name')
                 
-                # Garante que a mensalidade e o vencimento venham da turma como fallback
-                enrollment_data.setdefault('base_monthly_fee', class_info.get('default_monthly_fee', 0))
+                # --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
+                # Sobrescreve a mensalidade da matrícula com o valor ATUAL da turma.
+                # Isso garante que as cobranças usem sempre o preço mais recente.
+                enrollment_data['base_monthly_fee'] = class_info.get('default_monthly_fee', 0)
+                
+                # Mantém o dia de vencimento da matrícula, mas usa o da turma como fallback.
                 enrollment_data.setdefault('due_day', class_info.get('default_due_day', 15))
 
                 enrollments_details.append(enrollment_data)
@@ -128,7 +128,7 @@ class EnrollmentService:
     def delete_enrollments_by_student_id(self, student_id):
         """Deleta todas as matrículas de um aluno."""
         try:
-            docs = self.collection.where('student_id', '==', student_id).stream()
+            docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
             for doc in docs:
                 doc.reference.delete()
             return True
