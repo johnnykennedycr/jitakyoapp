@@ -113,9 +113,7 @@ export function renderFinancialDashboard(targetElement) {
                         `).join('')}
                     </select>
                 </div>
-                 <button id="generate-billings-btn" class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700">Gerar Cobranças</button>
-                 
-                 
+                <button id="generate-billings-btn" class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700">Gerar Cobranças</button>
             </div>
         </div>
         <div id="financial-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
@@ -139,7 +137,6 @@ export function renderFinancialDashboard(targetElement) {
     const monthFilter = targetElement.querySelector('#month-filter');
     const yearFilter = targetElement.querySelector('#year-filter');
     const generateBillingsBtn = targetElement.querySelector('#generate-billings-btn');
-    const populateStudentsBtn = targetElement.querySelector('#populate-students-btn');
 
     const fetchAndRenderData = async () => {
         showLoading();
@@ -160,7 +157,6 @@ export function renderFinancialDashboard(targetElement) {
             
             const data = await response.json();
 
-            // Renderiza o resumo
             summaryContainer.innerHTML = `
                 <div class="bg-green-100 p-4 rounded-lg shadow">
                     <h3 class="text-sm font-medium text-green-800">Total Arrecadado</h3>
@@ -176,7 +172,6 @@ export function renderFinancialDashboard(targetElement) {
                 </div>
             `;
 
-            // Renderiza tabela de PAGOS
             if (data.paid_payments.length === 0) {
                 paidTableContainer.innerHTML = '<p>Nenhum pagamento registrado para este período.</p>';
             } else {
@@ -209,7 +204,6 @@ export function renderFinancialDashboard(targetElement) {
                 `;
             }
 
-            // Renderiza tabela de PENDENTES
              if (data.pending_payments.length === 0) {
                 pendingTableContainer.innerHTML = '<p>Nenhuma cobrança pendente para este período.</p>';
             } else {
@@ -246,7 +240,6 @@ export function renderFinancialDashboard(targetElement) {
                         </table>
                     </div>
                 `;
-                 // Re-associa listeners para os botões de registrar pagamento
                  pendingTableContainer.querySelectorAll('button[data-action="register-payment"]').forEach(button => {
                      button.addEventListener('click', () => {
                          const paymentId = button.dataset.paymentId;
@@ -257,7 +250,6 @@ export function renderFinancialDashboard(targetElement) {
                      });
                  });
             }
-
         } catch (error) {
             console.error("Erro no painel financeiro:", error);
             const errorHtml = `
@@ -273,7 +265,7 @@ export function renderFinancialDashboard(targetElement) {
         }
     };
     
-    generateBillingsBtn.addEventListener('click', async () => {
+    const handleGenerateBillingsClick = async () => {
         showLoading();
         try {
             const year = yearFilter.value;
@@ -292,85 +284,18 @@ export function renderFinancialDashboard(targetElement) {
         } finally {
             hideLoading();
         }
-    });
-
-    // --- LÓGICA CORRIGIDA: CRIAÇÃO SEQUENCIAL DE ALUNOS ---
-    const handlePopulateStudents = async () => {
-        showLoading();
-        let successCount = 0;
-        let failedCount = 0;
-
-        try {
-            const firstNames = ["Ana", "Bruno", "Carlos", "Daniela", "Eduardo", "Fernanda", "Gabriel", "Helena", "Igor", "Juliana", "Lucas", "Mariana", "Nicolas", "Olivia", "Pedro", "Quintino", "Rafaela", "Sergio", "Tatiana", "Victor"];
-            const lastNames = ["Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Pereira", "Lima", "Gomes", "Costa", "Ribeiro", "Martins", "Carvalho", "Almeida"];
-            
-            // Loop sequencial para evitar sobrecarregar o servidor
-            for (let i = 0; i < 20; i++) {
-                const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-                const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-                const fullName = `${firstName} ${lastName}`;
-                const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${Math.floor(Math.random() * 1000)}@jitakyotest.com`;
-                const phone = '119' + Math.floor(10000000 + Math.random() * 90000000).toString();
-                
-                const year = 1980 + Math.floor(Math.random() * 25); // Nascidos entre 1980 e 2004
-                const month = 1 + Math.floor(Math.random() * 12);
-                const day = 1 + Math.floor(Math.random() * 28);
-                const birthDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-                const payload = {
-                    name: fullName,
-                    email: email,
-                    password: 'senha123',
-                    phone: phone,
-                    birth_date: birthDate,
-                    role: 'student',
-                    status: 'active'
-                };
-                
-                try {
-                    const response = await fetchWithAuth('/api/admin/users', {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        successCount++;
-                    } else {
-                        failedCount++;
-                        console.error(`Falha ao criar aluno ${i + 1}:`, await response.json());
-                    }
-                } catch (networkError) {
-                    failedCount++;
-                    console.error(`Erro de rede ao criar aluno ${i + 1}:`, networkError);
-                }
-            }
-
-            if (failedCount > 0) {
-                showModal('Concluído com Erros', `<p>${successCount} alunos foram criados com sucesso. ${failedCount} falharam. Verifique o console para mais detalhes.</p>`);
-            } else {
-                showModal('Sucesso', '<p>20 alunos fictícios foram criados com sucesso! Você pode precisar recarregar a página de Alunos para vê-los.</p>');
-            }
-
-        } catch (error) {
-            showModal('Erro Inesperado', `<p>Ocorreu um erro durante o processo: ${error.message}</p>`);
-        } finally {
-            hideLoading();
-        }
     };
-    
-    populateStudentsBtn.addEventListener('click', handlePopulateStudents);
 
+    generateBillingsBtn.addEventListener('click', handleGenerateBillingsClick);
     monthFilter.addEventListener('change', fetchAndRenderData);
     yearFilter.addEventListener('change', fetchAndRenderData);
 
     fetchAndRenderData();
 
-    // Função de limpeza
     return () => {
         monthFilter.removeEventListener('change', fetchAndRenderData);
         yearFilter.removeEventListener('change', fetchAndRenderData);
-        generateBillingsBtn.removeEventListener('click', async () => {});
-        populateStudentsBtn.removeEventListener('click', handlePopulateStudents);
+        generateBillingsBtn.removeEventListener('click', handleGenerateBillingsClick);
     };
 }
 
