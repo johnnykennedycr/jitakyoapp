@@ -508,6 +508,22 @@ def generate_monthly_billings():
         logging.error(f"Erro ao gerar cobranças: {e}", exc_info=True)
         return jsonify(error=f"Erro ao gerar cobranças: {e}"), 500
 
+# --- NOVA ROTA PARA FATURAS AVULSAS ---
+@admin_api_bp.route('/financial/generate-misc-invoice', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def generate_misc_invoice():
+    """Gera faturas avulsas para múltiplos alunos."""
+    try:
+        data = request.get_json()
+        created_count = payment_service.create_misc_invoices(data)
+        return jsonify(success=True, message=f"{created_count} faturas avulsas geradas com sucesso."), 201
+    except ValueError as ve:
+        return jsonify(error=str(ve)), 400
+    except Exception as e:
+        logging.error(f"Erro ao gerar faturas avulsas: {e}", exc_info=True)
+        return jsonify(error=f"Erro ao gerar faturas avulsas: {e}"), 500
+
 @admin_api_bp.route('/payments', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
@@ -675,3 +691,4 @@ def update_branding_settings():
     except Exception as e:
         print(f"Erro ao salvar configurações: {e}")
         return jsonify(error=str(e)), 500
+

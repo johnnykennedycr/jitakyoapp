@@ -74,6 +74,43 @@ class PaymentService:
             logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
             raise
 
+    def create_misc_invoices(self, data):
+        """Cria faturas avulsas para uma lista de alunos."""
+        student_ids = data.get('student_ids', [])
+        invoice_type = data.get('type')
+        amount = float(data.get('amount', 0))
+        due_date_str = data.get('due_date')
+
+        if not all([student_ids, invoice_type, amount > 0, due_date_str]):
+            raise ValueError("Dados insuficientes para criar faturas avulsas.")
+
+        due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
+        reference_year = due_date.year
+        reference_month = due_date.month
+        due_day = due_date.day
+        
+        created_count = 0
+        for student_id in student_ids:
+            payment_data = {
+                'student_id': student_id,
+                'enrollment_id': None,  # Fatura avulsa não tem matrícula
+                'amount': amount,
+                'status': 'pending',
+                'reference_month': reference_month,
+                'reference_year': reference_year,
+                'due_day': due_day,
+                'type': invoice_type,
+                'class_name': 'N/A', # Fatura avulsa não tem turma
+                'payment_date': None,
+                'payment_method': None,
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
+            }
+            self.collection.add(payment_data)
+            created_count += 1
+            
+        return created_count
+
     def get_financial_status(self, year, month):
         """
         Retorna um status financeiro detalhado, buscando pagamentos e enriquecendo com

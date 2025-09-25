@@ -87,6 +87,161 @@ function openRegisterPaymentModal(payment, onSave) {
     });
 }
 
+async function openMiscInvoiceModal(onSave) {
+    showLoading();
+    try {
+        const [studentsRes, classesRes] = await Promise.all([
+            fetchWithAuth('/api/admin/students/'),
+            fetchWithAuth('/api/admin/classes/')
+        ]);
+
+        if (!studentsRes.ok || !classesRes.ok) {
+            throw new Error('Falha ao carregar dados de alunos ou turmas.');
+        }
+
+        const allStudents = await studentsRes.json();
+        const allClasses = await classesRes.json();
+        hideLoading();
+
+        const modalHtml = `
+            <form id="misc-invoice-form">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium">Filtrar por Turma</label>
+                        <select name="class_filter" class="p-2 border rounded-md w-full">
+                            <option value="all">Todas as Turmas</option>
+                            ${allClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Buscar Aluno</label>
+                        <input type="text" name="student_search" placeholder="Digite o nome do aluno..." class="p-2 border rounded-md w-full">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Selecionar Alunos</label>
+                    <div id="student-list-container" class="max-h-48 overflow-y-auto border rounded p-2">
+                        <!-- Student list will be rendered here by JavaScript -->
+                    </div>
+                     <div class="mt-2">
+                        <label><input type="checkbox" id="select-all-students"> Selecionar Todos</label>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium">Tipo da Fatura</label>
+                        <input type="text" name="invoice_type" placeholder="Ex: Exame de Faixa" class="p-2 border rounded-md w-full" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Valor (R$)</label>
+                        <input type="number" step="0.01" name="invoice_amount" class="p-2 border rounded-md w-full" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Data de Vencimento</label>
+                        <input type="date" name="invoice_due_date" class="p-2 border rounded-md w-full" required>
+                    </div>
+                </div>
+                
+                <div class="text-right mt-6">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Gerar Faturas</button>
+                </div>
+            </form>
+        `;
+        showModal('Gerar Fatura Avulsa', modalHtml);
+
+        const form = document.getElementById('misc-invoice-form');
+        const classFilter = form.querySelector('[name="class_filter"]');
+        const studentSearch = form.querySelector('[name="student_search"]');
+        const studentListContainer = form.querySelector('#student-list-container');
+        const selectAllCheckbox = form.querySelector('#select-all-students');
+
+        const renderStudentList = () => {
+            const classId = classFilter.value;
+            const searchTerm = studentSearch.value.toLowerCase();
+            
+            const filteredStudents = allStudents.filter(student => {
+                const nameMatch = student.name.toLowerCase().includes(searchTerm);
+                const classMatch = classId === 'all' || student.enrollments.some(e => e.class_id === classId);
+                return nameMatch && classMatch;
+            });
+
+            if (filteredStudents.length === 0) {
+                studentListContainer.innerHTML = '<p class="text-gray-500">Nenhum aluno encontrado.</p>';
+                return;
+            }
+
+            studentListContainer.innerHTML = filteredStudents.map(student => `
+                <div class="p-1">
+                    <label><input type="checkbox" name="student_ids" value="${student.id}" class="mr-2"> ${student.name}</label>
+                </div>
+            `).join('');
+        };
+
+        classFilter.addEventListener('input', renderStudentList);
+        studentSearch.addEventListener('input', renderStudentList);
+        
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            studentListContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = isChecked;
+            });
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Gerando...';
+
+            const selectedStudentIds = Array.from(form.querySelectorAll('input[name="student_ids"]:checked')).map(cb => cb.value);
+            
+            if (selectedStudentIds.length === 0) {
+                showModal('Atenção', '<p>Selecione pelo menos um aluno.</p>');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Gerar Faturas';
+                return;
+            }
+
+            const payload = {
+                student_ids: selectedStudentIds,
+                type: form.elements.invoice_type.value,
+                amount: parseFloat(form.elements.invoice_amount.value),
+                due_date: form.elements.invoice_due_date.value,
+            };
+
+            try {
+                // NOTE: This endpoint needs to be created in the backend (e.g., in admin_routes.py)
+                const response = await fetchWithAuth('/api/admin/financial/generate-misc-invoice', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (!response.ok) throw result;
+
+                hideModal();
+                showModal('Sucesso', `<p>${result.message || 'Faturas geradas com sucesso!'}</p>`);
+                onSave();
+            } catch (error) {
+                showModal('Erro', `<p>${error.error || 'Não foi possível gerar as faturas.'}</p>`);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Gerar Faturas';
+            }
+        });
+
+        renderStudentList();
+
+    } catch (error) {
+        hideLoading();
+        showModal('Erro', `<p>${error.message}</p>`);
+    }
+}
+
+
 export function renderFinancialDashboard(targetElement) {
     const today = new Date();
     let currentYear = today.getFullYear();
@@ -113,6 +268,7 @@ export function renderFinancialDashboard(targetElement) {
                         `).join('')}
                     </select>
                 </div>
+                <button id="generate-misc-invoice-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">Fatura Avulsa</button>
                 <button id="generate-billings-btn" class="bg-green-600 text-white px-4 py-2 rounded-md shadow hover:bg-green-700">Gerar Cobranças</button>
             </div>
         </div>
@@ -137,6 +293,7 @@ export function renderFinancialDashboard(targetElement) {
     const monthFilter = targetElement.querySelector('#month-filter');
     const yearFilter = targetElement.querySelector('#year-filter');
     const generateBillingsBtn = targetElement.querySelector('#generate-billings-btn');
+    const generateMiscInvoiceBtn = targetElement.querySelector('#generate-misc-invoice-btn');
 
     const fetchAndRenderData = async () => {
         showLoading();
@@ -286,7 +443,12 @@ export function renderFinancialDashboard(targetElement) {
         }
     };
 
+    const handleGenerateMiscInvoiceClick = () => {
+        openMiscInvoiceModal(fetchAndRenderData);
+    };
+
     generateBillingsBtn.addEventListener('click', handleGenerateBillingsClick);
+    generateMiscInvoiceBtn.addEventListener('click', handleGenerateMiscInvoiceClick);
     monthFilter.addEventListener('change', fetchAndRenderData);
     yearFilter.addEventListener('change', fetchAndRenderData);
 
@@ -296,6 +458,7 @@ export function renderFinancialDashboard(targetElement) {
         monthFilter.removeEventListener('change', fetchAndRenderData);
         yearFilter.removeEventListener('change', fetchAndRenderData);
         generateBillingsBtn.removeEventListener('click', handleGenerateBillingsClick);
+        generateMiscInvoiceBtn.removeEventListener('click', handleGenerateMiscInvoiceClick);
     };
 }
 
