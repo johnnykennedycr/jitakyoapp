@@ -18,14 +18,13 @@ def create_app():
 
     # --- CORREÇÃO DE CORS ---
     # Adicione as URLs dos seus frontends aqui.
-    # É importante usar a URL exata, incluindo o "https://".
-    # A variável de ambiente é uma boa prática para produção.
     allowed_origins = [
         os.getenv('FRONTEND_ADMIN_URL', 'http://localhost:5173'), # URL do seu admin
         os.getenv('FRONTEND_ALUNO_URL', 'https://aluno-jitakyoapp.web.app'), # URL do app do aluno
         "https://jitakyoapp.web.app" # URL principal como fallback
     ]
-    CORS(app, supports_credentials=True, origins=allowed_origins)
+    # Configuração de CORS mais explícita para aplicar as regras a todas as rotas da API.
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
     
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
