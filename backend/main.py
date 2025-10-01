@@ -1,31 +1,35 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask_cors import CORS
 from flask_mail import Mail
 
+# Carrega as variáveis de ambiente no início
+load_dotenv()
+
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
     
     app = Flask(__name__)
-    load_dotenv()
     
-    # --- Configuração de Middlewares e Mail ---
+    # --- Configuração de Middlewares ---
+    # Aplica o ProxyFix para que o Flask entenda os cabeçalhos de proxy do Cloud Run
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-    # --- CORREÇÃO DE CORS ---
-    # Adicione as URLs dos seus frontends aqui.
+    # --- Configuração de CORS ---
+    # Define as origens permitidas. É crucial que estas URLs estejam corretas.
     allowed_origins = [
-        os.getenv('FRONTEND_ADMIN_URL', 'http://localhost:5173'), # URL do seu admin
-        os.getenv('FRONTEND_ALUNO_URL', 'https://aluno-jitakyoapp.web.app'), # URL do app do aluno
-        "https://jitakyoapp.web.app" # URL principal como fallback
+        "https://aluno-jitakyoapp.web.app",
+        "https://jitakyoapp.web.app", # Adicione a URL do seu painel de admin aqui
+        "http://localhost:5173", # Para desenvolvimento local
     ]
-    # Configuração de CORS mais explícita para aplicar as regras a todas as rotas da API.
+    # Inicializa o CORS para todas as rotas da API, com as origens especificadas
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
-    
+
+    # --- Configuração de Email ---
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
@@ -37,17 +41,22 @@ def create_app():
     mail = Mail(app)
 
     # --- Inicialização do Firebase ---
+    # Garante que a inicialização só ocorre uma vez
     try:
         if not firebase_admin._apps:
+            # Em produção (Cloud Run), as credenciais são detetadas automaticamente
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
-            print("Firebase Admin SDK inicializado.")
+            print("--- INFO: Firebase Admin SDK inicializado com sucesso.")
     except Exception as e:
-        print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
+        print(f"--- ERRO FATAL: Falha ao inicializar o Firebase Admin SDK: {e}")
+        # Lançar o erro pode ajudar a obter logs mais claros no Cloud Run
+        raise e
 
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
+    # Importações dentro da função para evitar problemas de contexto
     from app.services.enrollment_service import EnrollmentService
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
@@ -55,22 +64,15 @@ def create_app():
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     
-    # Nível 0: Serviços sem dependências de outros serviços.
     user_service = UserService(db, mail=mail)
     teacher_service = TeacherService(db, user_service=user_service)
     training_class_service = TrainingClassService(db, teacher_service=teacher_service)
-    
-    # Nível 1: Serviços que dependem do Nível 0.
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
-    
-    # Nível 2: Serviços que dependem de níveis anteriores.
     attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
     payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
-
-    # Resolução de dependência circular
     user_service.set_enrollment_service(enrollment_service)
 
-    # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
+    # --- IMPORTAÇÃO E REGISTO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
@@ -94,10 +96,10 @@ def create_app():
 
     return app
 
-# Cria a instância do app para que o Gunicorn possa encontrá-la.
+# A instância 'app' é criada aqui para que o Gunicorn a possa encontrar
 app = create_app()
 
-# As linhas abaixo são para execução local e não afetam o Cloud Run.
+# Este bloco só é executado em ambiente local, não no Cloud Run
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
