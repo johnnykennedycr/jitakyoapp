@@ -95,8 +95,11 @@ def create_app():
 
     return app
 
+# Cria a instância do app para que o Gunicorn possa encontrá-la.
+app = create_app()
+
 # As linhas abaixo são para execução local e não afetam o Cloud Run.
 if __name__ == '__main__':
-    app = create_app()
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
+
