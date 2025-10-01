@@ -1,24 +1,27 @@
 # Use uma imagem base oficial do Python. A versão 3.11 é moderna e estável.
 FROM python:3.11-slim
+
 # Define o diretório de trabalho dentro do contêiner
 WORKDIR /app
+
 # Define variáveis de ambiente para Python
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+
 # Copia apenas o arquivo de dependências primeiro para aproveitar o cache do Docker.
-# Se o requirements.txt não mudar, o Docker reutiliza esta camada, acelerando o build.
 COPY requirements.txt .
+
 # Instala as dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
-# Agora, copia o resto do código da sua aplicação
-# Copiamos a pasta 'app' para dentro de /app no contêiner
-COPY ./app /app/app
-# Copiamos o ponto de entrada principal
-COPY main.py .
 
-# Expõe a porta que o Gunicorn vai usar. O Cloud Run vai mapear para esta porta.
+# Copia TODO o resto do código da sua aplicação (do diretório 'backend')
+# para o diretório de trabalho (/app) no contêiner.
+# Isto é mais simples e robusto do que copiar ficheiros e pastas individualmente.
+COPY . .
+
+# Expõe a porta que o Gunicorn vai usar.
 EXPOSE 8080
-# Comando para iniciar a aplicação usando Gunicorn (servidor de produção).
-# Ele usa a variável de ambiente $PORT fornecida pelo Cloud Run.
-# As flags --workers, --threads e --timeout são recomendações do Google para performance.
+
+# Comando para iniciar a aplicação usando Gunicorn.
+# Esta linha permanece a mesma e funcionará com a nova estrutura de ficheiros.
 CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 main:app
