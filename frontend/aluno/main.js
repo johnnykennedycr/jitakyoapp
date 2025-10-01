@@ -1,11 +1,12 @@
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+console.log("main.js: Script carregado e executado.");
+
 // --- CONFIGURAÇÃO ---
 const API_BASE_URL = 'https://jitakyoapp-r7fl5wa5ea-rj.a.run.app'; 
 
 // --- VARIÁVEIS GLOBAIS ---
-// Declaramos as variáveis aqui, mas só as inicializamos depois de o DOM carregar.
 let authContainer, appContainer, loadingIndicator;
 let currentUser = null;
 let idToken = null;
@@ -41,7 +42,11 @@ function showLoading(show) {
 }
 
 function renderLoginScreen() {
-    if (!authContainer || !appContainer) return;
+    console.log("main.js: Chamando renderLoginScreen.");
+    if (!authContainer || !appContainer) {
+        console.error("main.js: Elementos 'authContainer' ou 'appContainer' não encontrados para renderizar o login.");
+        return;
+    }
 
     authContainer.innerHTML = `
         <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
@@ -90,7 +95,7 @@ async function renderAuthenticatedApp(studentProfile) {
     if (!authContainer || !appContainer) return;
 
     appContainer.innerHTML = `
-        <div class="w-full max-w-4xl mx-auto p-4 md:p-6">
+        <div class="w-full max-w-4xl mx-auto p-4 md-p-6">
             <header class="flex justify-between items-center mb-6">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-800">Olá, ${studentProfile.name.split(' ')[0]}!</h1>
@@ -197,15 +202,17 @@ async function initializeAuthenticatedState(user) {
 }
 
 // --- PONTO DE ENTRADA DA APLICAÇÃO ---
-// Espera o HTML estar completamente carregado antes de executar o código.
 document.addEventListener('DOMContentLoaded', () => {
-    // Agora que o DOM está pronto, podemos obter os elementos.
+    console.log("main.js: Evento DOMContentLoaded disparado.");
+    
     authContainer = document.getElementById('auth-container');
     appContainer = document.getElementById('app-container');
     loadingIndicator = document.getElementById('loading-indicator');
+    
+    console.log("main.js: Elementos do DOM obtidos:", { authContainer, appContainer, loadingIndicator });
 
-    // Configura o observador de estado de autenticação que inicia a aplicação.
     onAuthStateChanged(auth, (user) => {
+        console.log("main.js: onAuthStateChanged callback executado. Usuário:", user);
         if (user) {
             currentUser = user;
             initializeAuthenticatedState(user);
