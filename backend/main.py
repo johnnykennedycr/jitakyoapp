@@ -15,7 +15,18 @@ def create_app():
     
     # --- Configuração de Middlewares e Mail ---
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-    CORS(app)
+
+    # --- CORREÇÃO DE CORS ---
+    # Adicione as URLs dos seus frontends aqui.
+    # É importante usar a URL exata, incluindo o "https://".
+    # A variável de ambiente é uma boa prática para produção.
+    allowed_origins = [
+        os.getenv('FRONTEND_ADMIN_URL', 'http://localhost:5173'), # URL do seu admin
+        os.getenv('FRONTEND_ALUNO_URL', 'https://aluno-jitakyoapp.web.app'), # URL do app do aluno
+        "https://jitakyoapp.web.app" # URL principal como fallback
+    ]
+    CORS(app, supports_credentials=True, origins=allowed_origins)
+    
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
@@ -84,9 +95,8 @@ def create_app():
 
     return app
 
-app = create_app()
-
+# As linhas abaixo são para execução local e não afetam o Cloud Run.
 if __name__ == '__main__':
+    app = create_app()
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
-
