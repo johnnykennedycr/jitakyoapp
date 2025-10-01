@@ -16,15 +16,16 @@ def create_app():
     # --- Configuração de Middlewares e Mail ---
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-    # --- CORREÇÃO DE CORS ---
-    # Adicione as URLs dos seus frontends aqui.
+    # --- TESTE DE CORS ---
+    # Para depuração, estamos permitindo temporariamente TODAS as origens ('*').
+    # Se isso funcionar, o problema está na lista de URLs específicas.
+    # Se ainda falhar, o problema é um erro no servidor antes do CORS ser processado.
     allowed_origins = [
-        os.getenv('FRONTEND_ADMIN_URL', 'http://localhost:5173'), # URL do seu admin
-        os.getenv('FRONTEND_ALUNO_URL', 'https://aluno-jitakyoapp.web.app'), # URL do app do aluno
-        "https://jitakyoapp.web.app" # URL principal como fallback
+        os.getenv('FRONTEND_ADMIN_URL', 'http://localhost:5173'), 
+        os.getenv('FRONTEND_ALUNO_URL', 'https://aluno-jitakyoapp.web.app'), 
+        "https://jitakyoapp.web.app"
     ]
-    # Configuração de CORS mais explícita para aplicar as regras a todas as rotas da API.
-    CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
+    CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
     
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
