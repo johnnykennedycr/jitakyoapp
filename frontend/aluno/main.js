@@ -1,4 +1,4 @@
-import { auth } from "./firebase.js"; // Importa a configuração do Firebase
+import { auth } from "/firebase.js"; // Importa a configuração do Firebase
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
 
 // --- CONFIGURAÇÃO DA API ---
