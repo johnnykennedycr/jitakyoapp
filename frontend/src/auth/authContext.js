@@ -8,7 +8,7 @@ import { renderAdminDashboard } from "../components/AdminDashboard.js";
 import { renderTeacherList } from "../components/TeacherList.js";
 import { renderStudentList } from "../components/StudentList.js";
 import { renderClassList } from "../components/ClassList.js";
-import { renderFinancialDashboard } from "../components/FinancialDashboard.js"; // <-- ADICIONADO
+import { renderFinancialDashboard } from "../components/FinancialDashboard.js";
 
 // Variável para guardar a função de limpeza da página atual
 let currentPageCleanup = () => {};
@@ -22,6 +22,30 @@ export async function renderAuthenticatedApp(user, container) {
             throw new Error("Perfil do usuário ou 'role' não encontrado.");
         }
         
+        // --- NOVA LÓGICA DE VERIFICAÇÃO DE ROLE ---
+        const userRole = userProfile.role;
+
+        if (userRole !== 'admin' && userRole !== 'super_admin') {
+            // Se o usuário NÃO É admin ou super_admin, ele não pertence a este painel.
+            console.log(`Usuário com role '${userRole}' não tem acesso a este painel. Redirecionando...`);
+            
+            // Você pode customizar os alertas e redirecionamentos
+            if (userRole === 'student') {
+                // Removido o alert para uma melhor experiência do usuário
+                // IMPORTANTE: Use a URL correta do seu app de aluno aqui!
+                window.location.href = 'https://aluno-jitakyoapp.web.app'; 
+            } else if (userRole === 'teacher') {
+                // IMPORTANTE: Use a URL correta do seu futuro app de professor
+                window.location.href = 'https://professor-jitakyoapp.web.app'; 
+            } else {
+                // Se for uma role desconhecida, desloga por segurança.
+                alert('Você não tem permissão para acessar esta área.');
+                auth.signOut();
+            }
+            return; // Interrompe a execução para que o painel de admin não seja renderizado.
+        }
+
+        // --- O CÓDIGO ABAIXO SÓ EXECUTA SE FOR ADMIN OU SUPER_ADMIN ---
         setUserProfile(userProfile);
 
         const layoutTemplate = document.getElementById('layout-template');
@@ -33,18 +57,15 @@ export async function renderAuthenticatedApp(user, container) {
         const mainContent = document.getElementById('main-content');
         mainContent.classList.add('overflow-y-auto', 'pb-20', 'md:pb-0');
         
-        // A função de setup dos listeners da sidebar (que é persistente)
         setupEventListeners();
 
         // --- ROTEAMENTO COM LÓGICA DE LIMPEZA ---
         router.off(router.routes); // Limpa rotas antigas
 
         const navigateTo = async (renderFunction) => {
-            // 1. Executa a limpeza da página anterior
             if (typeof currentPageCleanup === 'function') {
                 currentPageCleanup();
             }
-            // 2. Renderiza a nova página e guarda sua nova função de limpeza
             currentPageCleanup = await renderFunction(mainContent);
         };
 
@@ -53,16 +74,14 @@ export async function renderAuthenticatedApp(user, container) {
             '/admin/teachers': () => navigateTo(renderTeacherList),
             '/admin/students': () => navigateTo(renderStudentList),
             '/admin/classes': () => navigateTo(renderClassList),
-            '/admin/financial': () => navigateTo(renderFinancialDashboard), // <-- ADICIONADO
+            '/admin/financial': () => navigateTo(renderFinancialDashboard),
         }).notFound(() => {
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });
-
-        const homeRoute = {
-            admin: '/admin/dashboard',
-            super_admin: '/admin/dashboard',
-        };
-        router.navigate(homeRoute[userProfile.role] || '/login');
+        
+        // Como já verificamos a role, podemos navegar diretamente para o dashboard,
+        // removendo a lógica antiga do 'homeRoute'.
+        router.navigate('/admin/dashboard');
         router.resolve();
 
     } catch (error) {
@@ -113,4 +132,3 @@ function setupEventListeners() {
         });
     }
 }
-
