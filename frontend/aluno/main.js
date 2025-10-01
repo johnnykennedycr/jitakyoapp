@@ -1,4 +1,4 @@
-import { auth, db } from './firebase.js';
+import { auth } from './firebase.js';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // --- CONFIGURAÇÃO ---
