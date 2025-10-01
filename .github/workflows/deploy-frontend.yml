@@ -17,7 +17,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20' # <-- ESTA LINHA FOI ALTERADA DE '18' PARA '20'
 
       - name: Install Frontend Dependencies
         run: cd frontend && npm ci
@@ -26,7 +26,6 @@ jobs:
         run: |
           cd frontend
           echo VITE_FIREBASE_API_KEY="${{ secrets.VITE_FIREBASE_API_KEY }}" >> .env
-          # Adicione aqui outras variáveis de ambiente que seu build precisa
           echo VITE_FIREBASE_AUTH_DOMAIN="${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}" >> .env
           echo VITE_FIREBASE_PROJECT_ID="${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> .env
           echo VITE_FIREBASE_STORAGE_BUCKET="${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" >> .env
@@ -43,5 +42,4 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JITAKYOAPP }}'
           projectId: jitakyoapp
-          # Ao omitir a propriedade "target", a action fará o deploy de TODOS os sites
-          # configurados no seu arquivo firebase.json.
+
