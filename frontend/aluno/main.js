@@ -1,243 +1,254 @@
-import { auth } from "/firebase.js"; // Importa a configuração do Firebase
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
+import { auth, db } from './firebase.js';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// --- CONFIGURAÇÃO DA API ---
-const API_BASE_URL = 'https://jitakyoapp-r7fl5wa5ea-rj.a.run.app'; // Substitua pela URL da sua API
+// --- CONFIGURAÇÃO ---
+// IMPORTANTE: Substitua pela URL da sua API no Cloud Run
+const API_BASE_URL = 'https://jitakyoapp-r7fl5wa5ea-rj.a.run.app'; 
 
-// --- GERENCIAMENTO DE ESTADO ---
-const state = {
-    user: null,
-    profile: null,
-    classes: [],
-    payments: [],
-    idToken: null,
-};
+// --- ELEMENTOS DA UI ---
+const authContainer = document.getElementById('auth-container');
+const appContainer = document.getElementById('app-container');
+const loadingIndicator = document.getElementById('loading-indicator');
 
-// --- CAMADA DA API ---
+// --- ESTADO DA APLICAÇÃO ---
+let currentUser = null;
+let idToken = null;
+
+// --- FUNÇÕES DE API ---
+
+/**
+ * Função centralizada para fazer chamadas à API com o token de autenticação.
+ * Força a obtenção de um novo token se o atual estiver expirado.
+ * @param {string} endpoint - O caminho da API (ex: '/api/student/profile')
+ * @param {object} options - Opções para a função fetch (method, headers, body)
+ * @returns {Promise<Response>}
+ */
 async function fetchWithAuth(endpoint, options = {}) {
-    if (!state.idToken) {
+    if (!currentUser) {
         throw new Error("Usuário não autenticado.");
     }
-    const headers = {
-        ...options.headers,
-        'Authorization': `Bearer ${state.idToken}`,
-        'Content-Type': 'application/json'
+
+    // O 'true' força a atualização do token se ele estiver perto de expirar
+    idToken = await currentUser.getIdToken(true);
+
+    const defaultHeaders = {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
     };
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+
+    const config = {
+        ...options,
+        headers: {
+            ...defaultHeaders,
+            ...options.headers,
+        },
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Erro na API: ${response.statusText}`);
+        // Se a resposta não for OK, tenta extrair o erro do corpo da resposta
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido na API.' }));
+        console.error(`Erro na API [${response.status}]:`, errorData);
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
-    return response.json();
+
+    return response;
 }
 
-// --- RENDERIZAÇÃO ---
-const appContainer = document.getElementById('app');
 
-function renderLogin() {
-    appContainer.innerHTML = `
-        <div class="flex items-center justify-center min-h-screen bg-gray-50">
-            <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
-                <div class="text-center">
-                    <h1 class="text-3xl font-bold text-gray-800">JitaKyoApp</h1>
-                    <p class="text-gray-500">Área do Aluno</p>
+// --- FUNÇÕES DE RENDERIZAÇÃO ---
+
+function showLoading(show) {
+    loadingIndicator.classList.toggle('hidden', !show);
+}
+
+function renderLoginScreen() {
+    authContainer.innerHTML = `
+        <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">JitaKyoApp</h2>
+            <p class="text-center text-gray-500 mb-6">Área do Aluno</p>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
                 </div>
-                <form id="login-form" class="space-y-6">
-                    <div>
-                        <label for="email" class="text-sm font-medium text-gray-700">Email</label>
-                        <input id="email" name="email" type="email" required class="w-full px-4 py-2 mt-1 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label for="password" class="text-sm font-medium text-gray-700">Senha</label>
-                        <input id="password" name="password" type="password" required class="w-full px-4 py-2 mt-1 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    </div>
-                     <p id="error-message" class="text-sm text-red-500 text-center hidden"></p>
-                    <button type="submit" class="w-full px-4 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300">Entrar</button>
-                </form>
-            </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Senha</label>
+                    <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full focus:outline-none focus:shadow-outline transition duration-300">
+                    Entrar
+                </button>
+            </form>
+            <p id="login-error" class="text-red-500 text-xs italic mt-4 text-center"></p>
         </div>
     `;
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    authContainer.classList.remove('hidden');
+    appContainer.classList.add('hidden');
+
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginError.textContent = '';
+        showLoading(true);
+        try {
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            await signInWithEmailAndPassword(auth, email, password);
+            // O onAuthStateChanged vai cuidar de renderizar o app
+        } catch (error) {
+            console.error("Erro no login:", error);
+            loginError.textContent = 'Email ou senha inválidos.';
+        } finally {
+            showLoading(false);
+        }
+    });
 }
 
-function renderDashboard() {
-    const profile = state.profile;
+
+async function renderAuthenticatedApp(studentProfile) {
     appContainer.innerHTML = `
-        <div class="flex h-screen bg-gray-100">
-            <!-- Sidebar -->
-            <aside class="w-64 bg-white shadow-md hidden md:flex flex-col">
-                <div class="p-6 text-2xl font-bold text-gray-800 border-b">
-                    JitaKyoApp
+        <div class="w-full max-w-4xl mx-auto p-4 md:p-6">
+            <header class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">Olá, ${studentProfile.name.split(' ')[0]}!</h1>
+                    <p class="text-gray-500">Bem-vindo(a) à sua área.</p>
                 </div>
-                <nav id="nav-menu" class="flex-1 p-4 space-y-2">
-                     <a href="#" data-page="classes" class="flex items-center px-4 py-2 text-gray-700 bg-blue-100 text-blue-700 rounded-lg">Minhas Turmas</a>
-                     <a href="#" data-page="payments" class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-blue-100 hover:text-blue-700">Meu Financeiro</a>
-                </nav>
-                <div class="p-4 border-t">
-                    <button id="logout-btn" class="w-full px-4 py-2 font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600">Sair</button>
-                </div>
-            </aside>
-            <!-- Main Content -->
-            <main class="flex-1 flex flex-col">
-                <header class="bg-white shadow-sm p-4 flex justify-between items-center">
-                    <h1 id="page-title" class="text-xl font-semibold text-gray-800">Bem-vindo(a), ${profile.name.split(' ')[0]}!</h1>
-                    <div class="md:hidden">
-                        <!-- Botão de menu mobile -->
-                    </div>
-                </header>
-                <div id="content-area" class="flex-1 p-6 overflow-y-auto">
-                   <!-- Conteúdo da página será inserido aqui -->
-                </div>
+                <button id="logout-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-300">Sair</button>
+            </header>
+
+            <main class="space-y-6">
+                <!-- Seção Minhas Turmas -->
+                <section id="classes-section" class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Minhas Turmas</h2>
+                    <div id="classes-content">Carregando turmas...</div>
+                </section>
+
+                <!-- Seção Meu Financeiro -->
+                <section id="payments-section" class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Meu Financeiro</h2>
+                    <div id="payments-content">Carregando histórico financeiro...</div>
+                </section>
             </main>
         </div>
     `;
+    authContainer.classList.add('hidden');
+    appContainer.classList.remove('hidden');
 
-    document.getElementById('logout-btn').addEventListener('click', handleLogout);
-    document.getElementById('nav-menu').addEventListener('click', handleNavigation);
+    document.getElementById('logout-button').addEventListener('click', () => {
+        signOut(auth);
+    });
 
-    // Renderiza a página inicial
-    renderClassesPage();
+    // Carrega os dados das seções
+    loadClasses();
+    loadPayments();
 }
 
-function renderClassesPage() {
-    document.getElementById('page-title').textContent = 'Minhas Turmas';
-    const contentArea = document.getElementById('content-area');
-    if (!state.classes || state.classes.length === 0) {
-         contentArea.innerHTML = '<p class="text-gray-500">Você ainda não está matriculado em nenhuma turma.</p>';
-         return;
+async function loadClasses() {
+    const contentDiv = document.getElementById('classes-content');
+    try {
+        const response = await fetchWithAuth('/api/student/classes');
+        const enrollments = await response.json();
+
+        if (enrollments.length === 0) {
+            contentDiv.innerHTML = '<p class="text-gray-500">Você não está matriculado em nenhuma turma.</p>';
+            return;
+        }
+
+        contentDiv.innerHTML = `
+            <ul class="space-y-3">
+                ${enrollments.map(e => `
+                    <li class="p-4 bg-gray-50 rounded-md border border-gray-200">
+                        <p class="font-bold text-lg text-blue-600">${e.class_details.name}</p>
+                        <p class="text-sm text-gray-600">Professor: ${e.class_details.teacher_name}</p>
+                        <p class="text-sm text-gray-600">Horário: ${e.class_details.schedule}</p>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    } catch (error) {
+        contentDiv.innerHTML = '<p class="text-red-500">Não foi possível carregar suas turmas.</p>';
+        console.error("Erro ao carregar turmas:", error);
     }
-     contentArea.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            ${state.classes.map(enrollment => `
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-xl font-bold text-gray-800">${enrollment.training_class.name}</h3>
-                    <p class="text-gray-600">Professor: ${enrollment.training_class.teacher_name}</p>
-                    <div class="mt-2 text-sm text-gray-500">
-                        ${enrollment.training_class.schedule.map(s => `<span>${s.day}: ${s.start_time} - ${s.end_time}</span>`).join('<br>')}
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
 }
 
-function renderPaymentsPage() {
-    document.getElementById('page-title').textContent = 'Meu Financeiro';
-    const contentArea = document.getElementById('content-area');
-    if (!state.payments || state.payments.length === 0) {
-         contentArea.innerHTML = '<p class="text-gray-500">Nenhuma cobrança encontrada.</p>';
-         return;
-    }
-     contentArea.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-xl font-bold mb-4">Minhas Cobranças</h3>
+async function loadPayments() {
+    const contentDiv = document.getElementById('payments-content');
+    try {
+        const response = await fetchWithAuth('/api/student/payments');
+        const payments = await response.json();
+        
+        if (payments.length === 0) {
+            contentDiv.innerHTML = '<p class="text-gray-500">Nenhum registro financeiro encontrado.</p>';
+            return;
+        }
+
+        contentDiv.innerHTML = `
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-gray-100">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="py-2 px-4 border-b">Vencimento</th>
+                            <th class="py-2 px-4 border-b">Valor</th>
+                            <th class="py-2 px-4 border-b">Status</th>
+                            <th class="py-2 px-4 border-b">Data Pagto.</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        ${state.payments.map(charge => `
-                            <tr>
-                                <td class="px-6 py-4 whitespace-nowrap">${new Date(charge.due_date).toLocaleDateString()}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">R$ ${charge.amount.toFixed(2)}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                        charge.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                                        charge.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                    <tbody>
+                        ${payments.map(p => `
+                            <tr class="text-center">
+                                <td class="py-2 px-4 border-b">${new Date(p.due_date).toLocaleDateString()}</td>
+                                <td class="py-2 px-4 border-b">R$ ${p.amount.toFixed(2)}</td>
+                                <td class="py-2 px-4 border-b">
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                                        p.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                        p.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
                                     }">
-                                        ${charge.status === 'paid' ? 'Pago' : charge.status === 'pending' ? 'Pendente' : 'Atrasado'}
+                                        ${p.status === 'paid' ? 'Pago' : p.status === 'pending' ? 'Pendente' : 'Atrasado'}
                                     </span>
                                 </td>
+                                <td class="py-2 px-4 border-b">${p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '---'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             </div>
-        </div>
-    `;
-}
-
-
-// --- CONTROLE DE LÓGICA ---
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-    const errorMessage = document.getElementById('error-message');
-    errorMessage.classList.add('hidden');
-
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // O onAuthStateChanged vai cuidar do resto
+        `;
     } catch (error) {
-        console.error("Erro no login:", error);
-        errorMessage.textContent = 'Email ou senha inválidos.';
-        errorMessage.classList.remove('hidden');
+        contentDiv.innerHTML = '<p class="text-red-500">Não foi possível carregar seu histórico financeiro.</p>';
+        console.error("Erro ao carregar pagamentos:", error);
     }
 }
 
-async function handleLogout() {
-    await signOut(auth);
-    // O onAuthStateChanged vai cuidar da renderização da tela de login
-}
-
-function handleNavigation(e) {
-    if (e.target.tagName === 'A') {
-        e.preventDefault();
-
-        // Remove a classe de 'ativo' de todos os links
-        document.querySelectorAll('#nav-menu a').forEach(link => {
-            link.classList.remove('bg-blue-100', 'text-blue-700');
-        });
-        // Adiciona a classe de 'ativo' ao link clicado
-        e.target.classList.add('bg-blue-100', 'text-blue-700');
-
-        const page = e.target.dataset.page;
-        if (page === 'classes') renderClassesPage();
-        if (page === 'payments') renderPaymentsPage();
-    }
-}
+// --- CONTROLO DE AUTENTICAÇÃO ---
 
 async function initializeAuthenticatedState(user) {
-    state.user = user;
-    state.idToken = await user.getIdToken();
-    
-    // Busca os dados em paralelo para agilizar
+    showLoading(true);
     try {
-        const [profile, classes, payments] = await Promise.all([
-            fetchWithAuth('/api/student/profile'),
-            fetchWithAuth('/api/student/classes'),
-            fetchWithAuth('/api/student/payments')
-        ]);
-
-        state.profile = profile;
-        state.classes = classes;
-        state.payments = payments;
-        
-        renderDashboard();
+        const response = await fetchWithAuth('/api/student/profile');
+        const studentProfile = await response.json();
+        await renderAuthenticatedApp(studentProfile);
     } catch (error) {
         console.error("Erro ao buscar dados do aluno:", error);
-        // Se a API falhar (ex: usuário não é aluno), desloga
-        alert("Falha ao carregar seus dados. Verifique se você tem permissão de aluno.");
-        await handleLogout();
+        // Se houver erro (ex: token inválido, perfil não encontrado), desloga por segurança
+        signOut(auth); 
+    } finally {
+        showLoading(false);
     }
 }
 
-// --- PONTO DE ENTRADA ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
+        currentUser = user;
         initializeAuthenticatedState(user);
     } else {
-        state.user = null;
-        state.profile = null;
-        state.idToken = null;
-        state.classes = [];
-        state.payments = [];
-        renderLogin();
+        currentUser = null;
+        idToken = null;
+        renderLoginScreen();
     }
 });
+
