@@ -1,6 +1,5 @@
 from firebase_admin import auth, firestore
 from flask_mail import Message
-from app.models.user import User
 
 class UserService:
     def __init__(self, db, mail=None):
