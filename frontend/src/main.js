@@ -103,11 +103,19 @@ async function loadClasses(container) {
 
     try {
         const enrollments = await fetchWithAuth('/api/student/classes');
+        console.log("Dados das turmas recebidos da API:", enrollments); // Log para depuração
         
         if (enrollments && enrollments.length > 0) {
             classesList.innerHTML = enrollments
-                .filter(enrollment => enrollment) // CORREÇÃO: Filtra quaisquer entradas nulas ou indefinidas da API
-                .map(enrollment => {
+                .map((enrollment, index) => {
+                    // Log de cada item para depuração
+                    console.log(`Processando matrícula [${index}]:`, enrollment);
+
+                    if (!enrollment) {
+                        console.warn(`Item [${index}] na lista de matrículas é nulo. A ignorar.`);
+                        return ''; // Retorna uma string vazia para ignorar este item
+                    }
+
                     const className = enrollment.class_name || 'Nome da Turma Indisponível';
                     const teacherName = enrollment.teacher_name || 'Professor não atribuído';
 
@@ -127,13 +135,14 @@ async function loadClasses(container) {
     }
 }
 
+
 async function loadPayments(container) {
     const paymentsList = container.querySelector('#payments-list');
     if (!paymentsList) return;
 
     try {
         const payments = await fetchWithAuth('/api/student/payments');
-        if (payments && payments.length > 0) {
+        if (payments && payments.length > <strong><mark>0</mark></strong>) {
             paymentsList.innerHTML = `
                 <ul class="space-y-3">
                     ${payments.map(p => `
