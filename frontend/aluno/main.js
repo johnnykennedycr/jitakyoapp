@@ -103,22 +103,29 @@ async function loadClasses(container) {
 
     try {
         const enrollments = await fetchWithAuth('/api/student/classes');
+        console.log("Dados das turmas recebidos da API:", enrollments); // Log para depuração
         
         if (enrollments && enrollments.length > 0) {
-            // CORREÇÃO APLICADA AQUI
-            // Garante que o código acede a 'class_name' e 'teacher_name', que são as
-            // propriedades corretas enviadas pelo backend.
-            classesList.innerHTML = enrollments.map(enrollment => {
-                const className = enrollment.class_name || 'Nome da Turma Indisponível';
-                const teacherName = enrollment.teacher_name || 'Professor não atribuído';
+            classesList.innerHTML = enrollments
+                .map((enrollment, index) => {
+                    // Log de cada item para depuração
+                    console.log(`Processando matrícula [${index}]:`, enrollment);
 
-                return `
-                <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
-                    <h3 class="font-bold text-lg text-gray-800">${className}</h3>
-                    <p class="text-sm text-gray-600">Professor: ${teacherName}</p>
-                </div>
-                `;
-            }).join('');
+                    if (!enrollment) {
+                        console.warn(`Item [${index}] na lista de matrículas é nulo. A ignorar.`);
+                        return ''; // Retorna uma string vazia para ignorar este item
+                    }
+
+                    const className = enrollment.class_name || 'Nome da Turma Indisponível';
+                    const teacherName = enrollment.teacher_name || 'Professor não atribuído';
+
+                    return `
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                        <h3 class="font-bold text-lg text-gray-800">${className}</h3>
+                        <p class="text-sm text-gray-600">Professor: ${teacherName}</p>
+                    </div>
+                    `;
+                }).join('');
         } else {
             classesList.innerHTML = '<p class="text-gray-500">Você não está matriculado em nenhuma turma.</p>';
         }
@@ -127,6 +134,7 @@ async function loadClasses(container) {
         classesList.innerHTML = '<p class="text-red-500 font-semibold">Não foi possível carregar suas turmas.</p>';
     }
 }
+
 
 async function loadPayments(container) {
     const paymentsList = container.querySelector('#payments-list');
