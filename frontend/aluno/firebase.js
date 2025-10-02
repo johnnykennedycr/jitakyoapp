@@ -1,5 +1,6 @@
-const { initializeApp } = firebase;
-const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } = firebase.auth;
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 // --- CONFIGURAÇÃO ---
 // IMPORTANTE: SUBSTITUA O OBJETO ABAIXO PELO SEU firebaseConfig REAL
 const firebaseConfig = {
@@ -12,11 +13,13 @@ const firebaseConfig = {
   measurementId: "G-8D4CHETJQY"
 };
 
+
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 
 // Inicializa e exporta a instância do Auth
 export const auth = getAuth(app);
 
-// Reexporta as funções para que o main.js as possa importar
+// Reexporta as funções para que o main.js possa usá-las
 export { onAuthStateChanged, signInWithEmailAndPassword, signOut };
+

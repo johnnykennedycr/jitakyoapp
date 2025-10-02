@@ -6,11 +6,6 @@
     <title>Área do Aluno - JitaKyoApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- **PASSO 1: Carregar os SDKs do Firebase globalmente** -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
-
     <style>
         body { font-family: 'Inter', sans-serif; }
         .loader {
@@ -31,7 +26,7 @@
     <div id="auth-container" class="min-h-screen flex items-center justify-center p-4"></div>
     <div id="app-container" class="hidden"></div>
 
-    <!-- O nosso main.js continua a ser um módulo, mas agora corre DEPOIS de o Firebase estar carregado -->
+    <!-- Carregamos apenas o nosso ponto de entrada principal como um módulo -->
     <script type="module" src="/main.js"></script>
 
 </body>
