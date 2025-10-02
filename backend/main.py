@@ -1,35 +1,32 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask_cors import CORS
 from flask_mail import Mail
 
-# Carrega as variáveis de ambiente no início
-load_dotenv()
-
 def create_app():
     """Cria e configura a instância da aplicação Flask."""
     
     app = Flask(__name__)
+    load_dotenv()
     
     # --- Configuração de Middlewares ---
-    # Aplica o ProxyFix para que o Flask entenda os cabeçalhos de proxy do Cloud Run
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-
-    # --- Configuração de CORS ---
-    # Define as origens permitidas. É crucial que estas URLs estejam corretas.
+    
+    # --- CONFIGURAÇÃO DE CORS CORRIGIDA E ROBUSTA ---
+    # Lista de URLs que podem fazer requisições para a sua API.
     allowed_origins = [
-        "https://aluno-jitakyoapp.web.app",
-        "https://jitakyoapp.web.app", # Adicione a URL do seu painel de admin aqui
-        "http://localhost:5173", # Para desenvolvimento local
+        "https://aluno-jitakyoapp.web.app", # URL do seu portal do aluno
+        "https://jitakyoapp.web.app",      # URL do seu painel de admin principal
+        "http://localhost:5173",          # Para desenvolvimento local do admin
+        "http://localhost:8080"           # Para desenvolvimento local do aluno
     ]
-    # Inicializa o CORS para todas as rotas da API, com as origens especificadas
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
-    # --- Configuração de Email ---
+    # --- Configuração de Mail ---
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
@@ -41,22 +38,17 @@ def create_app():
     mail = Mail(app)
 
     # --- Inicialização do Firebase ---
-    # Garante que a inicialização só ocorre uma vez
     try:
         if not firebase_admin._apps:
-            # Em produção (Cloud Run), as credenciais são detetadas automaticamente
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
-            print("--- INFO: Firebase Admin SDK inicializado com sucesso.")
+            print("Firebase Admin SDK inicializado.")
     except Exception as e:
-        print(f"--- ERRO FATAL: Falha ao inicializar o Firebase Admin SDK: {e}")
-        # Lançar o erro pode ajudar a obter logs mais claros no Cloud Run
-        raise e
+        print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
 
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
-    # Importações dentro da função para evitar problemas de contexto
     from app.services.enrollment_service import EnrollmentService
     from app.services.user_service import UserService
     from app.services.teacher_service import TeacherService
@@ -72,7 +64,7 @@ def create_app():
     payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
     user_service.set_enrollment_service(enrollment_service)
 
-    # --- IMPORTAÇÃO E REGISTO DE ROTAS (BLUEPRINTS) ---
+    # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
@@ -96,10 +88,9 @@ def create_app():
 
     return app
 
-# A instância 'app' é criada aqui para que o Gunicorn a possa encontrar
+# Esta linha é crucial para o Gunicorn encontrar a aplicação
 app = create_app()
 
-# Este bloco só é executado em ambiente local, não no Cloud Run
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
