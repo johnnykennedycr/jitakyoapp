@@ -105,20 +105,19 @@ async function loadClasses(container) {
         const enrollments = await fetchWithAuth('/api/student/classes');
         
         if (enrollments && enrollments.length > 0) {
-            // CORREÇÃO APLICADA AQUI
-            // Garante que o código acede a 'class_name' e 'teacher_name', que são as
-            // propriedades corretas enviadas pelo backend.
-            classesList.innerHTML = enrollments.map(enrollment => {
-                const className = enrollment.class_name || 'Nome da Turma Indisponível';
-                const teacherName = enrollment.teacher_name || 'Professor não atribuído';
+            classesList.innerHTML = enrollments
+                .filter(enrollment => enrollment) // CORREÇÃO: Filtra quaisquer entradas nulas ou indefinidas da API
+                .map(enrollment => {
+                    const className = enrollment.class_name || 'Nome da Turma Indisponível';
+                    const teacherName = enrollment.teacher_name || 'Professor não atribuído';
 
-                return `
-                <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
-                    <h3 class="font-bold text-lg text-gray-800">${className}</h3>
-                    <p class="text-sm text-gray-600">Professor: ${teacherName}</p>
-                </div>
-                `;
-            }).join('');
+                    return `
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
+                        <h3 class="font-bold text-lg text-gray-800">${className}</h3>
+                        <p class="text-sm text-gray-600">Professor: ${teacherName}</p>
+                    </div>
+                    `;
+                }).join('');
         } else {
             classesList.innerHTML = '<p class="text-gray-500">Você não está matriculado em nenhuma turma.</p>';
         }
