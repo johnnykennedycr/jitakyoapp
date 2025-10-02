@@ -284,8 +284,9 @@ def list_students():
             student_dict = student.to_dict()
             enrollments = enrollment_service.get_enrollments_by_student_id(student.id)
             
+            # ATENÇÃO: a linha abaixo pode causar erro se 'enrollments' for uma lista de dicionários
             student_dict['enrollments'] = [
-                {**enrollment.to_dict(), 'class_name': class_map.get(enrollment.class_id, 'Turma Desconhecida')}
+                {**enrollment, 'class_name': class_map.get(enrollment.get('class_id'), 'Turma Desconhecida')}
                 for enrollment in enrollments
             ]
             students_data.append(student_dict)
@@ -363,7 +364,8 @@ def get_student_enrollments(student_id):
     """API para buscar todas as matrículas de um aluno específico."""
     try:
         enrollments = enrollment_service.get_enrollments_by_student_id(student_id)
-        return jsonify([e.to_dict() for e in enrollments]), 200
+        # Assumindo que o serviço já retorna uma lista de dicionários
+        return jsonify(enrollments), 200
     except Exception as e:
         return jsonify(error=str(e)), 500
 
