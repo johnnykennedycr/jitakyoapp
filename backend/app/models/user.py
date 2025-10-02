@@ -1,104 +1,94 @@
-from firebase_admin import auth, firestore
-from flask_mail import Message
+from datetime import date, datetime
 
-class UserService:
-    def __init__(self, db, mail=None):
-        self.db = db
-        self.collection = self.db.collection('users')
-        self.mail = mail
-        self.enrollment_service = None
+class User:
+    """
+    Representa um usuário no sistema, com métodos robustos para conversão
+    de e para o formato do Firestore, lidando com diferentes tipos de data.
+    """
+    def __init__(self, id=None, name=None, email=None, role='student',
+                 date_of_birth=None, phone=None, guardians=None, 
+                 enrolled_disciplines=None, created_at=None, updated_at=None):
+        
+        self.id = id
+        self.name = name
+        self.email = email
+        self.role = role
+        self.date_of_birth = date_of_birth
+        self.phone = phone
+        self.guardians = guardians if guardians is not None else []
+        self.enrolled_disciplines = enrolled_disciplines if enrolled_disciplines is not None else []
+        self.created_at = created_at
+        self.updated_at = updated_at
 
-    def set_enrollment_service(self, enrollment_service):
-        self.enrollment_service = enrollment_service
+    @staticmethod
+    def from_dict(source_dict, doc_id):
+        """
+        Cria um objeto User a partir de um dicionário do Firestore.
+        Lida com a conversão de Timestamps e Strings de data para datetime do Python.
+        """
+        dob = source_dict.get('date_of_birth')
+        # LÓGICA DE CONVERSÃO DE DATA ROBUSTA
+        if hasattr(dob, 'to_date_time'): # Verifica se é um Timestamp do Firestore
+            dob = dob.to_date_time()
+        elif isinstance(dob, str): # Se for uma string, tenta converter
+            try:
+                dob = datetime.strptime(dob, '%Y-%m-%d')
+            except ValueError:
+                print(f"Aviso: formato de data inválido para a string '{dob}'. Ignorando.")
+                dob = None
 
-    def create_user(self, data):
-        try:
-            email = data['email']
-            password = data['password']
-            name = data['name']
-            role = data.get('role', 'student') 
+        created = source_dict.get('created_at')
+        if hasattr(created, 'to_date_time'):
+            created = created.to_date_time()
 
-            firebase_user = auth.create_user(email=email, password=password, display_name=name)
-            
-            user_data = {
-                'name': name,
-                'email': email,
-                'role': role,
-                'created_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': firestore.SERVER_TIMESTAMP
-            }
-            self.collection.document(firebase_user.uid).set(user_data)
-            
-            user_data['id'] = firebase_user.uid
-            return User.from_dict(user_data, firebase_user.uid)
-        except Exception as e:
-            print(f"Erro ao criar utilizador: {e}")
-            raise
+        updated = source_dict.get('updated_at')
+        if hasattr(updated, 'to_date_time'):
+            updated = updated.to_date_time()
 
-    def get_user_by_id(self, uid):
-        try:
-            doc = self.collection.document(uid).get()
-            if doc.exists:
-                return User.from_dict(doc.to_dict(), doc.id)
+        return User(
+            id=doc_id,
+            name=source_dict.get('name'),
+            email=source_dict.get('email'),
+            role=source_dict.get('role', 'student'),
+            date_of_birth=dob,
+            phone=source_dict.get('phone'),
+            guardians=source_dict.get('guardians', []),
+            enrolled_disciplines=source_dict.get('enrolled_disciplines', []),
+            created_at=created,
+            updated_at=updated
+        )
+
+    def to_dict(self):
+        """
+        Converte o objeto User para um dicionário JSON-serializável.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "role": self.role,
+            "phone": self.phone,
+            "age": self.age,
+            "guardians": self.guardians,
+            "enrolled_disciplines": self.enrolled_disciplines,
+            "date_of_birth": self.date_of_birth.isoformat() if isinstance(self.date_of_birth, (datetime, date)) else None,
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, (datetime, date)) else None,
+            "updated_at": self.updated_at.isoformat() if isinstance(self.updated_at, (datetime, date)) else None
+        }
+
+    @property
+    def age(self):
+        """Calcula a idade com base na data de nascimento."""
+        if not isinstance(self.date_of_birth, (datetime, date)):
             return None
-        except Exception as e:
-            print(f"Erro ao buscar utilizador por ID {uid}: {e}")
-            return None
+        
+        birth_date = self.date_of_birth
+        if isinstance(birth_date, datetime):
+            birth_date = birth_date.date()
 
-    def get_users_by_role(self, role):
-        users = []
-        try:
-            docs = self.collection.where(filter=firestore.FieldFilter('role', '==', role)).stream()
-            for doc in docs:
-                users.append(User.from_dict(doc.to_dict(), doc.id))
-        except Exception as e:
-            print(f"Erro ao buscar utilizadores pela role '{role}': {e}")
-        return users
+        today = date.today()
+        return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        
+    def __repr__(self):
+        return f"<User(id='{self.id}', name='{self.name}', role='{self.role}')>"
 
-    def get_all_users_as_dicts(self):
-        """ Retorna todos os utilizadores como uma lista de dicionários. """
-        users_list = []
-        try:
-            docs = self.collection.stream()
-            for doc in docs:
-                user = User.from_dict(doc.to_dict(), doc.id)
-                users_list.append(user.to_dict())
-        except Exception as e:
-            print(f"Erro ao buscar todos os utilizadores: {e}")
-        return users_list
-
-    def delete_user(self, uid):
-        try:
-            # Primeiro, deleta as matrículas associadas, se o serviço estiver disponível
-            if self.enrollment_service:
-                self.enrollment_service.delete_enrollments_by_student_id(uid)
-            
-            # Deleta do Firestore
-            self.collection.document(uid).delete()
-            # Deleta do Firebase Authentication
-            auth.delete_user(uid)
-            return True
-        except Exception as e:
-            print(f"Erro ao deletar utilizador {uid}: {e}")
-            return False
-
-    def update_user(self, uid, data):
-        try:
-            # Atualiza no Firestore
-            user_ref = self.collection.document(uid)
-            update_data = {
-                'name': data.get('name'),
-                'email': data.get('email'),
-                'updated_at': firestore.SERVER_TIMESTAMP
-            }
-            # Remove chaves com valor None para não sobrescrever campos existentes com nada
-            update_data = {k: v for k, v in update_data.items() if v is not None}
-            user_ref.update(update_data)
-            
-            # Atualiza no Firebase Authentication
-            auth.update_user(uid, email=data.get('email'), display_name=data.get('name'))
-
-            return self.get_user_by_id(uid)
-        except Exception as e:
-            print(f"Erro ao atualizar utilizador {uid}: {e}")
-            raise
