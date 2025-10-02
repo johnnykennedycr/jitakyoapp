@@ -2,11 +2,12 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-# Passo 1: Constrói a imagem Docker do backend
+# Passo 1: Constrói a imagem Docker do backend, ignorando o cache
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'backend'
   args: [
     'build', 
+    '--no-cache',  # <--- ADICIONADO: Força uma compilação limpa
     '-t', 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/jitakyoapp/jitakyoapp:$SHORT_SHA', 
     '.'
   ]
