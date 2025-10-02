@@ -51,15 +51,29 @@ class EnrollmentService:
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
 
     def get_enrollments_by_student_id(self, student_id):
-        """Busca todas as matrículas de um aluno específico."""
-        enrollments = []
+        """Busca todas as matrículas de um aluno, enriquece os dados e retorna uma lista de dicionários."""
+        enrollments_list = []
         try:
             docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
             for doc in docs:
-                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+                # Cria o objeto a partir do dicionário do Firestore
+                enrollment_obj = Enrollment.from_dict(doc.to_dict(), doc.id)
+                # Converte o objeto para um dicionário para a resposta da API
+                enrollment_dict = enrollment_obj.to_dict()
+
+                # Enriquece o dicionário com informações adicionais da turma e do professor
+                class_info = self.training_class_service.get_class_by_id(enrollment_dict['class_id'])
+                if class_info:
+                    enrollment_dict['class_name'] = class_info.name
+                    enrollment_dict['teacher_name'] = class_info.teacher_name
+                else:
+                    enrollment_dict['class_name'] = "Turma Removida"
+                    enrollment_dict['teacher_name'] = "N/A"
+                
+                enrollments_list.append(enrollment_dict)
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
-        return enrollments
+        return enrollments_list
         
     def get_student_ids_by_class_id(self, class_id):
         """Retorna uma lista de IDs de alunos matriculados em uma turma."""
@@ -135,3 +149,4 @@ class EnrollmentService:
         except Exception as e:
             print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             raise e
+

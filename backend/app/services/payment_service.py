@@ -185,4 +185,18 @@ class PaymentService:
         }
         payment_ref.update(update_data)
         return True
+    
+    def get_charges_by_user_id(self, user_id):
+        """Busca todas as cobranças (pagas e pendentes) para um aluno específico."""
+        try:
+            charges_ref = self.db.collection('charges').where('student_id', '==', user_id).stream()
+            charges = []
+            for charge in charges_ref:
+                charge_data = charge.to_dict()
+                charge_data['id'] = charge.id
+                charges.append(charge_data)
+            return charges
+        except Exception as e:
+            print(f"Erro ao buscar cobranças para o usuário {user_id}: {e}")
+            return []
 
