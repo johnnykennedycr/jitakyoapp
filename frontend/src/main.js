@@ -142,7 +142,7 @@ async function loadPayments(container) {
 
     try {
         const payments = await fetchWithAuth('/api/student/payments');
-        if (payments && payments.length > <strong><mark>0</mark></strong>) {
+        if (payments && payments.length > 0) {
             paymentsList.innerHTML = `
                 <ul class="space-y-3">
                     ${payments.map(p => `
