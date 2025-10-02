@@ -56,16 +56,19 @@ class EnrollmentService:
         try:
             docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
             for doc in docs:
-                # Cria o objeto a partir do dicionário do Firestore
                 enrollment_obj = Enrollment.from_dict(doc.to_dict(), doc.id)
-                # Converte o objeto para um dicionário para a resposta da API
                 enrollment_dict = enrollment_obj.to_dict()
 
-                # Enriquece o dicionário com informações adicionais da turma e do professor
                 class_info = self.training_class_service.get_class_by_id(enrollment_dict['class_id'])
                 if class_info:
                     enrollment_dict['class_name'] = class_info.name
-                    enrollment_dict['teacher_name'] = class_info.teacher_name
+                    # --- CORREÇÃO APLICADA AQUI ---
+                    # Busca o nome do professor usando o teacher_id da turma
+                    if hasattr(class_info, 'teacher_id') and class_info.teacher_id:
+                        teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
+                        enrollment_dict['teacher_name'] = teacher_info.name if teacher_info else "Professor não encontrado"
+                    else:
+                        enrollment_dict['teacher_name'] = "Não atribuído"
                 else:
                     enrollment_dict['class_name'] = "Turma Removida"
                     enrollment_dict['teacher_name'] = "N/A"
