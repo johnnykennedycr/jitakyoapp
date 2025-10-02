@@ -1,4 +1,4 @@
-// Agora importamos tudo do nosso ficheiro local firebase.js
+// Nenhuma alteração é necessária aqui. O main.js continua a funcionar da mesma forma.
 import { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from './firebase.js';
 
 console.log("main.js: Script carregado e executado.");

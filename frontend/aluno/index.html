@@ -6,6 +6,11 @@
     <title>Área do Aluno - JitaKyoApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- **PASSO 1: Carregar os SDKs do Firebase globalmente** -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+
     <style>
         body { font-family: 'Inter', sans-serif; }
         .loader {
@@ -13,34 +18,20 @@
             -webkit-animation: spin 1s linear infinite;
             animation: spin 1s linear infinite;
         }
-        @-webkit-keyframes spin {
-            0% { -webkit-transform: rotate(0deg); }
-            100% { -webkit-transform: rotate(360deg); }
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- Indicador de Carregamento Global -->
     <div id="loading-indicator" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
         <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
     </div>
 
-    <!-- Container para a Tela de Login -->
-    <div id="auth-container" class="min-h-screen flex items-center justify-center p-4">
-        <!-- O conteúdo do login será inserido aqui pelo JavaScript -->
-    </div>
+    <div id="auth-container" class="min-h-screen flex items-center justify-center p-4"></div>
+    <div id="app-container" class="hidden"></div>
 
-    <!-- Container para a Aplicação Autenticada -->
-    <div id="app-container" class="hidden">
-        <!-- O conteúdo do app será inserido aqui pelo JavaScript -->
-    </div>
-
-    <!-- Ponto de entrada principal da aplicação -->
+    <!-- O nosso main.js continua a ser um módulo, mas agora corre DEPOIS de o Firebase estar carregado -->
     <script type="module" src="/main.js"></script>
 
 </body>
