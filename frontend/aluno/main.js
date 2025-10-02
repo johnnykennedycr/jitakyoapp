@@ -4,7 +4,7 @@ import { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from '.
 console.log("main.js: Script carregado e executado.");
 
 // --- CONFIGURAÇÃO ---
-const API_BASE_URL = 'https://jitakyoapp-r7fl5wa5ea-rj.a.run.app'; 
+const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';  
 
 // --- VARIÁVEIS GLOBAIS ---
 let authContainer, appContainer, loadingIndicator;
