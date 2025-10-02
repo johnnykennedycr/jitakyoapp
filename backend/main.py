@@ -17,10 +17,11 @@ def create_app():
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     
     # --- CONFIGURAÇÃO DE CORS ---
+    # É crucial ter a sua URL de produção aqui
     allowed_origins = [
         "https://aluno-jitakyoapp.web.app",
-        "https://jitakyoapp.web.app",
-        "http://localhost:5173",
+        "https://jitakyoapp.web.app", # Adicione a URL do seu painel de admin
+        "http://localhost:5173",    # Para desenvolvimento local
         "http://localhost:8080"
     ]
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
@@ -59,19 +60,21 @@ def create_app():
     payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
     user_service.set_enrollment_service(enrollment_service)
 
-    # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
+    # --- IMPORTAÇÃO E REGISTO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
     from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
     from app.utils.decorators import init_decorators
 
+    # Inicializa os módulos com as instâncias dos serviços
     init_decorators(user_service)
     init_user_bp(user_service)
     init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
     init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service)
 
+    # Regista os Blueprints na aplicação
     app.register_blueprint(user_api_bp) 
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(student_api_bp)
