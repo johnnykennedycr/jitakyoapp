@@ -52,11 +52,46 @@ async function fetchWithAuth(endpoint, options = {}) {
 function renderLoginScreen() {
     console.log("main.js: Chamando renderLoginScreen.");
     if (authContainer && appContainer) {
+        // CORREÇÃO: Injeta ativamente o HTML do formulário de login
+        authContainer.innerHTML = `
+            <div class="w-full max-w-md bg-white rounded-xl shadow-xl p-8 space-y-6">
+                <div class="text-center">
+                    <h1 class="text-3xl font-bold text-gray-800">JitaKyoApp</h1>
+                    <p class="text-gray-500">Área do Aluno</p>
+                </div>
+                <form id="login-form" class="space-y-6">
+                    <div>
+                        <label for="email" class="text-sm font-medium text-gray-700">Email</label>
+                        <input id="email" name="email" type="email" autocomplete="email" required
+                            class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="password" class="text-sm font-medium text-gray-700">Senha</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required
+                            class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div id="login-error" class="text-red-500 text-sm text-center h-4"></div>
+                    <div>
+                        <button type="submit"
+                            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                            Entrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+
         authContainer.style.display = 'flex';
         appContainer.style.display = 'none';
         loadingIndicator.style.display = 'none';
+
+        // Reatribui o formulário e adiciona o 'listener'
+        loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', handleLoginSubmit);
+        }
     } else {
-        console.error("main.js: Elementos 'authContainer' ou 'appContainer' não encontrados para renderizar o login.");
+        console.error("main.js: Elemento 'authContainer' não encontrado para renderizar o login.");
     }
 }
 
@@ -103,17 +138,16 @@ async function loadClasses(container) {
 
     try {
         const enrollments = await fetchWithAuth('/api/student/classes');
-        console.log("Dados das turmas recebidos da API:", enrollments); // Log para depuração
+        console.log("Dados das turmas recebidos da API:", enrollments);
         
         if (enrollments && enrollments.length > 0) {
             classesList.innerHTML = enrollments
                 .map((enrollment, index) => {
-                    // Log de cada item para depuração
                     console.log(`Processando matrícula [${index}]:`, enrollment);
 
                     if (!enrollment) {
                         console.warn(`Item [${index}] na lista de matrículas é nulo. A ignorar.`);
-                        return ''; // Retorna uma string vazia para ignorar este item
+                        return '';
                     }
 
                     const className = enrollment.class_name || 'Nome da Turma Indisponível';
@@ -134,7 +168,6 @@ async function loadClasses(container) {
         classesList.innerHTML = '<p class="text-red-500 font-semibold">Não foi possível carregar suas turmas.</p>';
     }
 }
-
 
 async function loadPayments(container) {
     const paymentsList = container.querySelector('#payments-list');
@@ -179,7 +212,23 @@ async function initializeAuthenticatedState(user) {
         renderDashboard(userProfile);
     } catch (error) {
         console.error("Erro ao buscar dados do aluno:", error);
-        signOut(auth); // Desloga se não conseguir buscar o perfil
+        signOut(auth);
+    }
+}
+
+// --- EVENT HANDLERS ---
+async function handleLoginSubmit(e) {
+    e.preventDefault();
+    const email = loginForm.email.value;
+    const password = loginForm.password.value;
+    const errorDiv = document.getElementById('login-error');
+    errorDiv.textContent = '';
+    
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+        console.error("Erro no login:", error);
+        errorDiv.textContent = 'Email ou senha inválidos.';
     }
 }
 
@@ -190,11 +239,9 @@ function main() {
     document.addEventListener('DOMContentLoaded', () => {
         console.log("main.js: Evento DOMContentLoaded disparado.");
         
-        // Get DOM elements after they are loaded
         authContainer = document.getElementById('auth-container');
         appContainer = document.getElementById('app-container');
         loadingIndicator = document.getElementById('loading-indicator');
-        loginForm = document.getElementById('login-form');
 
         console.log("main.js: Elementos do DOM obtidos:", { authContainer, appContainer, loadingIndicator });
 
@@ -208,24 +255,6 @@ function main() {
                 renderLoginScreen();
             }
         });
-
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = loginForm.email.value;
-                const password = loginForm.password.value;
-                const errorDiv = document.getElementById('login-error');
-                errorDiv.textContent = '';
-                
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                    // O onAuthStateChanged vai lidar com a renderização
-                } catch (error) {
-                    console.error("Erro no login:", error);
-                    errorDiv.textContent = 'Email ou senha inválidos.';
-                }
-            });
-        }
     });
 }
 
