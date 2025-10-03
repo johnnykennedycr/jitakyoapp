@@ -51,32 +51,33 @@ class EnrollmentService:
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
 
     def get_enrollments_by_student_id(self, student_id):
-        """Busca todas as matrículas de um aluno, enriquece os dados e retorna uma lista de dicionários."""
-        enrollments_list = []
+        """Busca todas as matrículas de um aluno, enriquecidas com nomes da turma e do professor."""
+        enrollments_details = []
         try:
-            docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
-            for doc in docs:
-                enrollment_obj = Enrollment.from_dict(doc.to_dict(), doc.id)
-                enrollment_dict = enrollment_obj.to_dict()
-
-                class_info = self.training_class_service.get_class_by_id(enrollment_dict['class_id'])
-                if class_info:
-                    enrollment_dict['class_name'] = class_info.name
-                    # --- CORREÇÃO APLICADA AQUI ---
-                    # Busca o nome do professor usando o teacher_id da turma
-                    if hasattr(class_info, 'teacher_id') and class_info.teacher_id:
-                        teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
-                        enrollment_dict['teacher_name'] = teacher_info.name if teacher_info else "Professor não encontrado"
-                    else:
-                        enrollment_dict['teacher_name'] = "Não atribuído"
-                else:
-                    enrollment_dict['class_name'] = "Turma Removida"
-                    enrollment_dict['teacher_name'] = "N/A"
+            enrollment_docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
+            
+            for doc in enrollment_docs:
+                enrollment = Enrollment.from_dict(doc.to_dict(), doc.id)
                 
-                enrollments_list.append(enrollment_dict)
+                # Buscar informações da turma
+                class_info = self.training_class_service.get_class_by_id(enrollment.class_id)
+                
+                teacher_name = "Professor não encontrado"
+                if class_info and class_info.teacher_id:
+                    # Buscar informações do professor usando o teacher_id da turma
+                    teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
+                    if teacher_info:
+                        teacher_name = teacher_info.name
+
+                enrollment_dict = enrollment.to_dict()
+                enrollment_dict['class_name'] = class_info.name if class_info else "Turma desconhecida"
+                enrollment_dict['teacher_name'] = teacher_name
+                
+                enrollments_details.append(enrollment_dict)
+                
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
-        return enrollments_list
+        return enrollments_details
         
     def get_student_ids_by_class_id(self, class_id):
         """Retorna uma lista de IDs de alunos matriculados em uma turma."""
@@ -93,11 +94,7 @@ class EnrollmentService:
         return student_ids
 
     def get_all_active_enrollments_with_details(self):
-        """
-        Busca todas as matrículas ativas e as enriquece com detalhes do aluno e da turma.
-        Esta versão é otimizada para minimizar as consultas ao banco de dados e usa o valor
-        atual da mensalidade da turma.
-        """
+        """Busca todas as matrículas ativas e as enriquece com detalhes do aluno e da turma."""
         enrollments_details = []
         try:
             all_students = {s.id: s for s in self.user_service.get_users_by_role('student')}
@@ -118,12 +115,7 @@ class EnrollmentService:
                 enrollment_data['student_name'] = student_info.name
                 enrollment_data['class_name'] = class_info.get('name')
                 
-                # --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
-                # Sobrescreve a mensalidade da matrícula com o valor ATUAL da turma.
-                # Isso garante que as cobranças usem sempre o preço mais recente.
                 enrollment_data['base_monthly_fee'] = class_info.get('default_monthly_fee', 0)
-                
-                # Mantém o dia de vencimento da matrícula, mas usa o da turma como fallback.
                 enrollment_data.setdefault('due_day', class_info.get('default_due_day', 15))
 
                 enrollments_details.append(enrollment_data)
