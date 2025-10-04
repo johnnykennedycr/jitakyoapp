@@ -98,7 +98,6 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <!-- CORREÇÃO DA BARRA DE ROLAGEM APLICADA AQUI -->
         <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
                 <div class="flex-shrink-0 flex justify-between items-center mb-6">
@@ -267,17 +266,6 @@ async function handlePayment(paymentId) {
         
         const oldBrick = document.getElementById('paymentBrick_container');
         if(oldBrick) oldBrick.remove();
-
-        // --- CONTROLE DAS FORMAS DE PAGAMENTO ---
-        // Você pode habilitar ou desabilitar as formas de pagamento
-        // simplesmente adicionando ou removendo as linhas abaixo.
-        const paymentMethods = {
-            creditCard: "all", // Cartão de crédito
-            debitCard: "all",  // Cartão de débito
-            ticket: "all",     // Boleto
-            pix: "all",        // Pix
-            // atm: "all"      // Lotérica (Caixa)
-        };
         
         await mp.bricks().create("payment", "payment-brick-container", {
             initialization: {
@@ -285,16 +273,12 @@ async function handlePayment(paymentId) {
                 preferenceId: preferenceId,
             },
             customization: {
-                paymentMethods: paymentMethods,
+                paymentMethods: { creditCard: "all", debitCard: "all", ticket: "all", pix: "all" },
             },
             callbacks: {
                 onReady: () => {},
-                onSubmit: ({ selectedPaymentMethod, formData }) => {
-                    return new Promise(() => {});
-                },
-                onError: (error) => {
-                    console.error('Erro no brick de pagamento:', error);
-                },
+                onSubmit: () => new Promise(() => {}),
+                onError: (error) => console.error('Erro no brick de pagamento:', error),
             },
         });
 
@@ -327,21 +311,26 @@ function initialize() {
         appContainer = document.getElementById('app-container');
         loadingIndicator = document.getElementById('loading-indicator');
         
-        // Lembre-se de usar sua Public Key de TESTE aqui.
-        mp = new MercadoPago('APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6', {
-            locale: 'pt-BR'
-        });
+        // CORREÇÃO: Garante que a instância do MP seja criada antes de qualquer outra coisa.
+        try {
+            mp = new MercadoPago('APP_USR-524152433361858-100411-34ab0ec79aa449cef1f97353a5eef376-161100425', {
+                locale: 'pt-BR'
+            });
 
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if (user) {
-                initializeAuthenticatedState(user);
-            } else {
-                userProfile = null;
-                renderLoginScreen();
-                loadingIndicator.classList.add('hidden');
-            }
-        });
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    initializeAuthenticatedState(user);
+                } else {
+                    userProfile = null;
+                    renderLoginScreen();
+                    loadingIndicator.classList.add('hidden');
+                }
+            });
+
+        } catch(e) {
+            console.error("Erro ao inicializar Mercado Pago. Verifique sua Public Key.", e);
+        }
     });
 }
 
