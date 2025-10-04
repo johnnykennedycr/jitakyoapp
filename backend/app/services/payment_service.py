@@ -48,11 +48,9 @@ class PaymentService:
                     continue
 
                 due_day = int(enrollment.get('due_day', 15))
-                # CORREÇÃO: Cria um objeto de data completo para o vencimento
                 try:
                     due_date_obj = datetime(int(year), int(month), due_day)
                 except ValueError:
-                    # Lida com dias que não existem no mês (ex: 31 de Fev)
                     _, last_day = calendar.monthrange(int(year), int(month))
                     due_date_obj = datetime(int(year), int(month), last_day)
 
@@ -64,7 +62,7 @@ class PaymentService:
                     'reference_month': int(month),
                     'reference_year': int(year),
                     'due_day': due_day,
-                    'due_date': due_date_obj, # NOVO CAMPO ADICIONADO
+                    'due_date': due_date_obj,
                     'type': 'Mensalidade',
                     'description': f"Mensalidade {enrollment.get('class_name', 'N/A')} - {int(month):02d}/{int(year)}",
                     'class_name': enrollment.get('class_name', 'N/A'),
@@ -83,7 +81,6 @@ class PaymentService:
             raise
 
     def create_misc_invoices(self, data):
-        """Cria faturas avulsas para uma lista de alunos."""
         student_ids = data.get('student_ids', [])
         invoice_type = data.get('type')
         amount = float(data.get('amount', 0))
@@ -104,7 +101,7 @@ class PaymentService:
                 'reference_month': due_date_obj.month,
                 'reference_year': due_date_obj.year,
                 'due_day': due_date_obj.day,
-                'due_date': due_date_obj, # CAMPO ADICIONADO PARA CONSISTÊNCIA
+                'due_date': due_date_obj,
                 'type': invoice_type,
                 'description': invoice_type,
                 'class_name': 'N/A',
@@ -119,7 +116,6 @@ class PaymentService:
         return created_count
 
     def get_financial_status(self, year, month):
-        """Retorna um status financeiro detalhado."""
         summary = {'total_paid': 0, 'total_pending': 0, 'total_overdue': 0}
         paid_payments = []
         pending_payments = []
@@ -171,7 +167,6 @@ class PaymentService:
             raise
 
     def record_payment(self, data):
-        """Registra um pagamento para uma cobrança existente."""
         payment_id = data.get('payment_id')
         if not payment_id:
             raise ValueError("ID do pagamento é obrigatório.")
@@ -191,14 +186,18 @@ class PaymentService:
     
     # --- MÉTODO CORRIGIDO ---
     def get_charges_by_user_id(self, student_id):
-        """Busca todas as cobranças (pagas e pendentes) para um aluno específico."""
+        """
+        Busca todas as cobranças para um aluno e as ordena em Python
+        para evitar a necessidade de um índice composto no Firestore.
+        """
         charges = []
         try:
-            # Ordena as cobranças pela data de vencimento, da mais recente para a mais antiga
+            # 1. Busca todos os documentos do aluno sem ordenar na query
             docs = self.collection.where(
                 filter=FieldFilter('student_id', '==', student_id)
-            ).order_by('due_date', direction=firestore.Query.DESCENDING).stream()
+            ).stream()
             
+            raw_charges = []
             for doc in docs:
                 charge_data = doc.to_dict()
                 charge_data['id'] = doc.id
@@ -209,8 +208,14 @@ class PaymentService:
                 if 'payment_date' in charge_data and charge_data.get('payment_date') and hasattr(charge_data['payment_date'], 'isoformat'):
                     charge_data['payment_date'] = charge_data['payment_date'].isoformat()
 
-                charges.append(charge_data)
+                raw_charges.append(charge_data)
+
+            # 2. Ordena a lista de resultados em Python, da data mais recente para a mais antiga
+            charges = sorted(raw_charges, key=lambda x: x.get('due_date', ''), reverse=True)
+
         except Exception as e:
             print(f"Erro ao buscar cobranças para o usuário {student_id}: {e}")
+            logging.error(f"Erro ao buscar cobranças para o usuário {student_id}: {e}", exc_info=True)
+
         return charges
 
