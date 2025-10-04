@@ -2,7 +2,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
-// IMPORTANTE: Substitua pela sua Public Key de PRODUÇÃO ou TESTE do Mercado Pago
+// IMPORTANTE: Chave pública do Mercado Pago
 const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 
 
@@ -108,6 +108,11 @@ function renderAppScreen() {
                 <div class="flex-shrink-0 flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-800">Finalizar Pagamento</h3>
                     <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
+                </div>
+                 <!-- NOVO: Container para mensagens de erro -->
+                <div id="payment-error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                    <strong class="font-bold">Erro!</strong>
+                    <span id="payment-error-message" class="block sm:inline"></span>
                 </div>
                 <div class="flex-grow overflow-y-auto">
                     <div id="payment-brick-container"></div>
@@ -305,6 +310,13 @@ function renderPaymentStatus(payment) {
 async function handlePayment(paymentId, paymentAmount) {
     const modal = document.getElementById('payment-modal');
     const brickContainer = document.getElementById('payment-brick-container');
+    const errorContainer = document.getElementById('payment-error-container');
+    const errorMessage = document.getElementById('payment-error-message');
+
+    // Limpa erros anteriores
+    errorContainer.classList.add('hidden');
+    errorMessage.textContent = '';
+    
     brickContainer.innerHTML = '<p class="text-center text-gray-600">Gerando link de pagamento...</p>';
     modal.classList.remove('hidden');
 
@@ -333,6 +345,8 @@ async function handlePayment(paymentId, paymentAmount) {
                 onReady: () => { console.log("Brick de pagamento pronto!"); },
                 onSubmit: async (formData) => {
                     console.log("Enviando pagamento para o backend...", formData);
+                    // Esconde a mensagem de erro ao tentar um novo pagamento
+                    errorContainer.classList.add('hidden');
                     try {
                         const response = await fetchWithAuth(`/api/student/payments/process`, {
                             method: 'POST',
@@ -344,30 +358,32 @@ async function handlePayment(paymentId, paymentAmount) {
                         
                         console.log("Backend respondeu:", response);
 
-                        // --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
                         if (response && response.status === 'success') {
                             document.getElementById('payment-modal').classList.add('hidden');
                             if (currentBrick) {
                                 currentBrick.unmount();
                                 currentBrick = null;
                             }
-                            // Exibe o modal de sucesso
                             document.getElementById('success-modal').classList.remove('hidden');
-                            // Recarrega a lista de pagamentos para atualizar a interface
                             loadPayments();
                         } else {
-                            // Se o backend retornar uma falha, exibe a mensagem de erro
-                            const errorMessage = response.message || "Ocorreu um erro desconhecido.";
-                            alert(`Falha no pagamento: ${errorMessage}`);
+                            // Exibe a mensagem de erro específica do Mercado Pago no modal
+                            const message = response.message || "Ocorreu um erro desconhecido.";
+                            errorMessage.textContent = message;
+                            errorContainer.classList.remove('hidden');
                         }
 
                     } catch (error) {
                         console.error("Erro ao processar pagamento no backend:", error);
-                        alert("Ocorreu um erro ao processar seu pagamento. Por favor, tente novamente.");
-                        // Não relança o erro para não quebrar a experiência do brick
+                        errorMessage.textContent = "Ocorreu um erro de comunicação. Por favor, tente novamente.";
+                        errorContainer.classList.remove('hidden');
                     }
                 },
-                onError: (error) => console.error('Erro no brick de pagamento:', error),
+                onError: (error) => {
+                    console.error('Erro no brick de pagamento:', error);
+                    errorMessage.textContent = "Erro ao inicializar o formulário de pagamento. Verifique os dados inseridos.";
+                    errorContainer.classList.remove('hidden');
+                },
             },
         };
         
