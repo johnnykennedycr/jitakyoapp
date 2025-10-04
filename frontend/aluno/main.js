@@ -2,14 +2,15 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
-// IMPORTANTE: Substitua pela sua Public Key de TESTE do Mercado Pago
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
+// IMPORTANTE: Substitua pela sua Public Key de PRODUÇÃO ou TESTE do Mercado Pago
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6';
 
 
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
 let userProfile = null;
 let mp = null; // Instância do Mercado Pago
+let currentBrick = null; // Armazena a instância do brick atual para poder destruí-la
 
 // --- ELEMENTOS DO DOM ---
 let authContainer;
@@ -157,7 +158,13 @@ function setupTabListeners() {
 
 function setupModalListeners() {
     const modal = document.getElementById('payment-modal');
-    document.getElementById('close-modal-button').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('close-modal-button').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        if (currentBrick) {
+            currentBrick.unmount();
+            currentBrick = null;
+        }
+    });
 }
 
 async function loadClasses() {
@@ -208,7 +215,6 @@ function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
     const date = new Date(dateString);
     if (isNaN(date)) return 'Data inválida';
-    // Adiciona a opção timeZone para evitar problemas de fuso horário
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
@@ -281,31 +287,47 @@ async function handlePayment(paymentId, paymentAmount) {
     try {
         const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { method: 'POST' });
         
-        // Limpa o container e remove qualquer instância antiga do brick
+        if (currentBrick) {
+            currentBrick.unmount();
+        }
         brickContainer.innerHTML = '';
-        const oldBrick = document.getElementById('paymentBrick_container');
-        if(oldBrick) oldBrick.remove();
         
-        await mp.bricks().create("payment", "payment-brick-container", {
+        const settings = {
             initialization: {
                 amount: parseFloat(paymentAmount), 
                 preferenceId: preferenceId,
             },
             customization: {
-                paymentMethods: { creditCard: "all", debitCard: "all", ticket: "all", pix: "all" },
+                paymentMethods: {
+                    creditCard: "all",
+                    debitCard: "all",
+                    ticket: "all",
+                    pix: "all", 
+                },
             },
             callbacks: {
-                onReady: () => {},
-                onSubmit: () => new Promise(() => {}),
+                onReady: () => { console.log("Brick de pagamento pronto!"); },
+                // --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
+                onSubmit: async (cardFormData) => {
+                    // cardFormData contém os dados do pagamento (valor, método, etc.)
+                    // O SDK do Mercado Pago usa esses dados para processar o pagamento
+                    // quando esta função é chamada.
+                    console.log("Enviando pagamento...", cardFormData);
+                    // A função deve retornar uma promessa que resolve com o ID do pagamento
+                    // ou rejeita com um erro. O SDK cuida da maior parte disso.
+                },
                 onError: (error) => console.error('Erro no brick de pagamento:', error),
             },
-        });
+        };
+        
+        currentBrick = await mp.bricks().create("payment", "payment-brick-container", settings);
 
     } catch (error) {
         console.error("Erro ao criar preferência de pagamento:", error);
         brickContainer.innerHTML = '<p class="text-center text-red-500 font-semibold">Não foi possível gerar o link de pagamento. Tente novamente mais tarde.</p>';
     }
 }
+
 
 async function initializeAuthenticatedState(user) {
     loadingIndicator.classList.remove('hidden');
