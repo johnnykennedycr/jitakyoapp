@@ -3,7 +3,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
 // IMPORTANTE: Substitua pela sua Public Key de PRODUÇÃO ou TESTE do Mercado Pago
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6';
 
 
 // --- ESTADO DA APLICAÇÃO ---
@@ -307,14 +307,32 @@ async function handlePayment(paymentId, paymentAmount) {
             },
             callbacks: {
                 onReady: () => { console.log("Brick de pagamento pronto!"); },
-                // --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
-                onSubmit: async (cardFormData) => {
-                    // cardFormData contém os dados do pagamento (valor, método, etc.)
-                    // O SDK do Mercado Pago usa esses dados para processar o pagamento
-                    // quando esta função é chamada.
-                    console.log("Enviando pagamento...", cardFormData);
-                    // A função deve retornar uma promessa que resolve com o ID do pagamento
-                    // ou rejeita com um erro. O SDK cuida da maior parte disso.
+                onSubmit: async (formData) => {
+                    console.log("Enviando pagamento para o backend...", formData);
+                    try {
+                        const response = await fetchWithAuth(`/api/student/payments/process`, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                paymentId: paymentId,
+                                mercadoPagoData: formData
+                            }),
+                        });
+                        
+                        console.log("Backend respondeu:", response);
+                        alert("Pagamento realizado com sucesso!");
+                        
+                        document.getElementById('payment-modal').classList.add('hidden');
+                        if (currentBrick) {
+                            currentBrick.unmount();
+                            currentBrick = null;
+                        }
+                        loadPayments();
+
+                    } catch (error) {
+                        console.error("Erro ao processar pagamento no backend:", error);
+                        alert("Ocorreu um erro ao processar seu pagamento. Por favor, tente novamente.");
+                        throw error;
+                    }
                 },
                 onError: (error) => console.error('Erro no brick de pagamento:', error),
             },

@@ -1,9 +1,8 @@
-import calendar
-from datetime import date, datetime, timedelta
-import logging
 import os
+import calendar
+from datetime import date, datetime
+import logging
 from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
 import mercadopago
 
 class PaymentService:
@@ -13,37 +12,133 @@ class PaymentService:
         self.enrollment_service = enrollment_service
         self.user_service = user_service
         self.training_class_service = training_class_service
-        
         # Inicializa o SDK do Mercado Pago
-        access_token = os.getenv('MERCADO_PAGO_ACCESS_TOKEN')
+        access_token = os.getenv("MERCADO_PAGO_ACCESS_TOKEN")
         if access_token:
-            self.mp_sdk = mercadopago.SDK(access_token)
+            self.sdk = mercadopago.SDK(access_token)
         else:
-            self.mp_sdk = None
-            print("AVISO: MERCADO_PAGO_ACCESS_TOKEN não configurado. A funcionalidade de pagamento estará desabilitada.")
+            self.sdk = None
+            print("AVISO: MERCADO_PAGO_ACCESS_TOKEN não está configurado. A funcionalidade de pagamento estará desabilitada.")
 
-    # ... (os outros métodos como generate_monthly_payments, get_financial_status, etc. permanecem aqui)
+    def create_payment_preference(self, payment_id, user):
+        """Cria uma preferência de pagamento no Mercado Pago."""
+        if not self.sdk:
+            raise Exception("SDK do Mercado Pago não inicializado.")
+
+        payment_doc = self.collection.document(payment_id).get()
+        if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user.id:
+            raise ValueError("Fatura não encontrada ou não pertence a este usuário.")
+        
+        payment_data = payment_doc.to_dict()
+        description = payment_data.get('description', f"{payment_data.get('type', 'Fatura')} - {payment_data.get('reference_month')}/{payment_data.get('reference_year')}")
+
+        preference_data = {
+            "items": [
+                {
+                    "title": description,
+                    "quantity": 1,
+                    "unit_price": float(payment_data.get('amount'))
+                }
+            ],
+            "payer": {
+                "name": user.name,
+                "email": user.email,
+            },
+            "back_urls": {
+                "success": "https://aluno-jitakyoapp.web.app",
+                "failure": "https://aluno-jitakyoapp.web.app",
+                "pending": "https://aluno-jitakyoapp.web.app"
+            },
+            "auto_return": "approved",
+        }
+        
+        preference_response = self.sdk.preference().create(preference_data)
+        preference = preference_response["response"]
+        return preference["id"]
+
+    def process_payment(self, payment_id, mp_data, user_id):
+        """Processa o pagamento usando o SDK do Mercado Pago no lado do servidor."""
+        if not self.sdk:
+            raise Exception("SDK do Mercado Pago não inicializado.")
+            
+        try:
+            payment_doc_ref = self.collection.document(payment_id)
+            payment_doc = payment_doc_ref.get()
+            if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user_id:
+                raise ValueError("Fatura não encontrada ou não pertence a este usuário.")
+
+            payment_data_to_send = {
+                "transaction_amount": float(mp_data.get("transaction_amount")),
+                "token": mp_data.get("token"),
+                "description": payment_doc.to_dict().get('description', 'Pagamento JitaKyoApp'),
+                "installments": int(mp_data.get("installments")),
+                "payment_method_id": mp_data.get("payment_method_id"),
+                "payer": {
+                    "email": mp_data.get("payer", {}).get("email"),
+                    "identification": {
+                        "type": mp_data.get("payer", {}).get("identification", {}).get("type"),
+                        "number": mp_data.get("payer", {}).get("identification", {}).get("number")
+                    }
+                }
+            }
+
+            payment_response = self.sdk.payment().create(payment_data_to_send)
+            payment_result = payment_response["response"]
+
+            if payment_result.get("status") == "approved":
+                update_data = {
+                    'status': 'paid',
+                    'payment_date': datetime.now(),
+                    'payment_method': payment_result.get("payment_method_id"),
+                    'updated_at': datetime.now(),
+                    'mercado_pago_payment_id': payment_result.get("id")
+                }
+                payment_doc_ref.update(update_data)
+                return {"status": "success", "message": "Pagamento aprovado!", "paymentId": payment_result.get("id")}
+            else:
+                return {"status": "failed", "message": payment_result.get("status_detail"), "paymentInfo": payment_result}
+
+        except Exception as e:
+            logging.error(f"Erro ao processar pagamento para a fatura {payment_id}: {e}", exc_info=True)
+            raise
+
+    # O resto dos seus métodos...
     def generate_monthly_payments(self, year, month):
         try:
             active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
             generated_count = 0
             existing_count = 0
+
             for enrollment in active_enrollments:
                 student_id = enrollment['student_id']
                 enrollment_id = enrollment['enrollment_id']
-                existing_payment_query = self.collection.where(filter=firestore.And([firestore.FieldFilter('student_id', '==', student_id), firestore.FieldFilter('enrollment_id', '==', enrollment_id), firestore.FieldFilter('reference_year', '==', int(year)), firestore.FieldFilter('reference_month', '==', int(month))])).limit(1).stream()
+                
+                existing_payment_query = self.collection.where(
+                    filter=firestore.And(
+                        [
+                            firestore.FieldFilter('student_id', '==', student_id),
+                            firestore.FieldFilter('enrollment_id', '==', enrollment_id),
+                            firestore.FieldFilter('reference_year', '==', int(year)),
+                            firestore.FieldFilter('reference_month', '==', int(month))
+                        ]
+                    )
+                ).limit(1).stream()
+                
                 if len(list(existing_payment_query)) > 0:
                     existing_count += 1
                     continue
+
                 total_due = float(enrollment.get('base_monthly_fee', 0)) - float(enrollment.get('discount_amount', 0))
+                
                 if total_due <= 0:
                     continue
+
                 due_day = int(enrollment.get('due_day', 15))
-                try:
-                    due_date_obj = datetime(int(year), int(month), due_day)
-                except ValueError:
-                    _, last_day = calendar.monthrange(int(year), int(month))
-                    due_date_obj = datetime(int(year), int(month), last_day)
+                # Garante que o dia de vencimento é válido para o mês/ano
+                _, last_day_of_month = calendar.monthrange(int(year), int(month))
+                valid_due_day = min(due_day, last_day_of_month)
+                due_date_obj = datetime(int(year), int(month), valid_due_day)
+
                 payment_data = {
                     'student_id': student_id,
                     'enrollment_id': enrollment_id, 
@@ -54,7 +149,7 @@ class PaymentService:
                     'due_day': due_day,
                     'due_date': due_date_obj,
                     'type': 'Mensalidade',
-                    'description': f"Mensalidade {enrollment.get('class_name', 'N/A')} - {int(month):02d}/{int(year)}",
+                    'description': f"Mensalidade {enrollment.get('class_name', 'N/A')} - {int(month)}/{int(year)}",
                     'class_name': enrollment.get('class_name', 'N/A'),
                     'payment_date': None,
                     'payment_method': None,
@@ -63,55 +158,53 @@ class PaymentService:
                 }
                 self.collection.add(payment_data)
                 generated_count += 1
+            
             return {"generated": generated_count, "skipped": existing_count}
+
         except Exception as e:
             logging.error(f"Erro ao gerar cobranças mensais para {month}/{year}: {e}", exc_info=True)
             raise
 
-    def create_misc_invoices(self, data):
-        student_ids = data.get('student_ids', [])
-        invoice_type = data.get('type')
-        amount = float(data.get('amount', 0))
-        due_date_str = data.get('due_date')
-        if not all([student_ids, invoice_type, amount > 0, due_date_str]):
-            raise ValueError("Dados insuficientes para criar faturas avulsas.")
-        due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d')
-        created_count = 0
-        for student_id in student_ids:
-            payment_data = {
-                'student_id': student_id,
-                'enrollment_id': None,
-                'amount': amount,
-                'status': 'pending',
-                'reference_month': due_date_obj.month,
-                'reference_year': due_date_obj.year,
-                'due_day': due_date_obj.day,
-                'due_date': due_date_obj,
-                'type': invoice_type,
-                'description': invoice_type,
-                'class_name': 'N/A',
-                'payment_date': None,
-                'payment_method': None,
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
-            }
-            self.collection.add(payment_data)
-            created_count += 1
-        return created_count
+    def get_charges_by_user_id(self, user_id):
+        """Busca todas as cobranças (pagas e pendentes) para um aluno específico, ordenadas no backend."""
+        try:
+            docs = self.collection.where('student_id', '==', user_id).stream()
+            charges = []
+            for doc in docs:
+                charge_data = doc.to_dict()
+                charge_data['id'] = doc.id
+                charges.append(charge_data)
+            
+            # Ordena a lista em memória para evitar a necessidade de índices compostos complexos no Firestore
+            charges.sort(key=lambda x: (x.get('reference_year', 0), x.get('reference_month', 0)), reverse=True)
+            
+            return charges
+        except Exception as e:
+            print(f"Erro ao buscar cobranças para o usuário {user_id}: {e}")
+            return []
 
     def get_financial_status(self, year, month):
         summary = {'total_paid': 0, 'total_pending': 0, 'total_overdue': 0}
         paid_payments = []
         pending_payments = []
         today = date.today()
+
         try:
-            payments_query = self.collection.where(filter=firestore.And([firestore.FieldFilter('reference_year', '==', int(year)), firestore.FieldFilter('reference_month', '==', int(month))])).stream()
+            payments_query = self.collection.where(filter=firestore.And(
+                [
+                    firestore.FieldFilter('reference_year', '==', int(year)),
+                    firestore.FieldFilter('reference_month', '==', int(month))
+                ]
+            )).stream()
+            
             all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
+
             for doc in payments_query:
                 payment = doc.to_dict()
-                payment['id'] = doc.id 
+                payment['id'] = doc.id
                 payment['student_name'] = all_students.get(payment.get('student_id'), "Aluno Desconhecido")
                 amount = float(payment.get('amount', 0))
+
                 if payment.get('status') == 'paid':
                     summary['total_paid'] += amount
                     paid_payments.append(payment)
@@ -120,23 +213,33 @@ class PaymentService:
                     due_day = min(int(payment.get('due_day', 15)), last_day)
                     due_date = date(int(year), int(month), due_day)
                     payment['due_date_formatted'] = due_date.strftime('%d/%m/%Y')
+
                     if due_date < today and payment.get('status') != 'paid':
                         summary['total_overdue'] += amount
                         payment['status'] = 'overdue'
                     else:
                         summary['total_pending'] += amount
                         payment['status'] = 'pending'
+                    
                     pending_payments.append(payment)
-            return {"summary": summary, "paid_payments": paid_payments, "pending_payments": pending_payments}
+
+            return {
+                "summary": summary,
+                "paid_payments": paid_payments,
+                "pending_payments": pending_payments
+            }
         except Exception as e:
             logging.error(f"Erro ao obter status financeiro para {month}/{year}: {e}", exc_info=True)
             raise
 
     def record_payment(self, data):
+        """Registra um pagamento para uma cobrança existente."""
         payment_id = data.get('payment_id')
         if not payment_id:
             raise ValueError("ID do pagamento é obrigatório.")
+
         payment_ref = self.collection.document(payment_id)
+        
         update_data = {
             'status': 'paid',
             'amount': float(data.get('amount')),
@@ -148,70 +251,38 @@ class PaymentService:
         payment_ref.update(update_data)
         return True
 
-    def get_charges_by_user_id(self, student_id):
-        charges = []
-        try:
-            docs = self.collection.where(filter=FieldFilter('student_id', '==', student_id)).stream()
-            raw_charges = []
-            for doc in docs:
-                charge_data = doc.to_dict()
-                charge_data['id'] = doc.id
-                if 'due_date' in charge_data and hasattr(charge_data['due_date'], 'isoformat'):
-                    charge_data['due_date'] = charge_data['due_date'].isoformat()
-                if 'payment_date' in charge_data and charge_data.get('payment_date') and hasattr(charge_data['payment_date'], 'isoformat'):
-                    charge_data['payment_date'] = charge_data['payment_date'].isoformat()
-                raw_charges.append(charge_data)
-            charges = sorted(raw_charges, key=lambda x: x.get('due_date', ''), reverse=True)
-        except Exception as e:
-            print(f"Erro ao buscar cobranças para o usuário {student_id}: {e}")
-            logging.error(f"Erro ao buscar cobranças para o usuário {student_id}: {e}", exc_info=True)
-        return charges
+    def create_misc_invoices(self, data):
+        student_ids = data.get('student_ids', [])
+        invoice_type = data.get('type')
+        amount = float(data.get('amount', 0))
+        due_date_str = data.get('due_date')
 
-    # --- NOVO MÉTODO PARA PAGAMENTO ---
-    def create_payment_preference(self, payment_id, user):
-        """
-        Cria uma preferência de pagamento no Mercado Pago para uma fatura específica.
-        """
-        if not self.mp_sdk:
-            raise Exception("SDK do Mercado Pago não está configurado.")
+        if not all([student_ids, invoice_type, amount > 0, due_date_str]):
+            raise ValueError("Dados insuficientes para criar faturas avulsas.")
 
-        try:
-            # 1. Buscar a fatura no Firestore
-            payment_doc = self.collection.document(payment_id).get()
-            if not payment_doc.exists:
-                raise ValueError("Fatura não encontrada.")
-            
-            payment_data = payment_doc.to_dict()
-            
-            # 2. Preparar os dados para a preferência do Mercado Pago
-            preference_data = {
-                "items": [
-                    {
-                        "title": payment_data.get('description', 'Pagamento JitaKyoApp'),
-                        "quantity": 1,
-                        "unit_price": float(payment_data.get('amount', 0))
-                    }
-                ],
-                "payer": {
-                    "name": user.name,
-                    "email": user.email,
-                },
-                "back_urls": {
-                    "success": "https://aluno-jitakyoapp.web.app", # URL de retorno em caso de sucesso
-                    "failure": "https://aluno-jitakyoapp.web.app",
-                    "pending": "https://aluno-jitakyoapp.web.app"
-                },
-                "auto_return": "approved",
-                "external_reference": payment_id, # Vincula a preferência ao ID da sua fatura
+        due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
+        
+        created_count = 0
+        for student_id in student_ids:
+            payment_data = {
+                'student_id': student_id,
+                'enrollment_id': None,
+                'amount': amount,
+                'status': 'pending',
+                'reference_month': due_date.month,
+                'reference_year': due_date.year,
+                'due_day': due_date.day,
+                'due_date': due_date,
+                'type': invoice_type,
+                'description': invoice_type,
+                'class_name': 'N/A',
+                'payment_date': None,
+                'payment_method': None,
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
             }
-
-            # 3. Criar a preferência
-            preference_response = self.mp_sdk.preference().create(preference_data)
-            preference = preference_response["response"]
+            self.collection.add(payment_data)
+            created_count += 1
             
-            return preference['id']
-
-        except Exception as e:
-            logging.error(f"Erro ao criar preferência de pagamento para {payment_id}: {e}", exc_info=True)
-            raise
+        return created_count
 
