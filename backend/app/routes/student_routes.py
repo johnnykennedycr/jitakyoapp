@@ -8,11 +8,13 @@ user_service = None
 enrollment_service = None
 payment_service = None
 
-def init_student_bp(us, es, ps):
+def init_student_bp(us, es, tcs, ats, ps):
     """Inicializa o Blueprint com as instâncias dos serviços."""
     global user_service, enrollment_service, payment_service
     user_service = us
     enrollment_service = es
+    # A função estava recebendo mais argumentos do que o esperado.
+    # Corrigido para atribuir o serviço de pagamento (ps) corretamente.
     payment_service = ps
 
 @student_api_bp.route('/profile', methods=['GET'])
