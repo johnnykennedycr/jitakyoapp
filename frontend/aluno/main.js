@@ -98,13 +98,16 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50">
-            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4">
-                <div class="flex justify-between items-center mb-6">
+        <!-- CORREÇÃO DA BARRA DE ROLAGEM APLICADA AQUI -->
+        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
+                <div class="flex-shrink-0 flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-800">Finalizar Pagamento</h3>
                     <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
                 </div>
-                <div id="payment-brick-container"></div>
+                <div class="flex-grow overflow-y-auto">
+                    <div id="payment-brick-container"></div>
+                </div>
             </div>
         </div>
     `;
@@ -117,7 +120,6 @@ function renderAppScreen() {
     setupTabListeners();
     setupModalListeners();
     
-    // Adiciona listener para os botões de pagar (usando delegação de evento)
     appContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('pay-button')) {
             const paymentId = event.target.dataset.paymentId;
@@ -261,29 +263,33 @@ async function handlePayment(paymentId) {
     try {
         const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { method: 'POST' });
         
-        brickContainer.innerHTML = ''; // Limpa a mensagem de carregamento
+        brickContainer.innerHTML = '';
         
-        // Remove qualquer "brick" anterior para evitar duplicatas
         const oldBrick = document.getElementById('paymentBrick_container');
         if(oldBrick) oldBrick.remove();
 
+        // --- CONTROLE DAS FORMAS DE PAGAMENTO ---
+        // Você pode habilitar ou desabilitar as formas de pagamento
+        // simplesmente adicionando ou removendo as linhas abaixo.
+        const paymentMethods = {
+            creditCard: "all", // Cartão de crédito
+            debitCard: "all",  // Cartão de débito
+            ticket: "all",     // Boleto
+            pix: "all",        // Pix
+            // atm: "all"      // Lotérica (Caixa)
+        };
+        
         await mp.bricks().create("payment", "payment-brick-container", {
             initialization: {
-                amount: 1, // O valor é controlado pela preferência, aqui pode ser qualquer valor > 0
+                amount: 1, 
                 preferenceId: preferenceId,
             },
             customization: {
-                paymentMethods: {
-                    creditCard: "all",
-                    debitCard: "all",
-                    ticket: "all",
-                    pix: "all"
-                },
+                paymentMethods: paymentMethods,
             },
             callbacks: {
-                onReady: () => { /* Botão de pagamento pronto */ },
+                onReady: () => {},
                 onSubmit: ({ selectedPaymentMethod, formData }) => {
-                    // O pagamento é processado pelo Mercado Pago
                     return new Promise(() => {});
                 },
                 onError: (error) => {
@@ -298,7 +304,6 @@ async function handlePayment(paymentId) {
     }
 }
 
-// --- LÓGICA DE INICIALIZAÇÃO ---
 async function initializeAuthenticatedState(user) {
     loadingIndicator.classList.remove('hidden');
     try {
@@ -322,8 +327,8 @@ function initialize() {
         appContainer = document.getElementById('app-container');
         loadingIndicator = document.getElementById('loading-indicator');
         
-        // ATENÇÃO: Coloque sua Public Key do Mercado Pago aqui!
-        mp = new MercadoPago('APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90', {
+        // Lembre-se de usar sua Public Key de TESTE aqui.
+        mp = new MercadoPago('APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6', {
             locale: 'pt-BR'
         });
 
@@ -331,7 +336,6 @@ function initialize() {
             currentUser = user;
             if (user) {
                 initializeAuthenticatedState(user);
-
             } else {
                 userProfile = null;
                 renderLoginScreen();
