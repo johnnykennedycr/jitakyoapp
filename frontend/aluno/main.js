@@ -37,7 +37,7 @@ async function fetchWithAuth(endpoint, options = {}) {
     return response.json();
 }
 
-// --- FUNÇÕES DE RENDERIZAÇÃO ---
+// --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
 function renderLoginScreen() {
     if (!authContainer) return;
     authContainer.innerHTML = `
@@ -102,6 +102,7 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
+        <!-- Modal de Pagamento -->
         <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
                 <div class="flex-shrink-0 flex justify-between items-center mb-6">
@@ -110,6 +111,23 @@ function renderAppScreen() {
                 </div>
                 <div class="flex-grow overflow-y-auto">
                     <div id="payment-brick-container"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Modal de Sucesso -->
+        <div id="success-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm mx-auto text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                    <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Pagamento Aprovado!</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">Seu pagamento foi processado com sucesso. Obrigado!</p>
+                </div>
+                <div class="mt-4">
+                    <button id="close-success-modal-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
                 </div>
             </div>
         </div>
@@ -157,13 +175,19 @@ function setupTabListeners() {
 }
 
 function setupModalListeners() {
-    const modal = document.getElementById('payment-modal');
+    const paymentModal = document.getElementById('payment-modal');
+    const successModal = document.getElementById('success-modal');
+    
     document.getElementById('close-modal-button').addEventListener('click', () => {
-        modal.classList.add('hidden');
+        paymentModal.classList.add('hidden');
         if (currentBrick) {
             currentBrick.unmount();
             currentBrick = null;
         }
+    });
+
+    document.getElementById('close-success-modal-button').addEventListener('click', () => {
+        successModal.classList.add('hidden');
     });
 }
 
@@ -319,19 +343,28 @@ async function handlePayment(paymentId, paymentAmount) {
                         });
                         
                         console.log("Backend respondeu:", response);
-                        alert("Pagamento realizado com sucesso!");
-                        
-                        document.getElementById('payment-modal').classList.add('hidden');
-                        if (currentBrick) {
-                            currentBrick.unmount();
-                            currentBrick = null;
+
+                        // --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
+                        if (response && response.status === 'success') {
+                            document.getElementById('payment-modal').classList.add('hidden');
+                            if (currentBrick) {
+                                currentBrick.unmount();
+                                currentBrick = null;
+                            }
+                            // Exibe o modal de sucesso
+                            document.getElementById('success-modal').classList.remove('hidden');
+                            // Recarrega a lista de pagamentos para atualizar a interface
+                            loadPayments();
+                        } else {
+                            // Se o backend retornar uma falha, exibe a mensagem de erro
+                            const errorMessage = response.message || "Ocorreu um erro desconhecido.";
+                            alert(`Falha no pagamento: ${errorMessage}`);
                         }
-                        loadPayments();
 
                     } catch (error) {
                         console.error("Erro ao processar pagamento no backend:", error);
                         alert("Ocorreu um erro ao processar seu pagamento. Por favor, tente novamente.");
-                        throw error;
+                        // Não relança o erro para não quebrar a experiência do brick
                     }
                 },
                 onError: (error) => console.error('Erro no brick de pagamento:', error),
