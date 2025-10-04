@@ -52,33 +52,20 @@ class EnrollmentService:
 
     def get_enrollments_by_student_id(self, student_id):
         """Busca todas as matrículas de um aluno, enriquecidas com nomes da turma e do professor."""
-        print(f"[DIAGNÓSTICO] Buscando matrículas para o aluno ID: {student_id}")
         enrollments_details = []
         try:
             enrollment_docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
             
             for doc in enrollment_docs:
                 enrollment = Enrollment.from_dict(doc.to_dict(), doc.id)
-                print(f"[DIAGNÓSTICO] Encontrada matrícula ID: {enrollment.id} para a turma ID: {enrollment.class_id}")
                 
-                # Buscar informações da turma
                 class_info = self.training_class_service.get_class_by_id(enrollment.class_id)
                 
                 teacher_name = "Professor não encontrado"
-                if class_info:
-                    print(f"[DIAGNÓSTICO] Turma encontrada: {class_info.name}. ID do professor: {getattr(class_info, 'teacher_id', 'N/A')}")
-                    if hasattr(class_info, 'teacher_id') and class_info.teacher_id:
-                        # Buscar informações do professor usando o teacher_id da turma
-                        teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
-                        if teacher_info:
-                            print(f"[DIAGNÓSTICO] Professor encontrado: {teacher_info.name}")
-                            teacher_name = teacher_info.name
-                        else:
-                            print(f"[DIAGNÓSTICO] AVISO: Professor com ID {class_info.teacher_id} não encontrado no user_service.")
-                    else:
-                        print("[DIAGNÓSTICO] AVISO: A turma não possui um teacher_id associado.")
-                else:
-                    print(f"[DIAGNÓSTICO] AVISO: Turma com ID {enrollment.class_id} não encontrada no training_class_service.")
+                if class_info and hasattr(class_info, 'teacher_id') and class_info.teacher_id:
+                    teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
+                    if teacher_info:
+                        teacher_name = teacher_info.name
 
                 enrollment_dict = enrollment.to_dict()
                 enrollment_dict['class_name'] = class_info.name if class_info else "Turma desconhecida"
@@ -86,7 +73,6 @@ class EnrollmentService:
                 
                 enrollments_details.append(enrollment_dict)
                 
-            print(f"[DIAGNÓSTICO] Processamento de matrículas para o aluno {student_id} concluído.")
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
         return enrollments_details

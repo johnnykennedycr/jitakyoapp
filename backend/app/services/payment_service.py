@@ -1,7 +1,8 @@
 import calendar
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 class PaymentService:
     def __init__(self, db, enrollment_service=None, user_service=None, training_class_service=None):
@@ -14,7 +15,7 @@ class PaymentService:
     def generate_monthly_payments(self, year, month):
         """
         Gera cobranças de mensalidade individuais para cada matrícula ativa,
-        evitando a criação de duplicatas, usando a sintaxe de consulta moderna.
+        incluindo um campo 'due_date' para facilitar as consultas.
         """
         try:
             active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
@@ -26,8 +27,6 @@ class PaymentService:
                 student_id = enrollment['student_id']
                 enrollment_id = enrollment['enrollment_id']
                 
-                # A consulta foi reescrita para usar a sintaxe moderna com 'filter'
-                # e firestore.And, que é a forma correta e recomendada.
                 existing_payment_query = self.collection.where(
                     filter=firestore.And(
                         [
@@ -43,11 +42,19 @@ class PaymentService:
                     existing_count += 1
                     continue
 
-                # Calcula o valor devido para esta matrícula
                 total_due = float(enrollment.get('base_monthly_fee', 0)) - float(enrollment.get('discount_amount', 0))
                 
                 if total_due <= 0:
                     continue
+
+                due_day = int(enrollment.get('due_day', 15))
+                # CORREÇÃO: Cria um objeto de data completo para o vencimento
+                try:
+                    due_date_obj = datetime(int(year), int(month), due_day)
+                except ValueError:
+                    # Lida com dias que não existem no mês (ex: 31 de Fev)
+                    _, last_day = calendar.monthrange(int(year), int(month))
+                    due_date_obj = datetime(int(year), int(month), last_day)
 
                 payment_data = {
                     'student_id': student_id,
@@ -56,8 +63,10 @@ class PaymentService:
                     'status': 'pending',
                     'reference_month': int(month),
                     'reference_year': int(year),
-                    'due_day': int(enrollment.get('due_day', 15)),
+                    'due_day': due_day,
+                    'due_date': due_date_obj, # NOVO CAMPO ADICIONADO
                     'type': 'Mensalidade',
+                    'description': f"Mensalidade {enrollment.get('class_name', 'N/A')} - {int(month):02d}/{int(year)}",
                     'class_name': enrollment.get('class_name', 'N/A'),
                     'payment_date': None,
                     'payment_method': None,
@@ -67,7 +76,6 @@ class PaymentService:
                 self.collection.add(payment_data)
                 generated_count += 1
             
-            # --- CORREÇÃO APLICADA AQUI: A chave 'existing' foi alterada para 'skipped' ---
             return {"generated": generated_count, "skipped": existing_count}
 
         except Exception as e:
@@ -84,23 +92,22 @@ class PaymentService:
         if not all([student_ids, invoice_type, amount > 0, due_date_str]):
             raise ValueError("Dados insuficientes para criar faturas avulsas.")
 
-        due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
-        reference_year = due_date.year
-        reference_month = due_date.month
-        due_day = due_date.day
+        due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d')
         
         created_count = 0
         for student_id in student_ids:
             payment_data = {
                 'student_id': student_id,
-                'enrollment_id': None,  # Fatura avulsa não tem matrícula
+                'enrollment_id': None,
                 'amount': amount,
                 'status': 'pending',
-                'reference_month': reference_month,
-                'reference_year': reference_year,
-                'due_day': due_day,
+                'reference_month': due_date_obj.month,
+                'reference_year': due_date_obj.year,
+                'due_day': due_date_obj.day,
+                'due_date': due_date_obj, # CAMPO ADICIONADO PARA CONSISTÊNCIA
                 'type': invoice_type,
-                'class_name': 'N/A', # Fatura avulsa não tem turma
+                'description': invoice_type,
+                'class_name': 'N/A',
                 'payment_date': None,
                 'payment_method': None,
                 'created_at': datetime.now(),
@@ -112,17 +119,13 @@ class PaymentService:
         return created_count
 
     def get_financial_status(self, year, month):
-        """
-        Retorna um status financeiro detalhado, buscando pagamentos e enriquecendo com
-        detalhes do aluno e da turma.
-        """
+        """Retorna um status financeiro detalhado."""
         summary = {'total_paid': 0, 'total_pending': 0, 'total_overdue': 0}
         paid_payments = []
         pending_payments = []
         today = date.today()
 
         try:
-            # Consulta atualizada para a sintaxe moderna
             payments_query = self.collection.where(filter=firestore.And(
                 [
                     firestore.FieldFilter('reference_year', '==', int(year)),
@@ -186,17 +189,28 @@ class PaymentService:
         payment_ref.update(update_data)
         return True
     
-    def get_charges_by_user_id(self, user_id):
+    # --- MÉTODO CORRIGIDO ---
+    def get_charges_by_user_id(self, student_id):
         """Busca todas as cobranças (pagas e pendentes) para um aluno específico."""
+        charges = []
         try:
-            charges_ref = self.db.collection('charges').where('student_id', '==', user_id).stream()
-            charges = []
-            for charge in charges_ref:
-                charge_data = charge.to_dict()
-                charge_data['id'] = charge.id
+            # Ordena as cobranças pela data de vencimento, da mais recente para a mais antiga
+            docs = self.collection.where(
+                filter=FieldFilter('student_id', '==', student_id)
+            ).order_by('due_date', direction=firestore.Query.DESCENDING).stream()
+            
+            for doc in docs:
+                charge_data = doc.to_dict()
+                charge_data['id'] = doc.id
+                
+                # Garante que as datas são strings no formato ISO para o frontend
+                if 'due_date' in charge_data and hasattr(charge_data['due_date'], 'isoformat'):
+                    charge_data['due_date'] = charge_data['due_date'].isoformat()
+                if 'payment_date' in charge_data and charge_data.get('payment_date') and hasattr(charge_data['payment_date'], 'isoformat'):
+                    charge_data['payment_date'] = charge_data['payment_date'].isoformat()
+
                 charges.append(charge_data)
-            return charges
         except Exception as e:
-            print(f"Erro ao buscar cobranças para o usuário {user_id}: {e}")
-            return []
+            print(f"Erro ao buscar cobranças para o usuário {student_id}: {e}")
+        return charges
 
