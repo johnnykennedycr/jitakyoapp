@@ -2,6 +2,9 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
+// IMPORTANTE: Substitua pela sua Public Key de TESTE do Mercado Pago
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6';
+
 
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
@@ -122,7 +125,8 @@ function renderAppScreen() {
     appContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('pay-button')) {
             const paymentId = event.target.dataset.paymentId;
-            handlePayment(paymentId);
+            const paymentAmount = event.target.dataset.paymentAmount;
+            handlePayment(paymentId, paymentAmount);
         }
     });
 
@@ -185,6 +189,7 @@ async function loadPayments() {
 
     try {
         const payments = await fetchWithAuth('/api/student/payments');
+        console.log("Pagamentos recebidos da API:", payments);
         
         const pendingPayments = payments.filter(p => p.status !== 'paid');
         const paidPayments = payments.filter(p => p.status === 'paid');
@@ -197,6 +202,14 @@ async function loadPayments() {
         pendingContent.innerHTML = '<p class="text-red-500 mt-4">Não foi possível carregar seu histórico financeiro.</p>';
         paidContent.innerHTML = '<p class="text-red-500 mt-4">Não foi possível carregar seu histórico financeiro.</p>';
     }
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Data inválida';
+    const date = new Date(dateString);
+    if (isNaN(date)) return 'Data inválida';
+    // Adiciona a opção timeZone para evitar problemas de fuso horário
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
 function renderPaymentsTable(container, payments, isPaidTable) {
@@ -218,21 +231,26 @@ function renderPaymentsTable(container, payments, isPaidTable) {
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    ${payments.map(p => `
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${p.description}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${new Date(p.due_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">R$ ${p.amount.toFixed(2)}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">${renderPaymentStatus(p)}</td>
-                            ${isPaidTable ? 
-                                `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${p.payment_date ? new Date(p.payment_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A'}</td>` 
-                                : 
-                                `<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button class="pay-button text-blue-600 hover:text-blue-800 font-semibold" data-payment-id="${p.id}">Pagar</button>
-                                 </td>`
-                            }
-                        </tr>
-                    `).join('')}
+                    ${payments.map(p => {
+                        const description = p.description || `${p.type || 'Fatura'} - ${p.reference_month}/${p.reference_year}`;
+                        return `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${description}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatDate(p.due_date)}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">R$ ${p.amount.toFixed(2)}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">${renderPaymentStatus(p)}</td>
+                                ${isPaidTable ? 
+                                    `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatDate(p.payment_date)}</td>` 
+                                    : 
+                                    `<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button class="pay-button text-blue-600 hover:text-blue-800 font-semibold" 
+                                                data-payment-id="${p.id}" 
+                                                data-payment-amount="${p.amount}">Pagar</button>
+                                     </td>`
+                                }
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -240,6 +258,7 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
+    if (!payment || !payment.status) return '';
     const dueDate = new Date(payment.due_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -253,7 +272,7 @@ function renderPaymentStatus(payment) {
     return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendente</span>`;
 }
 
-async function handlePayment(paymentId) {
+async function handlePayment(paymentId, paymentAmount) {
     const modal = document.getElementById('payment-modal');
     const brickContainer = document.getElementById('payment-brick-container');
     brickContainer.innerHTML = '<p class="text-center text-gray-600">Gerando link de pagamento...</p>';
@@ -262,14 +281,14 @@ async function handlePayment(paymentId) {
     try {
         const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { method: 'POST' });
         
+        // Limpa o container e remove qualquer instância antiga do brick
         brickContainer.innerHTML = '';
-        
         const oldBrick = document.getElementById('paymentBrick_container');
         if(oldBrick) oldBrick.remove();
         
         await mp.bricks().create("payment", "payment-brick-container", {
             initialization: {
-                amount: 1, 
+                amount: parseFloat(paymentAmount), 
                 preferenceId: preferenceId,
             },
             customization: {
@@ -311,9 +330,8 @@ function initialize() {
         appContainer = document.getElementById('app-container');
         loadingIndicator = document.getElementById('loading-indicator');
         
-        // CORREÇÃO: Garante que a instância do MP seja criada antes de qualquer outra coisa.
         try {
-            mp = new MercadoPago('APP_USR-524152433361858-100411-34ab0ec79aa449cef1f97353a5eef376-161100425', {
+            mp = new MercadoPago(MERCADO_PAGO_PUBLIC_KEY, {
                 locale: 'pt-BR'
             });
 
@@ -330,6 +348,7 @@ function initialize() {
 
         } catch(e) {
             console.error("Erro ao inicializar Mercado Pago. Verifique sua Public Key.", e);
+            alert("Erro na configuração de pagamentos. Verifique o console para mais detalhes.");
         }
     });
 }
