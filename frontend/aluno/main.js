@@ -3,7 +3,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
 // IMPORTANTE: Substitua pela sua Public Key de TESTE do Mercado Pago
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-f3e1b7f0-0d32-4411-92b0-b962772545d6';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 
 
 // --- ESTADO DA APLICAÇÃO ---
