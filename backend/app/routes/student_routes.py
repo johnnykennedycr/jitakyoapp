@@ -1,40 +1,30 @@
 from flask import Blueprint, jsonify, g
-
-# Garante que estamos a usar os decorators e serviços corretos da sua aplicação
 from app.utils.decorators import role_required
-from app.services.user_service import UserService
-from app.services.enrollment_service import EnrollmentService
-from app.services.training_class_service import TrainingClassService
-from app.services.attendance_service import AttendanceService
-from app.services.payment_service import PaymentService
 
-# Esta linha é a mais importante: define o prefixo para todas as rotas neste ficheiro.
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-# Variáveis globais para guardar as instâncias dos serviços
-_user_service: UserService = None
-_enrollment_service: EnrollmentService = None
-_payment_service: PaymentService = None
+# Variáveis globais para os serviços
+user_service = None
+enrollment_service = None
+payment_service = None
 
-def init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service):
+def init_student_bp(us, es, ps):
     """Inicializa o Blueprint com as instâncias dos serviços."""
-    global _user_service, _enrollment_service, _payment_service
-    _user_service = user_service
-    _enrollment_service = enrollment_service
-    _payment_service = payment_service
-
+    global user_service, enrollment_service, payment_service
+    user_service = us
+    enrollment_service = es
+    payment_service = ps
 
 @student_api_bp.route('/profile', methods=['GET'])
 @role_required('student')
 def get_student_profile():
-    """Retorna os dados do perfil do aluno logado."""
+    """Retorna o perfil do aluno logado."""
     try:
-        # O decorator `role_required` já colocou o perfil do usuário em `g.user`
+        # g.user é preenchido pelo decorator
         return jsonify(g.user.to_dict()), 200
     except Exception as e:
-        print(f"Erro ao buscar perfil do aluno: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
+        print(f"Erro em get_student_profile: {e}")
+        return jsonify(error=str(e)), 500
 
 @student_api_bp.route('/classes', methods=['GET'])
 @role_required('student')
@@ -42,22 +32,36 @@ def get_student_classes():
     """Retorna as turmas em que o aluno está matriculado."""
     try:
         student_id = g.user.id
-        enrollments = _enrollment_service.get_enrollments_by_student_id(student_id)
+        enrollments = enrollment_service.get_enrollments_by_student_id(student_id)
         return jsonify(enrollments), 200
     except Exception as e:
-        print(f"Erro ao buscar turmas do aluno: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
+        print(f"Erro em get_student_classes: {e}")
+        return jsonify(error=str(e)), 500
 
 @student_api_bp.route('/payments', methods=['GET'])
 @role_required('student')
 def get_student_payments():
-    """Retorna o histórico de cobranças e pagamentos do aluno."""
+    """Retorna o histórico financeiro do aluno."""
     try:
         student_id = g.user.id
-        charges = _payment_service.get_charges_by_user_id(student_id)
+        charges = payment_service.get_charges_by_user_id(student_id)
         return jsonify(charges), 200
     except Exception as e:
-        print(f"Erro ao buscar financeiro do aluno: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        print(f"Erro em get_student_payments: {e}")
+        return jsonify(error=str(e)), 500
+
+# --- NOVO ENDPOINT PARA PAGAMENTO ---
+@student_api_bp.route('/payments/<string:payment_id>/create-preference', methods=['POST'])
+@role_required('student')
+def create_payment_preference_route(payment_id):
+    """Cria uma preferência de pagamento no Mercado Pago para uma fatura."""
+    try:
+        # Passa o objeto 'user' completo para o serviço
+        preference_id = payment_service.create_payment_preference(payment_id, g.user)
+        return jsonify({"preferenceId": preference_id}), 200
+    except ValueError as ve:
+        return jsonify(error=str(ve)), 404 # Fatura não encontrada
+    except Exception as e:
+        print(f"Erro em create_payment_preference_route: {e}")
+        return jsonify(error="Falha ao gerar link de pagamento."), 500
 

@@ -6,6 +6,7 @@ const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
 let userProfile = null;
+let mp = null; // Instância do Mercado Pago
 
 // --- ELEMENTOS DO DOM ---
 let authContainer;
@@ -17,17 +18,13 @@ async function fetchWithAuth(endpoint, options = {}) {
     if (!currentUser) {
         throw new Error("Usuário não autenticado.");
     }
-    // Força a atualização do token para evitar expiração
     const idToken = await currentUser.getIdToken(true);
-
     const headers = {
         'Authorization': `Bearer ${idToken}`,
         'Content-Type': 'application/json',
         ...options.headers,
     };
-
     const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Falha ao decodificar erro da API.' }));
         console.error('Erro na API:', response.status, errorData);
@@ -59,10 +56,8 @@ function renderLoginScreen() {
     `;
     authContainer.classList.remove('hidden');
     appContainer.classList.add('hidden');
-
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
-
     loginForm.addEventListener('submit', async(e) => {
         e.preventDefault();
         const email = e.target.email.value;
@@ -91,21 +86,25 @@ function renderAppScreen() {
                     <div id="classes-list" class="space-y-4"></div>
                 </section>
                 <section class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-md">
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">Meu Financeiro</h2>
-                    <div id="financial-list" class="space-y-4"></div>
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">Faturas</h2>
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button id="tab-pending" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">Pendentes e Atrasadas</button>
+                            <button id="tab-paid" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">Histórico de Pagas</button>
+                        </nav>
+                    </div>
+                    <div id="pending-payments-content"></div>
+                    <div id="paid-payments-content" class="hidden"></div>
                 </section>
             </main>
         </div>
-
-        <!-- Modal de Pagamento (inicialmente oculto) -->
-        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50">
             <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-4">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-2xl font-bold text-gray-800">Realizar Pagamento</h3>
-                    <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Finalizar Pagamento</h3>
+                    <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
                 </div>
-                <div id="modal-content"></div>
-                <button id="close-modal-button-footer" class="mt-6 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
+                <div id="payment-brick-container"></div>
             </div>
         </div>
     `;
@@ -114,22 +113,15 @@ function renderAppScreen() {
 
     document.getElementById('user-name').textContent = userProfile.name;
     document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
-    
-    // Adiciona os listeners para o modal
-    const modal = document.getElementById('payment-modal');
-    document.getElementById('close-modal-button').addEventListener('click', () => modal.classList.add('hidden'));
-    document.getElementById('close-modal-button-footer').addEventListener('click', () => modal.classList.add('hidden'));
+
+    setupTabListeners();
+    setupModalListeners();
     
     // Adiciona listener para os botões de pagar (usando delegação de evento)
-    const financialList = document.getElementById('financial-list');
-    financialList.addEventListener('click', (event) => {
+    appContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('pay-button')) {
-            const button = event.target;
-            openPaymentModal({
-                id: button.dataset.paymentId,
-                description: button.dataset.description,
-                amount: button.dataset.amount,
-            });
+            const paymentId = event.target.dataset.paymentId;
+            handlePayment(paymentId);
         }
     });
 
@@ -137,12 +129,37 @@ function renderAppScreen() {
     loadPayments();
 }
 
+function setupTabListeners() {
+    const tabPending = document.getElementById('tab-pending');
+    const tabPaid = document.getElementById('tab-paid');
+    const pendingContent = document.getElementById('pending-payments-content');
+    const paidContent = document.getElementById('paid-payments-content');
+
+    tabPending.addEventListener('click', () => {
+        pendingContent.classList.remove('hidden');
+        paidContent.classList.add('hidden');
+        tabPending.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600';
+        tabPaid.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+    });
+
+    tabPaid.addEventListener('click', () => {
+        paidContent.classList.remove('hidden');
+        pendingContent.classList.add('hidden');
+        tabPaid.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600';
+        tabPending.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300';
+    });
+}
+
+function setupModalListeners() {
+    const modal = document.getElementById('payment-modal');
+    document.getElementById('close-modal-button').addEventListener('click', () => modal.classList.add('hidden'));
+}
+
 async function loadClasses() {
     const classesList = document.getElementById('classes-list');
     classesList.innerHTML = '<p class="text-gray-500">Carregando...</p>';
     try {
         const classes = await fetchWithAuth('/api/student/classes');
-        console.log("Dados das turmas recebidos da API:", classes);
         if (classes && classes.length > 0) {
             classesList.innerHTML = classes.map(c => `
                 <div class="border-b pb-2">
@@ -160,55 +177,65 @@ async function loadClasses() {
 }
 
 async function loadPayments() {
-    const paymentsList = document.getElementById('financial-list');
-    paymentsList.innerHTML = '<p class="text-gray-500">Carregando...</p>';
+    const pendingContent = document.getElementById('pending-payments-content');
+    const paidContent = document.getElementById('paid-payments-content');
+    pendingContent.innerHTML = '<p class="text-gray-500 mt-4">Carregando...</p>';
+    paidContent.innerHTML = '<p class="text-gray-500 mt-4">Carregando...</p>';
+
     try {
         const payments = await fetchWithAuth('/api/student/payments');
-        console.log("Dados financeiros recebidos da API:", payments);
-        if (payments && payments.length > 0) {
-            paymentsList.innerHTML = `
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${payments.map(p => `
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${p.description}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${new Date(p.due_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">R$ ${p.amount.toFixed(2)}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm">${renderPaymentStatus(p)}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        ${p.status !== 'paid' ?
-                                            `<button class="pay-button text-blue-600 hover:text-blue-800 font-semibold" 
-                                                     data-payment-id="${p.id}" 
-                                                     data-description="${p.description}" 
-                                                     data-amount="${p.amount.toFixed(2)}">
-                                                Pagar
-                                            </button>` :
-                                            `<span class="text-green-600 font-semibold">Finalizado</span>`
-                                        }
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        } else {
-            paymentsList.innerHTML = '<p class="text-gray-500">Nenhum registro financeiro encontrado.</p>';
-        }
+        
+        const pendingPayments = payments.filter(p => p.status !== 'paid');
+        const paidPayments = payments.filter(p => p.status === 'paid');
+
+        renderPaymentsTable(pendingContent, pendingPayments, false);
+        renderPaymentsTable(paidContent, paidPayments, true);
+
     } catch (error) {
         console.error('Erro ao carregar pagamentos:', error);
-        paymentsList.innerHTML = '<p class="text-red-500">Não foi possível carregar seu histórico financeiro.</p>';
+        pendingContent.innerHTML = '<p class="text-red-500 mt-4">Não foi possível carregar seu histórico financeiro.</p>';
+        paidContent.innerHTML = '<p class="text-red-500 mt-4">Não foi possível carregar seu histórico financeiro.</p>';
     }
+}
+
+function renderPaymentsTable(container, payments, isPaidTable) {
+     if (!payments || payments.length === 0) {
+        container.innerHTML = `<p class="text-gray-500 mt-4">${isPaidTable ? 'Nenhum pagamento finalizado encontrado.' : 'Nenhuma fatura pendente encontrada.'}</p>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="overflow-x-auto mt-4">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        ${isPaidTable ? '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Pag.</th>' : '<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>'}
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${payments.map(p => `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${p.description}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${new Date(p.due_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">R$ ${p.amount.toFixed(2)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">${renderPaymentStatus(p)}</td>
+                            ${isPaidTable ? 
+                                `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${p.payment_date ? new Date(p.payment_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A'}</td>` 
+                                : 
+                                `<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="pay-button text-blue-600 hover:text-blue-800 font-semibold" data-payment-id="${p.id}">Pagar</button>
+                                 </td>`
+                            }
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 function renderPaymentStatus(payment) {
@@ -225,20 +252,50 @@ function renderPaymentStatus(payment) {
     return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendente</span>`;
 }
 
-function openPaymentModal({ id, description, amount }) {
+async function handlePayment(paymentId) {
     const modal = document.getElementById('payment-modal');
-    const modalContent = document.getElementById('modal-content');
-    modalContent.innerHTML = `
-        <p class="text-gray-700 mb-2"><strong>Descrição:</strong> ${description}</p>
-        <p class="text-gray-700 mb-4"><strong>Valor:</strong> R$ ${amount}</p>
-        <div class="mt-4 p-4 border rounded-lg text-center bg-gray-50">
-            <p class="font-semibold text-gray-800">Pague com Pix!</p>
-            <img src="https://placehold.co/250x250/fafafa/333?text=QR+Code+PIX" alt="QR Code PIX" class="mx-auto mt-2 rounded-md">
-            <p class="mt-2 text-xs text-gray-500">Aponte a câmera do seu celular para o QR Code para pagar.</p>
-        </div>
-        <p class="mt-4 text-sm text-gray-600 text-center">Após o pagamento, o status será atualizado automaticamente em alguns minutos.</p>
-    `;
+    const brickContainer = document.getElementById('payment-brick-container');
+    brickContainer.innerHTML = '<p class="text-center text-gray-600">Gerando link de pagamento...</p>';
     modal.classList.remove('hidden');
+
+    try {
+        const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { method: 'POST' });
+        
+        brickContainer.innerHTML = ''; // Limpa a mensagem de carregamento
+        
+        // Remove qualquer "brick" anterior para evitar duplicatas
+        const oldBrick = document.getElementById('paymentBrick_container');
+        if(oldBrick) oldBrick.remove();
+
+        await mp.bricks().create("payment", "payment-brick-container", {
+            initialization: {
+                amount: 1, // O valor é controlado pela preferência, aqui pode ser qualquer valor > 0
+                preferenceId: preferenceId,
+            },
+            customization: {
+                paymentMethods: {
+                    creditCard: "all",
+                    debitCard: "all",
+                    ticket: "all",
+                    pix: "all"
+                },
+            },
+            callbacks: {
+                onReady: () => { /* Botão de pagamento pronto */ },
+                onSubmit: ({ selectedPaymentMethod, formData }) => {
+                    // O pagamento é processado pelo Mercado Pago
+                    return new Promise(() => {});
+                },
+                onError: (error) => {
+                    console.error('Erro no brick de pagamento:', error);
+                },
+            },
+        });
+
+    } catch (error) {
+        console.error("Erro ao criar preferência de pagamento:", error);
+        brickContainer.innerHTML = '<p class="text-center text-red-500 font-semibold">Não foi possível gerar o link de pagamento. Tente novamente mais tarde.</p>';
+    }
 }
 
 // --- LÓGICA DE INICIALIZAÇÃO ---
@@ -264,16 +321,19 @@ function initialize() {
         authContainer = document.getElementById('auth-container');
         appContainer = document.getElementById('app-container');
         loadingIndicator = document.getElementById('loading-indicator');
-        console.log("main.js: Elementos do DOM obtidos:", { authContainer, appContainer, loadingIndicator });
+        
+        // ATENÇÃO: Coloque sua Public Key do Mercado Pago aqui!
+        mp = new MercadoPago('APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90', {
+            locale: 'pt-BR'
+        });
 
         onAuthStateChanged(auth, (user) => {
-            console.log("main.js: onAuthStateChanged callback executado. Usuário:", user ? 'UserImpl' : null);
             currentUser = user;
             if (user) {
                 initializeAuthenticatedState(user);
+
             } else {
                 userProfile = null;
-                console.log("main.js: Chamando renderLoginScreen.");
                 renderLoginScreen();
                 loadingIndicator.classList.add('hidden');
             }

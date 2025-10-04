@@ -1,34 +1,38 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="h-full bg-gray-100">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Área do Aluno - JitaKyoApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SDK do Mercado Pago -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .loader {
-            border-top-color: #3498db;
-            -webkit-animation: spin 1s linear infinite;
-            animation: spin 1s linear infinite;
+        body {
+            font-family: 'Inter', sans-serif;
         }
-        @-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); } }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-100">
 
-    <div id="loading-indicator" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24"></div>
+<body class="h-full">
+    <div id="loading-indicator" class="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
+        <p class="text-gray-600">Carregando...</p>
     </div>
 
-    <div id="auth-container" class="min-h-screen flex items-center justify-center p-4"></div>
-    <div id="app-container" class="hidden"></div>
+    <div id="auth-container" class="min-h-screen flex items-center justify-center p-4 bg-gray-50 hidden">
+        <!-- O formulário de login será injetado aqui pelo main.js -->
+    </div>
 
-    <!-- Carregamos apenas o nosso ponto de entrada principal como um módulo -->
-    <script type="module" src="/main.js"></script>
+    <div id="app-container" class="hidden">
+        <!-- O painel do aluno será injetado aqui pelo main.js -->
+    </div>
 
+    <script type="module" src="./main.js"></script>
 </body>
+
 </html>
 
