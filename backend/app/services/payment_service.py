@@ -68,10 +68,11 @@ class PaymentService:
                 raise ValueError("Fatura não encontrada ou não pertence a este usuário.")
 
             payment_data_to_send = {
-                "transaction_amount": float(mp_data.get("transaction_amount")),
+                # --- CORREÇÃO APLICADA AQUI ---
+                "transaction_amount": float(mp_data.get("transaction_amount", 0.0)),
                 "token": mp_data.get("token"),
                 "description": payment_doc.to_dict().get('description', 'Pagamento JitaKyoApp'),
-                "installments": int(mp_data.get("installments")),
+                "installments": int(mp_data.get("installments", 1)),
                 "payment_method_id": mp_data.get("payment_method_id"),
                 "payer": {
                     "email": mp_data.get("payer", {}).get("email"),
@@ -96,6 +97,7 @@ class PaymentService:
                 payment_doc_ref.update(update_data)
                 return {"status": "success", "message": "Pagamento aprovado!", "paymentId": payment_result.get("id")}
             else:
+                # Retorna a resposta de falha do Mercado Pago para o frontend
                 return {"status": "failed", "message": payment_result.get("status_detail"), "paymentInfo": payment_result}
 
         except Exception as e:
