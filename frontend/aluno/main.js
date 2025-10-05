@@ -3,7 +3,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from '.
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
 // IMPORTANTE: Chave pública do Mercado Pago
-const MERCADO_PAGO_PUBLIC_KEY = 'TEST-3b7646e8-b1e0-449b-9302-cd34b9266e51';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 
 
 // --- ESTADO DA APLICAÇÃO ---
@@ -104,19 +104,8 @@ function renderAppScreen() {
         </div>
         <!-- Modal de Pagamento -->
         <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
-            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
-                <div class="flex-shrink-0 flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Finalizar Pagamento</h3>
-                    <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
-                </div>
-                 <!-- NOVO: Container para mensagens de erro -->
-                <div id="payment-error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-                    <strong class="font-bold">Erro!</strong>
-                    <span id="payment-error-message" class="block sm:inline"></span>
-                </div>
-                <div class="flex-grow overflow-y-auto">
-                    <div id="payment-brick-container"></div>
-                </div>
+             <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
+                <!-- O conteúdo do modal será injetado aqui -->
             </div>
         </div>
         <!-- Modal de Sucesso -->
@@ -183,11 +172,14 @@ function setupModalListeners() {
     const paymentModal = document.getElementById('payment-modal');
     const successModal = document.getElementById('success-modal');
     
-    document.getElementById('close-modal-button').addEventListener('click', () => {
-        paymentModal.classList.add('hidden');
-        if (currentBrick) {
-            currentBrick.unmount();
-            currentBrick = null;
+    // O botão de fechar agora é parte do conteúdo dinâmico, então o listener é adicionado depois
+    paymentModal.addEventListener('click', (event) => {
+        if (event.target.id === 'close-modal-button' || event.target === paymentModal) {
+            paymentModal.classList.add('hidden');
+            if (currentBrick) {
+                currentBrick.unmount();
+                currentBrick = null;
+            }
         }
     });
 
@@ -195,6 +187,7 @@ function setupModalListeners() {
         successModal.classList.add('hidden');
     });
 }
+
 
 async function loadClasses() {
     const classesList = document.getElementById('classes-list');
@@ -244,6 +237,7 @@ function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
     const date = new Date(dateString);
     if (isNaN(date)) return 'Data inválida';
+    // Adiciona a opção timeZone para evitar problemas de fuso horário
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
@@ -307,26 +301,70 @@ function renderPaymentStatus(payment) {
     return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendente</span>`;
 }
 
-async function handlePayment(paymentId, paymentAmount) {
-    const modal = document.getElementById('payment-modal');
-    const brickContainer = document.getElementById('payment-brick-container');
-    const errorContainer = document.getElementById('payment-error-container');
-    const errorMessage = document.getElementById('payment-error-message');
+// --- LÓGICA DE PAGAMENTO EM DUAS ETAPAS ---
 
-    // Limpa erros anteriores
-    errorContainer.classList.add('hidden');
-    errorMessage.textContent = '';
-    
-    brickContainer.innerHTML = '<p class="text-center text-gray-600">Gerando link de pagamento...</p>';
+function handlePayment(paymentId, paymentAmount) {
+    const modal = document.getElementById('payment-modal');
+    const modalContent = document.getElementById('payment-modal-content');
+
+    // Etapa 1: Renderiza o formulário para pedir o CPF
+    modalContent.innerHTML = `
+        <div class="flex-shrink-0 flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-800">Informações para Pagamento</h3>
+            <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
+        </div>
+        <div id="payment-step-1">
+            <p class="text-gray-600 mb-4">Para habilitar todas as formas de pagamento, por favor, informe seu CPF.</p>
+            <form id="cpf-form">
+                <label for="cpf" class="block text-gray-700 text-sm font-bold mb-2">CPF</label>
+                <input type="text" id="cpf" placeholder="000.000.000-00" required class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors duration-300">
+                    Continuar
+                </button>
+            </form>
+        </div>
+        <div id="payment-step-2" class="hidden">
+            <!-- O Brick será renderizado aqui -->
+        </div>
+    `;
+
     modal.classList.remove('hidden');
 
+    const cpfForm = document.getElementById('cpf-form');
+    cpfForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cpf = document.getElementById('cpf').value;
+        // Inicia a Etapa 2: Inicializa o Brick de Pagamento
+        initializeBrick(paymentId, paymentAmount, cpf);
+    });
+}
+
+async function initializeBrick(paymentId, paymentAmount, cpf) {
+    const modalContent = document.getElementById('payment-modal-content');
+    modalContent.innerHTML = `
+        <div class="flex-shrink-0 flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-800">Finalizar Pagamento</h3>
+            <button id="close-modal-button" class="text-gray-500 hover:text-gray-800 text-3xl font-light">&times;</button>
+        </div>
+        <div id="payment-error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+            <strong class="font-bold">Erro!</strong>
+            <span id="payment-error-message" class="block sm:inline"></span>
+        </div>
+        <div class="flex-grow overflow-y-auto">
+             <div id="payment-brick-container"><p class="text-center text-gray-600">Gerando link de pagamento...</p></div>
+        </div>
+    `;
+    
     try {
-        const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { method: 'POST' });
+        const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { 
+            method: 'POST',
+            body: JSON.stringify({ cpf })
+        });
         
         if (currentBrick) {
             currentBrick.unmount();
         }
-        brickContainer.innerHTML = '';
+        document.getElementById('payment-brick-container').innerHTML = '';
         
         const settings = {
             initialization: {
@@ -344,9 +382,7 @@ async function handlePayment(paymentId, paymentAmount) {
             callbacks: {
                 onReady: () => { console.log("Brick de pagamento pronto!"); },
                 onSubmit: async (formData) => {
-                    console.log("Enviando pagamento para o backend...", formData);
-                    // Esconde a mensagem de erro ao tentar um novo pagamento
-                    errorContainer.classList.add('hidden');
+                    document.getElementById('payment-error-container').classList.add('hidden');
                     try {
                         const response = await fetchWithAuth(`/api/student/payments/process`, {
                             method: 'POST',
@@ -356,33 +392,26 @@ async function handlePayment(paymentId, paymentAmount) {
                             }),
                         });
                         
-                        console.log("Backend respondeu:", response);
-
                         if (response && response.status === 'success') {
                             document.getElementById('payment-modal').classList.add('hidden');
-                            if (currentBrick) {
-                                currentBrick.unmount();
-                                currentBrick = null;
-                            }
+                            if (currentBrick) currentBrick.unmount();
                             document.getElementById('success-modal').classList.remove('hidden');
                             loadPayments();
                         } else {
-                            // Exibe a mensagem de erro específica do Mercado Pago no modal
                             const message = response.message || "Ocorreu um erro desconhecido.";
-                            errorMessage.textContent = message;
-                            errorContainer.classList.remove('hidden');
+                            document.getElementById('payment-error-message').textContent = message;
+                            document.getElementById('payment-error-container').classList.remove('hidden');
                         }
 
                     } catch (error) {
-                        console.error("Erro ao processar pagamento no backend:", error);
-                        errorMessage.textContent = "Ocorreu um erro de comunicação. Por favor, tente novamente.";
-                        errorContainer.classList.remove('hidden');
+                        document.getElementById('payment-error-message').textContent = "Ocorreu um erro de comunicação. Por favor, tente novamente.";
+                        document.getElementById('payment-error-container').classList.remove('hidden');
                     }
                 },
                 onError: (error) => {
                     console.error('Erro no brick de pagamento:', error);
-                    errorMessage.textContent = "Erro ao inicializar o formulário de pagamento. Verifique os dados inseridos.";
-                    errorContainer.classList.remove('hidden');
+                    document.getElementById('payment-error-message').textContent = "Erro ao inicializar o formulário. Verifique os dados.";
+                    document.getElementById('payment-error-container').classList.remove('hidden');
                 },
             },
         };
@@ -391,10 +420,9 @@ async function handlePayment(paymentId, paymentAmount) {
 
     } catch (error) {
         console.error("Erro ao criar preferência de pagamento:", error);
-        brickContainer.innerHTML = '<p class="text-center text-red-500 font-semibold">Não foi possível gerar o link de pagamento. Tente novamente mais tarde.</p>';
+        document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-semibold">Não foi possível gerar o link de pagamento. Tente novamente mais tarde.</p>';
     }
 }
-
 
 async function initializeAuthenticatedState(user) {
     loadingIndicator.classList.remove('hidden');

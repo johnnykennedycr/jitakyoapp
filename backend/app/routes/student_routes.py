@@ -4,19 +4,15 @@ from app.utils.decorators import role_required
 # Inicialização das variáveis de serviço (serão injetadas)
 user_service = None
 enrollment_service = None
-training_class_service = None
-attendance_service = None
 payment_service = None
 
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-def init_student_bp(us, es, tcs, ats, ps):
+def init_student_bp(us, es, ps):
     """Inicializa o Blueprint com as instâncias de serviço necessárias."""
-    global user_service, enrollment_service, training_class_service, attendance_service, payment_service
+    global user_service, enrollment_service, payment_service
     user_service = us
     enrollment_service = es
-    training_class_service = tcs
-    attendance_service = ats
     payment_service = ps
 
 @student_api_bp.route('/profile', methods=['GET'])
@@ -57,7 +53,11 @@ def get_student_payments():
 def create_payment_preference(payment_id):
     """Cria uma preferência de pagamento no Mercado Pago para uma fatura específica."""
     try:
-        preference_id = payment_service.create_payment_preference(payment_id, g.user)
+        # Extrai o CPF do corpo da requisição JSON
+        data = request.get_json()
+        cpf = data.get('cpf')
+        
+        preference_id = payment_service.create_payment_preference(payment_id, g.user, cpf=cpf)
         return jsonify({'preferenceId': preference_id}), 200
     except ValueError as ve:
         return jsonify(error=str(ve)), 404

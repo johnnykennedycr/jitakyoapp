@@ -20,7 +20,7 @@ class PaymentService:
             self.sdk = None
             print("AVISO: MERCADO_PAGO_ACCESS_TOKEN não está configurado. A funcionalidade de pagamento estará desabilitada.")
 
-    def create_payment_preference(self, payment_id, user):
+    def create_payment_preference(self, payment_id, user, cpf=None):
         """Cria uma preferência de pagamento no Mercado Pago."""
         if not self.sdk:
             raise Exception("SDK do Mercado Pago não inicializado.")
@@ -43,12 +43,6 @@ class PaymentService:
             "payer": {
                 "name": user.name,
                 "email": user.email,
-                # --- CORREÇÃO APLICADA AQUI ---
-                # Adiciona a identificação do pagador (CPF), que é necessária para o Pix.
-                "identification": {
-                    "type": "CPF",
-                    "number": user.cpf
-                },
             },
             "back_urls": {
                 "success": "https://aluno-jitakyoapp.web.app",
@@ -57,6 +51,13 @@ class PaymentService:
             },
             "auto_return": "approved",
         }
+        
+        # Adiciona a identificação do pagador (CPF) SOMENTE se for fornecido.
+        if cpf:
+            preference_data["payer"]["identification"] = {
+                "type": "CPF",
+                "number": cpf
+            }
         
         preference_response = self.sdk.preference().create(preference_data)
         preference = preference_response["response"]
