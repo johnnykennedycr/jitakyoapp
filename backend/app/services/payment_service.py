@@ -1,6 +1,6 @@
 import os
 import calendar
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import logging
 from firebase_admin import firestore
 import mercadopago
@@ -194,8 +194,8 @@ class PaymentService:
             
             # --- CORREÇÃO APLICADA AQUI ---
             # Ordena a lista em memória, tratando o caso de 'due_date' ser nulo
-            # para evitar o TypeError. Registros sem data são tratados como os mais antigos.
-            charges.sort(key=lambda x: x.get('due_date') or datetime.min, reverse=True)
+            # e garantindo que a comparação de datas seja segura em relação a timezones.
+            charges.sort(key=lambda x: x.get('due_date') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             
             return charges
         except Exception as e:
