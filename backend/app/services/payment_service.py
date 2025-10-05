@@ -67,11 +67,18 @@ class PaymentService:
             if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user_id:
                 raise ValueError("Fatura não encontrada ou não pertence a este usuário.")
 
+            # --- CORREÇÃO DE SEGURANÇA E BUG ---
+            # Busca o valor da fatura diretamente do banco de dados, nunca confiando no frontend.
+            payment_info_from_db = payment_doc.to_dict()
+            transaction_amount_from_db = float(payment_info_from_db.get("amount", 0.0))
+
+            if transaction_amount_from_db <= 0:
+                raise ValueError("O valor da fatura é inválido ou nulo.")
+
             payment_data_to_send = {
-                # --- CORREÇÃO APLICADA AQUI ---
-                "transaction_amount": float(mp_data.get("transaction_amount", 0.0)),
+                "transaction_amount": transaction_amount_from_db,
                 "token": mp_data.get("token"),
-                "description": payment_doc.to_dict().get('description', 'Pagamento JitaKyoApp'),
+                "description": payment_info_from_db.get('description', 'Pagamento JitaKyoApp'),
                 "installments": int(mp_data.get("installments", 1)),
                 "payment_method_id": mp_data.get("payment_method_id"),
                 "payer": {
@@ -97,8 +104,16 @@ class PaymentService:
                 payment_doc_ref.update(update_data)
                 return {"status": "success", "message": "Pagamento aprovado!", "paymentId": payment_result.get("id")}
             else:
-                # Retorna a resposta de falha do Mercado Pago para o frontend
-                return {"status": "failed", "message": payment_result.get("status_detail"), "paymentInfo": payment_result}
+                 # --- MELHORIA NA MENSAGEM DE ERRO ---
+                status_detail = payment_result.get("status_detail")
+                error_message = status_detail
+                # Tenta encontrar uma causa de erro mais específica
+                if "causes" in payment_result and payment_result["causes"]:
+                    cause = payment_result["causes"][0]
+                    if "description" in cause:
+                        error_message = cause["description"]
+
+                return {"status": "failed", "message": error_message, "paymentInfo": payment_result}
 
         except Exception as e:
             logging.error(f"Erro ao processar pagamento para a fatura {payment_id}: {e}", exc_info=True)
@@ -178,7 +193,7 @@ class PaymentService:
                 charges.append(charge_data)
             
             # Ordena a lista em memória para evitar a necessidade de índices compostos complexos no Firestore
-            charges.sort(key=lambda x: (x.get('reference_year', 0), x.get('reference_month', 0)), reverse=True)
+            charges.sort(key=lambda x: x.get('due_date'), reverse=True)
             
             return charges
         except Exception as e:
