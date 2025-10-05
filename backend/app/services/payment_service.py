@@ -192,8 +192,10 @@ class PaymentService:
                 charge_data['id'] = doc.id
                 charges.append(charge_data)
             
-            # Ordena a lista em memória para evitar a necessidade de índices compostos complexos no Firestore
-            charges.sort(key=lambda x: x.get('due_date'), reverse=True)
+            # --- CORREÇÃO APLICADA AQUI ---
+            # Ordena a lista em memória, tratando o caso de 'due_date' ser nulo
+            # para evitar o TypeError. Registros sem data são tratados como os mais antigos.
+            charges.sort(key=lambda x: x.get('due_date') or datetime.min, reverse=True)
             
             return charges
         except Exception as e:
