@@ -4,15 +4,21 @@ from app.utils.decorators import role_required
 # Inicialização das variáveis de serviço (serão injetadas)
 user_service = None
 enrollment_service = None
+training_class_service = None
+attendance_service = None
 payment_service = None
 
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-def init_student_bp(us, es, ps):
+# --- CORREÇÃO APLICADA AQUI ---
+# A função agora aceita todos os 5 serviços para corresponder à chamada no main.py
+def init_student_bp(us, es, tcs, ats, ps):
     """Inicializa o Blueprint com as instâncias de serviço necessárias."""
-    global user_service, enrollment_service, payment_service
+    global user_service, enrollment_service, training_class_service, attendance_service, payment_service
     user_service = us
     enrollment_service = es
+    training_class_service = tcs
+    attendance_service = ats
     payment_service = ps
 
 @student_api_bp.route('/profile', methods=['GET'])
@@ -20,7 +26,6 @@ def init_student_bp(us, es, ps):
 def get_student_profile():
     """Retorna os dados do perfil do aluno logado."""
     try:
-        # g.user já é o objeto User completo, graças ao decorator login_required
         return jsonify(g.user.to_dict()), 200
     except Exception as e:
         print(f"Erro ao buscar perfil do aluno: {e}")
@@ -53,8 +58,7 @@ def get_student_payments():
 def create_payment_preference(payment_id):
     """Cria uma preferência de pagamento no Mercado Pago para uma fatura específica."""
     try:
-        # Extrai o CPF do corpo da requisição JSON
-        data = request.get_json()
+        data = request.get_json() or {}
         cpf = data.get('cpf')
         
         preference_id = payment_service.create_payment_preference(payment_id, g.user, cpf=cpf)
