@@ -52,12 +52,15 @@ class PaymentService:
             "auto_return": "approved",
         }
         
-        # Adiciona a identificação do pagador (CPF) SOMENTE se for fornecido.
+        # --- CORREÇÃO APLICADA AQUI ---
+        # Adiciona o CPF (se fornecido) e garante que ele contenha apenas números.
         if cpf:
-            preference_data["payer"]["identification"] = {
-                "type": "CPF",
-                "number": cpf
-            }
+            cleaned_cpf = "".join(filter(str.isdigit, cpf))
+            if cleaned_cpf:
+                preference_data["payer"]["identification"] = {
+                    "type": "CPF",
+                    "number": cleaned_cpf
+                }
         
         preference_response = self.sdk.preference().create(preference_data)
         preference = preference_response["response"]

@@ -10,8 +10,6 @@ payment_service = None
 
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-# --- CORREÇÃO APLICADA AQUI ---
-# A função agora aceita todos os 5 serviços para corresponder à chamada no main.py
 def init_student_bp(us, es, tcs, ats, ps):
     """Inicializa o Blueprint com as instâncias de serviço necessárias."""
     global user_service, enrollment_service, training_class_service, attendance_service, payment_service
@@ -59,8 +57,6 @@ def create_payment_preference(payment_id):
     """Cria uma preferência de pagamento no Mercado Pago para uma fatura específica."""
     try:
         data = request.get_json() or {}
-        # --- DIAGNÓSTICO ADICIONADO AQUI ---
-        print(f"[DIAGNÓSTICO] Dados recebidos para criar preferência: {data}")
         cpf = data.get('cpf')
         
         preference_id = payment_service.create_payment_preference(payment_id, g.user, cpf=cpf)
