@@ -43,6 +43,12 @@ class PaymentService:
             "payer": {
                 "name": user.name,
                 "email": user.email,
+                # --- CORREÇÃO APLICADA AQUI ---
+                # Adiciona a identificação do pagador (CPF), que é necessária para o Pix.
+                "identification": {
+                    "type": "CPF",
+                    "number": user.cpf
+                },
             },
             "back_urls": {
                 "success": "https://aluno-jitakyoapp.web.app",
@@ -67,8 +73,6 @@ class PaymentService:
             if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user_id:
                 return {"status": "failed", "message": "Fatura não encontrada ou não pertence a este usuário."}
 
-            # --- CORREÇÃO APLICADA AQUI ---
-            # Extrai os dados do pagamento do objeto 'formData' aninhado.
             form_data = mp_data.get("formData", {})
             payment_method_id = form_data.get("payment_method_id")
             
