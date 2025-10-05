@@ -67,9 +67,11 @@ class PaymentService:
             if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user_id:
                 return {"status": "failed", "message": "Fatura não encontrada ou não pertence a este usuário."}
 
-            # --- VALIDAÇÃO EXPLÍCITA ---
-            # Verifica se o 'payment_method_id' foi recebido do frontend.
-            payment_method_id = mp_data.get("payment_method_id")
+            # --- CORREÇÃO APLICADA AQUI ---
+            # Extrai os dados do pagamento do objeto 'formData' aninhado.
+            form_data = mp_data.get("formData", {})
+            payment_method_id = form_data.get("payment_method_id")
+            
             if not payment_method_id:
                 logging.error(f"payment_method_id está faltando nos dados do brick: {mp_data}")
                 return {"status": "failed", "message": "O método de pagamento não foi informado. Por favor, selecione um método válido e tente novamente."}
@@ -82,15 +84,15 @@ class PaymentService:
 
             payment_data_to_send = {
                 "transaction_amount": transaction_amount_from_db,
-                "token": mp_data.get("token"),
+                "token": form_data.get("token"),
                 "description": payment_info_from_db.get('description', 'Pagamento JitaKyoApp'),
-                "installments": int(mp_data.get("installments", 1)),
+                "installments": int(form_data.get("installments", 1)),
                 "payment_method_id": payment_method_id,
                 "payer": {
-                    "email": mp_data.get("payer", {}).get("email"),
+                    "email": form_data.get("payer", {}).get("email"),
                     "identification": {
-                        "type": mp_data.get("payer", {}).get("identification", {}).get("type"),
-                        "number": mp_data.get("payer", {}).get("identification", {}).get("number")
+                        "type": form_data.get("payer", {}).get("identification", {}).get("type"),
+                        "number": form_data.get("payer", {}).get("identification", {}).get("number")
                     }
                 }
             }
@@ -109,7 +111,6 @@ class PaymentService:
                 payment_doc_ref.update(update_data)
                 return {"status": "success", "message": "Pagamento aprovado!", "paymentId": payment_result.get("id")}
             else:
-                 # --- MELHORIA NA EXTRAÇÃO DA MENSAGEM DE ERRO ---
                 error_message = payment_result.get("message", "Pagamento recusado pelo processador.")
                 if "causes" in payment_result and payment_result["causes"] and payment_result["causes"][0].get("description"):
                     error_message = payment_result["causes"][0]["description"]
@@ -153,7 +154,6 @@ class PaymentService:
                     continue
 
                 due_day = int(enrollment.get('due_day', 15))
-                # Garante que o dia de vencimento é válido para o mês/ano
                 _, last_day_of_month = calendar.monthrange(int(year), int(month))
                 valid_due_day = min(due_day, last_day_of_month)
                 due_date_obj = datetime(int(year), int(month), valid_due_day, tzinfo=timezone.utc)
@@ -194,9 +194,6 @@ class PaymentService:
                 charge_data['id'] = doc.id
                 charges.append(charge_data)
             
-            # --- CORREÇÃO APLICADA AQUI ---
-            # Ordena a lista em memória, tratando o caso de 'due_date' ser nulo
-            # e garantindo que a comparação de datas seja segura em relação a timezones.
             charges.sort(key=lambda x: x.get('due_date') or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             
             return charges
