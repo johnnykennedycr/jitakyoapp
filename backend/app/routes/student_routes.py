@@ -4,15 +4,19 @@ from app.utils.decorators import role_required
 # Inicialização das variáveis de serviço (serão injetadas)
 user_service = None
 enrollment_service = None
+training_class_service = None
+attendance_service = None
 payment_service = None
 
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-def init_student_bp(us, es, ps):
+def init_student_bp(us, es, tcs, ats, ps):
     """Inicializa o Blueprint com as instâncias de serviço necessárias."""
-    global user_service, enrollment_service, payment_service
+    global user_service, enrollment_service, training_class_service, attendance_service, payment_service
     user_service = us
     enrollment_service = es
+    training_class_service = tcs
+    attendance_service = ats
     payment_service = ps
 
 @student_api_bp.route('/profile', methods=['GET'])
@@ -66,9 +70,6 @@ def create_payment_preference(payment_id):
 def process_student_payment():
     """Processa o pagamento recebido do frontend."""
     data = request.get_json()
-    
-    # --- DIAGNÓSTICO ADICIONADO AQUI ---
-    print(f"[DIAGNÓSTICO] Payload de pagamento recebido: {data}")
     
     payment_id = data.get('paymentId')
     mp_data = data.get('mercadoPagoData')
