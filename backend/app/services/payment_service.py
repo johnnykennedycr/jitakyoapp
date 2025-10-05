@@ -50,6 +50,12 @@ class PaymentService:
                 "pending": "https://aluno-jitakyoapp.web.app"
             },
             "auto_return": "approved",
+            # --- CORREÇÃO FINAL APLICADA AQUI ---
+            # Habilita explicitamente todos os métodos de pagamento, incluindo Pix.
+            "payment_methods": {
+                "excluded_payment_methods": [],
+                "excluded_payment_types": []
+            }
         }
         
         if cpf:
@@ -61,10 +67,6 @@ class PaymentService:
                 }
         
         preference_response = self.sdk.preference().create(preference_data)
-        
-        # --- DIAGNÓSTICO ADICIONADO AQUI ---
-        print(f"[DIAGNÓSTICO] Resposta completa do Mercado Pago ao criar preferência: {preference_response}")
-
         preference = preference_response["response"]
         return preference["id"]
 
