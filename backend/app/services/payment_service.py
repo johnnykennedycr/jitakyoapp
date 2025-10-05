@@ -52,8 +52,6 @@ class PaymentService:
             "auto_return": "approved",
         }
         
-        # --- CORREÇÃO APLICADA AQUI ---
-        # Adiciona o CPF (se fornecido) e garante que ele contenha apenas números.
         if cpf:
             cleaned_cpf = "".join(filter(str.isdigit, cpf))
             if cleaned_cpf:
@@ -63,6 +61,10 @@ class PaymentService:
                 }
         
         preference_response = self.sdk.preference().create(preference_data)
+        
+        # --- DIAGNÓSTICO ADICIONADO AQUI ---
+        print(f"[DIAGNÓSTICO] Resposta completa do Mercado Pago ao criar preferência: {preference_response}")
+
         preference = preference_response["response"]
         return preference["id"]
 
