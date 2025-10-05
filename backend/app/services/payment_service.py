@@ -22,6 +22,8 @@ class PaymentService:
 
     def create_payment_preference(self, payment_id, user, cpf=None):
         """Cria uma preferência de pagamento no Mercado Pago."""
+        print(f"[DIAGNÓSTICO] Iniciando create_payment_preference. CPF recebido: {cpf}")
+
         if not self.sdk:
             raise Exception("SDK do Mercado Pago não inicializado.")
 
@@ -50,7 +52,6 @@ class PaymentService:
                 "pending": "https://aluno-jitakyoapp.web.app"
             },
             "auto_return": "approved",
-            # --- CORREÇÃO FINAL APLICADA AQUI ---
             # Habilita explicitamente todos os métodos de pagamento, incluindo Pix.
             "payment_methods": {
                 "excluded_payment_methods": [],
@@ -60,13 +61,19 @@ class PaymentService:
         
         if cpf:
             cleaned_cpf = "".join(filter(str.isdigit, cpf))
+            print(f"[DIAGNÓSTICO] CPF limpo: {cleaned_cpf}")
             if cleaned_cpf:
                 preference_data["payer"]["identification"] = {
                     "type": "CPF",
                     "number": cleaned_cpf
                 }
         
+        print(f"[DIAGNÓSTICO] Enviando para o Mercado Pago a seguinte preferência: {preference_data}")
+        
         preference_response = self.sdk.preference().create(preference_data)
+
+        print(f"[DIAGNÓSTICO] Resposta completa do Mercado Pago: {preference_response}")
+        
         preference = preference_response["response"]
         return preference["id"]
 
