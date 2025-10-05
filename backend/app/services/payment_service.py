@@ -59,28 +59,33 @@ class PaymentService:
     def process_payment(self, payment_id, mp_data, user_id):
         """Processa o pagamento usando o SDK do Mercado Pago no lado do servidor."""
         if not self.sdk:
-            raise Exception("SDK do Mercado Pago não inicializado.")
+            return {"status": "failed", "message": "O sistema de pagamentos não está configurado."}
             
         try:
             payment_doc_ref = self.collection.document(payment_id)
             payment_doc = payment_doc_ref.get()
             if not payment_doc.exists or payment_doc.to_dict().get('student_id') != user_id:
-                raise ValueError("Fatura não encontrada ou não pertence a este usuário.")
+                return {"status": "failed", "message": "Fatura não encontrada ou não pertence a este usuário."}
 
-            # --- CORREÇÃO DE SEGURANÇA E BUG ---
-            # Busca o valor da fatura diretamente do banco de dados, nunca confiando no frontend.
+            # --- VALIDAÇÃO EXPLÍCITA ---
+            # Verifica se o 'payment_method_id' foi recebido do frontend.
+            payment_method_id = mp_data.get("payment_method_id")
+            if not payment_method_id:
+                logging.error(f"payment_method_id está faltando nos dados do brick: {mp_data}")
+                return {"status": "failed", "message": "O método de pagamento não foi informado. Por favor, selecione um método válido e tente novamente."}
+
             payment_info_from_db = payment_doc.to_dict()
             transaction_amount_from_db = float(payment_info_from_db.get("amount", 0.0))
 
             if transaction_amount_from_db <= 0:
-                raise ValueError("O valor da fatura é inválido ou nulo.")
+                return {"status": "failed", "message": "O valor da fatura é inválido ou nulo."}
 
             payment_data_to_send = {
                 "transaction_amount": transaction_amount_from_db,
                 "token": mp_data.get("token"),
                 "description": payment_info_from_db.get('description', 'Pagamento JitaKyoApp'),
                 "installments": int(mp_data.get("installments", 1)),
-                "payment_method_id": mp_data.get("payment_method_id"),
+                "payment_method_id": payment_method_id,
                 "payer": {
                     "email": mp_data.get("payer", {}).get("email"),
                     "identification": {
@@ -96,28 +101,25 @@ class PaymentService:
             if payment_result.get("status") == "approved":
                 update_data = {
                     'status': 'paid',
-                    'payment_date': datetime.now(),
+                    'payment_date': datetime.now(timezone.utc),
                     'payment_method': payment_result.get("payment_method_id"),
-                    'updated_at': datetime.now(),
+                    'updated_at': datetime.now(timezone.utc),
                     'mercado_pago_payment_id': payment_result.get("id")
                 }
                 payment_doc_ref.update(update_data)
                 return {"status": "success", "message": "Pagamento aprovado!", "paymentId": payment_result.get("id")}
             else:
-                 # --- MELHORIA NA MENSAGEM DE ERRO ---
-                status_detail = payment_result.get("status_detail")
-                error_message = status_detail
-                # Tenta encontrar uma causa de erro mais específica
-                if "causes" in payment_result and payment_result["causes"]:
-                    cause = payment_result["causes"][0]
-                    if "description" in cause:
-                        error_message = cause["description"]
+                 # --- MELHORIA NA EXTRAÇÃO DA MENSAGEM DE ERRO ---
+                error_message = payment_result.get("message", "Pagamento recusado pelo processador.")
+                if "causes" in payment_result and payment_result["causes"] and payment_result["causes"][0].get("description"):
+                    error_message = payment_result["causes"][0]["description"]
 
+                logging.warning(f"Pagamento falhou para a fatura {payment_id}. Resposta do MP: {payment_result}")
                 return {"status": "failed", "message": error_message, "paymentInfo": payment_result}
 
         except Exception as e:
-            logging.error(f"Erro ao processar pagamento para a fatura {payment_id}: {e}", exc_info=True)
-            raise
+            logging.error(f"Erro EXCEPCIONAL ao processar pagamento para a fatura {payment_id}: {e}", exc_info=True)
+            return {"status": "failed", "message": f"Ocorreu um erro inesperado no servidor: {e}"}
 
     # O resto dos seus métodos...
     def generate_monthly_payments(self, year, month):
@@ -154,7 +156,7 @@ class PaymentService:
                 # Garante que o dia de vencimento é válido para o mês/ano
                 _, last_day_of_month = calendar.monthrange(int(year), int(month))
                 valid_due_day = min(due_day, last_day_of_month)
-                due_date_obj = datetime(int(year), int(month), valid_due_day)
+                due_date_obj = datetime(int(year), int(month), valid_due_day, tzinfo=timezone.utc)
 
                 payment_data = {
                     'student_id': student_id,
@@ -170,8 +172,8 @@ class PaymentService:
                     'class_name': enrollment.get('class_name', 'N/A'),
                     'payment_date': None,
                     'payment_method': None,
-                    'created_at': datetime.now(),
-                    'updated_at': datetime.now()
+                    'created_at': datetime.now(timezone.utc),
+                    'updated_at': datetime.now(timezone.utc)
                 }
                 self.collection.add(payment_data)
                 generated_count += 1
@@ -262,10 +264,10 @@ class PaymentService:
         update_data = {
             'status': 'paid',
             'amount': float(data.get('amount')),
-            'payment_date': datetime.strptime(data.get('payment_date'), '%Y-%m-%d'),
+            'payment_date': datetime.strptime(data.get('payment_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc),
             'payment_method': data.get('payment_method'),
             'payment_method_details': data.get('payment_method_details', ''),
-            'updated_at': datetime.now()
+            'updated_at': datetime.now(timezone.utc)
         }
         payment_ref.update(update_data)
         return True
@@ -291,14 +293,14 @@ class PaymentService:
                 'reference_month': due_date.month,
                 'reference_year': due_date.year,
                 'due_day': due_date.day,
-                'due_date': due_date,
+                'due_date': due_date.replace(tzinfo=timezone.utc),
                 'type': invoice_type,
                 'description': invoice_type,
                 'class_name': 'N/A',
                 'payment_date': None,
                 'payment_method': None,
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
+                'created_at': datetime.now(timezone.utc),
+                'updated_at': datetime.now(timezone.utc)
             }
             self.collection.add(payment_data)
             created_count += 1
