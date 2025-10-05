@@ -57,6 +57,8 @@ def create_payment_preference(payment_id):
     """Cria uma preferência de pagamento no Mercado Pago para uma fatura específica."""
     try:
         data = request.get_json() or {}
+        # --- DIAGNÓSTICO ADICIONADO AQUI ---
+        print(f"[DIAGNÓSTICO] Dados recebidos para criar preferência: {data}")
         cpf = data.get('cpf')
         
         preference_id = payment_service.create_payment_preference(payment_id, g.user, cpf=cpf)
