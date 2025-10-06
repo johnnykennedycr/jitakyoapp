@@ -1,5 +1,5 @@
 /**
- * Renderiza o dashboard com base nos dados do usuário fornecidos.
+
  * @param {HTMLElement} targetElement - O elemento onde o conteúdo será inserido.
  * @param {object} user - O objeto de perfil do usuário.
  */
