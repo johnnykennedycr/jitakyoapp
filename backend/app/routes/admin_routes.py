@@ -102,25 +102,31 @@ def get_available_users():
         print(f"Erro em get_available_users: {e}")
         return jsonify(error=str(e)), 500
 
-# --- NOVA ROTA DE NOTIFICAÇÕES ---
+# --- ROTA DE NOTIFICAÇÕES ATUALIZADA ---
 @admin_api_bp.route('/notifications', methods=['POST'])
 @login_required
 @role_required('admin', 'super_admin')
 def send_notification():
-    """Envia uma notificação push para todos os alunos."""
+    """Envia uma notificação push para um público-alvo específico."""
     data = request.get_json()
     title = data.get('title')
     body = data.get('body')
+    target_type = data.get('target_type', 'all') # 'all', 'class', 'individual'
+    target_ids = data.get('target_ids', [])
 
     if not title or not body:
         return jsonify(error="Título e corpo da mensagem são obrigatórios."), 400
 
     try:
-        result = notification_service.send_notification_to_all(title, body)
-        return jsonify(success=True, message=f"{result.get('success', 0)} notificações enviadas com sucesso.", details=result), 200
+        result = notification_service.send_targeted_notification(
+            title, body, target_type, target_ids
+        )
+        success_count = result.get('success', 0)
+        return jsonify(success=True, message=f"{success_count} notificações enviadas com sucesso.", details=result), 200
     except Exception as e:
         logging.error(f"Erro ao enviar notificações: {e}", exc_info=True)
         return jsonify(error=f"Falha ao enviar notificações: {e}"), 500
+
 
 # --- Rotas de Gerenciamento de Professores ---
 

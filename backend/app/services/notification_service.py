@@ -1,64 +1,89 @@
-from firebase_admin import messaging, firestore
+import logging
+from firebase_admin import messaging
 
 class NotificationService:
-    def __init__(self, db):
+    def __init__(self, db, enrollment_service=None):
         self.db = db
-        self.collection = self.db.collection('push_subscriptions')
+        self.tokens_collection = self.db.collection('push_tokens')
+        self.enrollment_service = enrollment_service
 
     def save_token(self, user_id, token):
-        """Salva ou atualiza o token de inscrição de um usuário."""
+        """Salva ou atualiza o token de notificação de um usuário."""
         try:
-            # Usamos o user_id como ID do documento para fácil acesso
-            doc_ref = self.collection.document(user_id)
-            doc_ref.set({
-                'token': token,
-                'updated_at': firestore.SERVER_TIMESTAMP
-            }, merge=True)
-            print(f"Token salvo/atualizado para o usuário {user_id}")
+            # O ID do documento é o próprio user_id para fácil acesso
+            token_ref = self.tokens_collection.document(user_id)
+            token_ref.set({'token': token, 'user_id': user_id}, merge=True)
             return True
         except Exception as e:
-            print(f"Erro ao salvar token para o usuário {user_id}: {e}")
+            logging.error(f"Erro ao salvar token para o usuário {user_id}: {e}")
             return False
 
-    def send_notification_to_all(self, title, body):
-        """Envia uma notificação para todos os usuários inscritos."""
-        try:
-            subscriptions = self.collection.stream()
-            tokens = [sub.to_dict()['token'] for sub in subscriptions if 'token' in sub.to_dict()]
-
-            if not tokens:
-                print("Nenhum token de inscrição encontrado para enviar notificações.")
-                return {"success": 0, "failure": 0}
-
-            # Monta a mensagem
-            message = messaging.MulticastMessage(
-                notification=messaging.Notification(
-                    title=title,
-                    body=body,
-                ),
-                tokens=tokens,
-            )
-
-            # Envia a mensagem
-            response = messaging.send_multicast(message)
-            
-            print(f'Notificações enviadas: {response.success_count} com sucesso, {response.failure_count} com falha.')
-            
-            # Opcional: Lógica para limpar tokens inválidos do banco de dados
-            if response.failure_count > 0:
-                responses = response.responses
-                failed_tokens = []
-                for idx, resp in enumerate(responses):
-                    if not resp.success:
-                        # O erro 'UNREGISTERED' significa que o token não é mais válido
-                        if resp.exception.code == 'UNREGISTERED':
-                            failed_tokens.append(tokens[idx])
-                # Aqui você poderia implementar a lógica para deletar os failed_tokens do Firestore
-                print(f"Tokens inválidos encontrados: {failed_tokens}")
-
-            return {"success": response.success_count, "failure": response.failure_count}
+    def _get_tokens_for_users(self, user_ids):
+        """Busca os tokens de notificação para uma lista de IDs de usuário."""
+        tokens = []
+        # O Firestore permite buscar até 30 documentos por vez com o operador 'in'
+        # Para listas maiores, seria necessário dividir em lotes (chunks)
+        if not user_ids:
+            return []
         
+        try:
+            # Busca todos os documentos cujos IDs estão na lista de user_ids
+            for doc_snapshot in self.tokens_collection.where('user_id', 'in', user_ids).stream():
+                token_data = doc_snapshot.to_dict()
+                if 'token' in token_data:
+                    tokens.append(token_data['token'])
         except Exception as e:
-            print(f"Erro ao enviar notificações: {e}")
+            logging.error(f"Erro ao buscar tokens para usuários {user_ids}: {e}")
+        
+        return tokens
+
+    def _get_all_student_tokens(self):
+        """Busca todos os tokens de notificação salvos no sistema."""
+        tokens = []
+        try:
+            all_tokens_docs = self.tokens_collection.stream()
+            for doc in all_tokens_docs:
+                token_data = doc.to_dict()
+                if 'token' in token_data:
+                    tokens.append(token_data['token'])
+        except Exception as e:
+            logging.error(f"Erro ao buscar todos os tokens: {e}")
+        return tokens
+
+    def send_targeted_notification(self, title, body, target_type='all', target_ids=None):
+        """Envia uma notificação para um público-alvo específico."""
+        tokens = []
+        if target_type == 'all':
+            tokens = self._get_all_student_tokens()
+        elif target_type == 'class' and target_ids and self.enrollment_service:
+            # Assumindo que target_ids contém o ID da turma
+            class_id = target_ids[0]
+            student_ids = self.enrollment_service.get_student_ids_by_class_id(class_id)
+            tokens = self._get_tokens_for_users(student_ids)
+        elif target_type == 'individual' and target_ids:
+            # Assumindo que target_ids contém os IDs dos alunos
+            tokens = self._get_tokens_for_users(target_ids)
+
+        if not tokens:
+            return {"success": 0, "failure": 0, "total": 0, "error": "Nenhum destinatário encontrado."}
+
+        # O Firebase FCM pode enviar para até 500 dispositivos de uma vez com `send_multicast`
+        message = messaging.MulticastMessage(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            tokens=tokens,
+        )
+
+        try:
+            response = messaging.send_multicast(message)
+            return {
+                "success": response.success_count, 
+                "failure": response.failure_count,
+                "total": len(tokens)
+            }
+        except Exception as e:
+            logging.error(f"Erro ao enviar multicast de notificação: {e}")
             raise
 
