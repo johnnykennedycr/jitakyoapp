@@ -127,10 +127,20 @@ function renderAppScreen() {
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="flex justify-between items-center py-6">
                 <h1 class="text-3xl font-bold text-gray-900">Olá, <span id="user-name"></span>!</h1>
-                <button id="logout-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sair</button>
+                <!-- ÍCONE DE NOTIFICAÇÃO ADICIONADO -->
+                <div class="flex items-center space-x-4">
+                    <button id="notification-icon" class="relative text-gray-500 hover:text-gray-700">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        <span id="notification-badge" class="hidden absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center"></span>
+                    </button>
+                    <button id="logout-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sair</button>
+                </div>
             </header>
             <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
-                <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md">
+                <!-- Conteúdo principal (turmas, faturas) -->
+                 <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-4">Minhas Turmas</h2>
                     <div id="classes-list" class="space-y-4"></div>
                 </section>
@@ -147,27 +157,30 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <!-- Modal de Pagamento -->
-        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
-             <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;">
-                <!-- O conteúdo do modal será injetado aqui -->
+        <!-- MODAL DE NOTIFICAÇÕES -->
+        <div id="notifications-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Notificações</h3>
+                    <button id="close-notifications-modal" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto">
+                    <!-- As notificações serão inseridas aqui -->
+                </div>
             </div>
         </div>
-        <!-- Modal de Sucesso -->
+        <!-- Outros modais (pagamento, sucesso) -->
+        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+             <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;"></div>
+        </div>
         <div id="success-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm mx-auto text-center">
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                    <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
+                    <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <h3 class="text-lg leading-6 font-medium text-gray-900">Pagamento Aprovado!</h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500">Seu pagamento foi processado com sucesso. Obrigado!</p>
-                </div>
-                <div class="mt-4">
-                    <button id="close-success-modal-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
-                </div>
+                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500">Seu pagamento foi processado com sucesso. Obrigado!</p></div>
+                <div class="mt-4"><button id="close-success-modal-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button></div>
             </div>
         </div>
     `;
@@ -180,6 +193,12 @@ function renderAppScreen() {
     setupTabListeners();
     setupModalListeners();
     
+    // Configura os listeners do novo modal de notificações
+    document.getElementById('notification-icon').addEventListener('click', loadNotifications);
+    document.getElementById('close-notifications-modal').addEventListener('click', () => {
+        document.getElementById('notifications-modal').classList.add('hidden');
+    });
+
     appContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('pay-button')) {
             const paymentId = event.target.dataset.paymentId;
@@ -190,10 +209,36 @@ function renderAppScreen() {
 
     loadClasses();
     loadPayments();
-    
-    // Pede permissão para notificações após renderizar o app
     requestNotificationPermission();
 }
+
+// --- NOVA FUNÇÃO PARA CARREGAR NOTIFICAÇÕES ---
+function loadNotifications() {
+    const modal = document.getElementById('notifications-modal');
+    const list = document.getElementById('notifications-list');
+    
+    // Por enquanto, apenas exibe dados de exemplo
+    list.innerHTML = `
+        <div class="p-3 bg-gray-50 rounded-lg">
+            <p class="font-semibold text-gray-800">Aula Cancelada</p>
+            <p class="text-sm text-gray-600">A aula de Judô Adulto de hoje foi cancelada. Entraremos em contato para remarcar.</p>
+            <p class="text-xs text-gray-400 text-right mt-1">Há 2 horas</p>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-lg">
+            <p class="font-semibold text-gray-800">Novo Exame de Faixa</p>
+            <p class="text-sm text-gray-600">As inscrições para o próximo exame de faixa estão abertas! Não perca o prazo.</p>
+            <p class="text-xs text-gray-400 text-right mt-1">Ontem</p>
+        </div>
+    `;
+    
+    // Simula uma contagem de notificações não lidas
+    const badge = document.getElementById('notification-badge');
+    badge.textContent = '2';
+    badge.classList.remove('hidden');
+
+    modal.classList.remove('hidden');
+}
+
 
 function setupTabListeners() {
     const tabPending = document.getElementById('tab-pending');
