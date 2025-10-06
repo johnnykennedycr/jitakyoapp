@@ -22,8 +22,6 @@ class PaymentService:
 
     def create_payment_preference(self, payment_id, user, cpf=None):
         """Cria uma preferência de pagamento no Mercado Pago."""
-        print(f"[DIAGNÓSTICO] Iniciando create_payment_preference. CPF recebido: {cpf}")
-
         if not self.sdk:
             raise Exception("SDK do Mercado Pago não inicializado.")
 
@@ -33,6 +31,9 @@ class PaymentService:
         
         payment_data = payment_doc.to_dict()
         description = payment_data.get('description', f"{payment_data.get('type', 'Fatura')} - {payment_data.get('reference_month')}/{payment_data.get('reference_year')}")
+
+        # IMPORTANTE: A URL base da sua API precisa estar configurada como uma variável de ambiente.
+        base_api_url = os.getenv("BASE_API_URL", "https://jitakyoapp-217073545024.southamerica-east1.run.app")
 
         preference_data = {
             "items": [
@@ -52,28 +53,27 @@ class PaymentService:
                 "pending": "https://aluno-jitakyoapp.web.app"
             },
             "auto_return": "approved",
-            # Habilita explicitamente todos os métodos de pagamento, incluindo Pix.
             "payment_methods": {
                 "excluded_payment_methods": [],
                 "excluded_payment_types": []
-            }
+            },
+            # --- MELHORIA 1: REFERÊNCIA EXTERNA ---
+            # Vincula esta transação do Mercado Pago ao ID da sua fatura interna.
+            "external_reference": payment_id,
+            # --- MELHORIA 2: NOTIFICAÇÃO WEBHOOK ---
+            # Informa ao Mercado Pago qual URL notificar quando o status do pagamento mudar.
+            "notification_url": f"{base_api_url}/api/payments/webhook"
         }
         
         if cpf:
             cleaned_cpf = "".join(filter(str.isdigit, cpf))
-            print(f"[DIAGNÓSTICO] CPF limpo: {cleaned_cpf}")
             if cleaned_cpf:
                 preference_data["payer"]["identification"] = {
                     "type": "CPF",
                     "number": cleaned_cpf
                 }
         
-        print(f"[DIAGNÓSTICO] Enviando para o Mercado Pago a seguinte preferência: {preference_data}")
-        
         preference_response = self.sdk.preference().create(preference_data)
-
-        print(f"[DIAGNÓSTICO] Resposta completa do Mercado Pago: {preference_response}")
-        
         preference = preference_response["response"]
         return preference["id"]
 
@@ -113,7 +113,9 @@ class PaymentService:
                         "type": form_data.get("payer", {}).get("identification", {}).get("type"),
                         "number": form_data.get("payer", {}).get("identification", {}).get("number")
                     }
-                }
+                },
+                "external_reference": payment_id,
+                "notification_url": f"{os.getenv('BASE_API_URL', 'https://jitakyoapp-217073545024.southamerica-east1.run.app')}/api/payments/webhook"
             }
 
             payment_response = self.sdk.payment().create(payment_data_to_send)
@@ -140,6 +142,54 @@ class PaymentService:
         except Exception as e:
             logging.error(f"Erro EXCEPCIONAL ao processar pagamento para a fatura {payment_id}: {e}", exc_info=True)
             return {"status": "failed", "message": f"Ocorreu um erro inesperado no servidor: {e}"}
+            
+    def handle_webhook_notification(self, notification_data):
+        """Processa uma notificação de webhook recebida do Mercado Pago."""
+        if not self.sdk:
+            print("AVISO: Webhook recebido, mas SDK do Mercado Pago não está configurado.")
+            return False
+
+        try:
+            if notification_data.get("type") == "payment":
+                mp_payment_id = notification_data["data"]["id"]
+                print(f"INFO: Recebida notificação de pagamento para o ID: {mp_payment_id}")
+                
+                # Busca os detalhes completos do pagamento na API do Mercado Pago
+                payment_info_response = self.sdk.payment().get(mp_payment_id)
+                payment_info = payment_info_response["response"]
+                
+                # Pega a nossa referência interna (o ID da nossa fatura)
+                external_reference = payment_info.get("external_reference")
+                payment_status = payment_info.get("status")
+
+                if not external_reference:
+                    print(f"AVISO: Webhook para o pagamento {mp_payment_id} não possui referência externa. Ignorando.")
+                    return False
+
+                # Se o pagamento foi aprovado, atualiza o status na nossa base de dados
+                if payment_status == "approved":
+                    payment_doc_ref = self.collection.document(external_reference)
+                    payment_doc = payment_doc_ref.get()
+                    
+                    if payment_doc.exists and payment_doc.to_dict().get('status') != 'paid':
+                        print(f"INFO: Atualizando fatura {external_reference} para 'pago' via webhook.")
+                        update_data = {
+                            'status': 'paid',
+                            'payment_date': datetime.now(timezone.utc),
+                            'payment_method': payment_info.get("payment_method_id"),
+                            'updated_at': datetime.now(timezone.utc),
+                            'mercado_pago_payment_id': mp_payment_id
+                        }
+                        payment_doc_ref.update(update_data)
+                        return True
+                    else:
+                        print(f"INFO: Fatura {external_reference} não encontrada ou já estava paga. Nenhuma ação necessária.")
+                        
+            return True
+        except Exception as e:
+            logging.error(f"Erro ao processar notificação de webhook: {e}", exc_info=True)
+            return False
+
 
     # O resto dos seus métodos...
     def generate_monthly_payments(self, year, month):

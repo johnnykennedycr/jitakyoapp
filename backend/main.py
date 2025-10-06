@@ -13,20 +13,15 @@ def create_app():
     app = Flask(__name__)
     load_dotenv()
     
-    # --- Configuração de Middlewares ---
+    # --- Configuração de Middlewares e Mail ---
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     
-    # --- CONFIGURAÇÃO DE CORS ---
-    # É crucial ter a sua URL de produção aqui
     allowed_origins = [
-        "https://aluno-jitakyoapp.web.app",
-        "https://jitakyoapp.web.app", # Adicione a URL do seu painel de admin
-        "http://localhost:5173",    # Para desenvolvimento local
-        "http://localhost:8080"
+        "https://jitakyoapp.web.app",
+        "https://aluno-jitakyoapp.web.app"
     ]
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
 
-    # --- Configuração de Mail ---
     app.config.update(
         MAIL_SERVER=os.getenv('MAIL_SERVER'),
         MAIL_PORT=int(os.getenv('MAIL_PORT', 587)),
@@ -38,10 +33,13 @@ def create_app():
     mail = Mail(app)
 
     # --- Inicialização do Firebase ---
-    if not firebase_admin._apps:
-        cred = credentials.ApplicationDefault()
-        firebase_admin.initialize_app(cred)
-    
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.ApplicationDefault()
+            firebase_admin.initialize_app(cred)
+    except Exception as e:
+        print(f"ERRO FATAL ao inicializar o Firebase Admin SDK: {e}")
+
     db = firestore.client()
     
     # --- Importação e Inicialização de Serviços ---
@@ -52,33 +50,41 @@ def create_app():
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     
+    # Nível 0
     user_service = UserService(db, mail=mail)
     teacher_service = TeacherService(db, user_service=user_service)
     training_class_service = TrainingClassService(db, teacher_service=teacher_service)
+    
+    # Nível 1
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
+    
+    # Nível 2
     attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
     payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
+
+    # Resolução de dependência circular
     user_service.set_enrollment_service(enrollment_service)
 
-    # --- IMPORTAÇÃO E REGISTO DE ROTAS (BLUEPRINTS) ---
+    # --- IMPORTAÇÃO E REGISTRO DE ROTAS (BLUEPRINTS) ---
     from app.routes.user_routes import user_api_bp, init_user_bp
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
     from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
+    from app.routes.webhook_routes import webhook_api_bp, init_webhook_bp # <-- NOVO
     from app.utils.decorators import init_decorators
 
-    # Inicializa os módulos com as instâncias dos serviços
     init_decorators(user_service)
     init_user_bp(user_service)
     init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
     init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service)
+    init_webhook_bp(payment_service) # <-- NOVO
 
-    # Regista os Blueprints na aplicação
     app.register_blueprint(user_api_bp) 
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(student_api_bp)
     app.register_blueprint(teacher_api_bp)
+    app.register_blueprint(webhook_api_bp) # <-- NOVO
 
     @app.route('/')
     def index():
@@ -86,7 +92,6 @@ def create_app():
 
     return app
 
-# Esta linha é crucial para o Gunicorn encontrar a aplicação
 app = create_app()
 
 if __name__ == '__main__':
