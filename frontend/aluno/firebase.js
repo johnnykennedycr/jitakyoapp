@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 // --- CONFIGURAÇÃO ---
-// IMPORTANTE: SUBSTITUA O OBJETO ABAIXO PELO SEU firebaseConfig REAL
 const firebaseConfig = {
   apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
   authDomain: "jitakyoapp.firebaseapp.com",
@@ -16,10 +16,25 @@ const firebaseConfig = {
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const messaging = getMessaging(app);
 
-// Inicializa e exporta a instância do Auth
-export const auth = getAuth(app);
+// Função para obter o token de notificação
+async function getMessagingToken() {
+    try {
+        // IMPORTANTE: Adicione sua VAPID Key aqui
+        const currentToken = await getToken(messaging, { vapidKey: "SUA_VAPID_KEY_DO_FIREBASE" });
+        if (currentToken) {
+            console.log('Token de notificação obtido:', currentToken);
+            return currentToken;
+        } else {
+            console.log('Não foi possível obter o token. Permissão não concedida?');
+            return null;
+        }
+    } catch (err) {
+        console.error('Ocorreu um erro ao obter o token.', err);
+        return null;
+    }
+}
 
-// Reexporta as funções para que o main.js possa usá-las
-export { onAuthStateChanged, signInWithEmailAndPassword, signOut };
-
+export { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getMessagingToken };

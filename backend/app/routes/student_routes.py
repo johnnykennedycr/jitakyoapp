@@ -7,17 +7,19 @@ enrollment_service = None
 training_class_service = None
 attendance_service = None
 payment_service = None
+notification_service = None
 
 student_api_bp = Blueprint('student_api', __name__, url_prefix='/api/student')
 
-def init_student_bp(us, es, tcs, ats, ps):
+def init_student_bp(us, es, tcs, ats, ps, ns):
     """Inicializa o Blueprint com as instâncias de serviço necessárias."""
-    global user_service, enrollment_service, training_class_service, attendance_service, payment_service
+    global user_service, enrollment_service, training_class_service, attendance_service, payment_service, notification_service
     user_service = us
     enrollment_service = es
     training_class_service = tcs
     attendance_service = ats
     payment_service = ps
+    notification_service = ns
 
 @student_api_bp.route('/profile', methods=['GET'])
 @role_required('student')
@@ -50,6 +52,25 @@ def get_student_payments():
     except Exception as e:
         print(f"Erro ao buscar financeiro do aluno: {e}")
         return jsonify(error="Falha ao buscar histórico financeiro."), 500
+        
+@student_api_bp.route('/save-push-token', methods=['POST'])
+@role_required('student')
+def save_push_token():
+    """Salva o token de notificação push para o usuário logado."""
+    data = request.get_json()
+    token = data.get('token')
+    if not token:
+        return jsonify(error="Token não fornecido."), 400
+    
+    try:
+        if notification_service.save_token(g.user.id, token):
+            return jsonify(success=True), 200
+        else:
+            return jsonify(error="Falha ao salvar o token."), 500
+    except Exception as e:
+        print(f"Erro ao salvar token de notificação: {e}")
+        return jsonify(error="Erro interno ao salvar token."), 500
+
 
 @student_api_bp.route('/payments/<string:payment_id>/create-preference', methods=['POST'])
 @role_required('student')
@@ -57,8 +78,6 @@ def create_payment_preference(payment_id):
     """Cria uma preferência de pagamento no Mercado Pago para uma fatura específica."""
     try:
         data = request.get_json() or {}
-        # --- DIAGNÓSTICO ADICIONADO AQUI ---
-        print(f"[DIAGNÓSTICO] Dados recebidos para criar preferência: {data}")
         cpf = data.get('cpf')
         
         preference_id = payment_service.create_payment_preference(payment_id, g.user, cpf=cpf)

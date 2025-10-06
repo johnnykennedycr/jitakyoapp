@@ -15,6 +15,7 @@ from app.services.training_class_service import TrainingClassService
 from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
+from app.services.notification_service import NotificationService # <-- NOVO
 
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
@@ -25,10 +26,11 @@ training_class_service = None
 enrollment_service = None
 attendance_service = None
 payment_service = None
+notification_service = None # <-- NOVO
 db = None
 
-def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
-    global db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service
+def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param, ns): # <-- ns ADICIONADO
+    global db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service
     db = database
     user_service = us
     teacher_service = ts
@@ -36,6 +38,7 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param):
     enrollment_service = es_param
     attendance_service = as_param
     payment_service = ps_param
+    notification_service = ns # <-- NOVO
 
 
 @admin_api_bp.route('/dashboard-data')
@@ -98,6 +101,27 @@ def get_available_users():
     except Exception as e:
         print(f"Erro em get_available_users: {e}")
         return jsonify(error=str(e)), 500
+
+# --- NOVA ROTA DE NOTIFICAÇÕES ---
+@admin_api_bp.route('/notifications', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def send_notification():
+    """Envia uma notificação push para todos os alunos."""
+    data = request.get_json()
+    title = data.get('title')
+    body = data.get('body')
+
+    if not title or not body:
+        return jsonify(error="Título e corpo da mensagem são obrigatórios."), 400
+
+    try:
+        result = notification_service.send_notification_to_all(title, body)
+        return jsonify(success=True, message=f"{result.get('success', 0)} notificações enviadas com sucesso.", details=result), 200
+    except Exception as e:
+        logging.error(f"Erro ao enviar notificações: {e}", exc_info=True)
+        return jsonify(error=f"Falha ao enviar notificações: {e}"), 500
+
 # --- Rotas de Gerenciamento de Professores ---
 
 @admin_api_bp.route('/teachers/<string:teacher_id>', methods=['GET'])
@@ -284,7 +308,6 @@ def list_students():
             student_dict = student.to_dict()
             enrollments = enrollment_service.get_enrollments_by_student_id(student.id)
             
-            # ATENÇÃO: a linha abaixo pode causar erro se 'enrollments' for uma lista de dicionários
             student_dict['enrollments'] = [
                 {**enrollment, 'class_name': class_map.get(enrollment.get('class_id'), 'Turma Desconhecida')}
                 for enrollment in enrollments

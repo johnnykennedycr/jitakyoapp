@@ -49,11 +49,13 @@ def create_app():
     from app.services.training_class_service import TrainingClassService
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
+    from app.services.notification_service import NotificationService # <-- NOVO
     
     # Nível 0
     user_service = UserService(db, mail=mail)
     teacher_service = TeacherService(db, user_service=user_service)
     training_class_service = TrainingClassService(db, teacher_service=teacher_service)
+    notification_service = NotificationService(db) # <-- NOVO
     
     # Nível 1
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
@@ -70,21 +72,21 @@ def create_app():
     from app.routes.admin_routes import admin_api_bp, init_admin_bp
     from app.routes.student_routes import student_api_bp, init_student_bp
     from app.routes.teacher_routes import teacher_api_bp, init_teacher_bp
-    from app.routes.webhook_routes import webhook_api_bp, init_webhook_bp # <-- NOVO
+    from app.routes.webhook_routes import webhook_api_bp, init_webhook_bp
     from app.utils.decorators import init_decorators
 
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service)
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service) # <-- ATUALIZADO
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
-    init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service)
-    init_webhook_bp(payment_service) # <-- NOVO
+    init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service, notification_service) # <-- ATUALIZADO
+    init_webhook_bp(payment_service)
 
     app.register_blueprint(user_api_bp) 
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(student_api_bp)
     app.register_blueprint(teacher_api_bp)
-    app.register_blueprint(webhook_api_bp) # <-- NOVO
+    app.register_blueprint(webhook_api_bp)
 
     @app.route('/')
     def index():

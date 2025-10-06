@@ -1,9 +1,9 @@
-import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase.js';
+import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, getMessagingToken } from './firebase.js';
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
 // IMPORTANTE: Chave pública do Mercado Pago
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-f300cec5-a290-499e-a2cd-787dc913f57f';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 
 
 // --- ESTADO DA APLICAÇÃO ---
@@ -36,6 +36,51 @@ async function fetchWithAuth(endpoint, options = {}) {
     }
     return response.json();
 }
+
+// --- LÓGICA DE NOTIFICAÇÕES ---
+async function requestNotificationPermission() {
+    console.log("Verificando permissão para notificações...");
+    if ('Notification' in window && Notification.permission === 'default') {
+        const banner = document.createElement('div');
+        banner.id = 'notification-banner';
+        banner.className = 'fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between items-center shadow-lg z-50';
+        banner.innerHTML = `
+            <p>Deseja receber notificações sobre novidades e avisos?</p>
+            <div>
+                <button id="allow-notifications" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Sim</button>
+                <button id="deny-notifications" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Agora não</button>
+            </div>
+        `;
+        document.body.appendChild(banner);
+
+        document.getElementById('allow-notifications').addEventListener('click', async () => {
+            console.log("Usuário clicou em 'Sim'");
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                console.log('Permissão para notificações concedida.');
+                const token = await getMessagingToken();
+                if (token) {
+                    try {
+                        await fetchWithAuth('/api/student/save-push-token', {
+                            method: 'POST',
+                            body: JSON.stringify({ token: token })
+                        });
+                        console.log('Token de notificação salvo no backend.');
+                    } catch (error) {
+                        console.error('Falha ao salvar token de notificação no backend:', error);
+                    }
+                }
+            }
+            banner.remove();
+        });
+
+        document.getElementById('deny-notifications').addEventListener('click', () => {
+            console.log("Usuário clicou em 'Agora não'");
+            banner.remove();
+        });
+    }
+}
+
 
 // --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
 function renderLoginScreen() {
@@ -145,6 +190,9 @@ function renderAppScreen() {
 
     loadClasses();
     loadPayments();
+    
+    // Pede permissão para notificações após renderizar o app
+    requestNotificationPermission();
 }
 
 function setupTabListeners() {
@@ -172,7 +220,6 @@ function setupModalListeners() {
     const paymentModal = document.getElementById('payment-modal');
     const successModal = document.getElementById('success-modal');
     
-    // O botão de fechar agora é parte do conteúdo dinâmico, então o listener é adicionado depois
     paymentModal.addEventListener('click', (event) => {
         if (event.target.id === 'close-modal-button' || event.target === paymentModal) {
             paymentModal.classList.add('hidden');
@@ -237,7 +284,6 @@ function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
     const date = new Date(dateString);
     if (isNaN(date)) return 'Data inválida';
-    // Adiciona a opção timeZone para evitar problemas de fuso horário
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
