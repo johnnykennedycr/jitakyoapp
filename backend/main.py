@@ -49,7 +49,7 @@ def create_app():
     from app.services.training_class_service import TrainingClassService
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
-    from app.services.notification_service import NotificationService # <-- NOVO
+    from app.services.notification_service import NotificationService
     
     # Nível 0
     user_service = UserService(db, mail=mail)
