@@ -139,13 +139,25 @@ export function renderAdminDashboard(targetElement, user) {
     const populateClassSelector = async () => {
         try {
             const classes = await fetchWithAuth('/api/admin/classes/');
-            classSelect.innerHTML = '<option value="">Selecione uma turma</option>'; // Placeholder
-            classes.forEach(c => {
-                const option = document.createElement('option');
-                option.value = c.id;
-                option.textContent = c.name;
-                classSelect.appendChild(option);
-            });
+            
+            // --- DIAGNÓSTICO ADICIONADO AQUI ---
+            console.log("Dados recebidos da API para popular o seletor de turmas:", classes);
+
+            // Reseta o seletor
+            classSelect.innerHTML = '<option value="">Selecione uma turma</option>';
+
+            // Verifica se a resposta é um array antes de tentar iterar
+            if (Array.isArray(classes)) {
+                classes.forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = c.name;
+                    classSelect.appendChild(option);
+                });
+            } else {
+                 console.error("A resposta da API para /api/admin/classes/ não é um array.", classes);
+                 classSelect.innerHTML = '<option>Erro: Formato de dados inválido</option>';
+            }
         } catch (error) {
             console.error("Erro ao carregar turmas:", error);
             classSelect.innerHTML = '<option>Erro ao carregar turmas</option>';
