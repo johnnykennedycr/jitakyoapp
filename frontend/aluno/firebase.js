@@ -1,6 +1,6 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js';
 
 // --- CONFIGURAÇÃO ---
 const firebaseConfig = {
@@ -14,27 +14,15 @@ const firebaseConfig = {
 };
 
 
-// Inicializa o Firebase
+
+// IMPORTANTE: Cole aqui a sua VAPID key do Firebase Cloud Messaging
+const VAPID_KEY = 'BDJXmwLSObDCGq6dgVYQLOlMchriI3KFFzsQqR5G2wLh1Y1jyR_oCYmlG2yGjycUzXGg2ccQ24vD8D2t6v8jE5Y';
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const messaging = getMessaging(app);
 
-// Função para obter o token de notificação
-async function getMessagingToken() {
-    try {
-        // IMPORTANTE: Adicione sua VAPID Key aqui
-        const currentToken = await getToken(messaging, { vapidKey: "SUA_VAPID_KEY_DO_FIREBASE" });
-        if (currentToken) {
-            console.log('Token de notificação obtido:', currentToken);
-            return currentToken;
-        } else {
-            console.log('Não foi possível obter o token. Permissão não concedida?');
-            return null;
-        }
-    } catch (err) {
-        console.error('Ocorreu um erro ao obter o token.', err);
-        return null;
-    }
-}
+// Função para obter o token, agora exportada daqui
+const getMessagingToken = () => getToken(messaging, { vapidKey: VAPID_KEY });
 
 export { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getMessagingToken };
