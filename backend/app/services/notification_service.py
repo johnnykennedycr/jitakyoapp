@@ -1,5 +1,5 @@
 import logging
-from firebase_admin import messaging
+from firebase_admin import messaging, firestore
 
 class NotificationService:
     def __init__(self, db, enrollment_service=None):
@@ -24,17 +24,19 @@ class NotificationService:
             return []
         
         try:
-            # --- DIAGNÓSTICO ---
-            print(f"[DIAGNÓSTICO] Buscando tokens para os seguintes IDs de usuário: {user_ids}")
+            # --- CORREÇÃO APLICADA AQUI ---
+            # A consulta agora busca os documentos diretamente pelos seus IDs,
+            # que é a forma correta, já que estamos usando o user_id como ID do documento.
+            refs_to_get = [self.tokens_collection.document(uid) for uid in user_ids]
             
-            for doc_snapshot in self.tokens_collection.where('user_id', 'in', user_ids).stream():
-                token_data = doc_snapshot.to_dict()
-                if 'token' in token_data:
-                    tokens.append(token_data['token'])
-            
-            # --- DIAGNÓSTICO ---
-            print(f"[DIAGNÓSTICO] Tokens encontrados: {len(tokens)}")
+            # O método get_all pode buscar múltiplos documentos de forma eficiente.
+            docs = self.db.get_all(refs_to_get)
 
+            for doc in docs:
+                if doc.exists:
+                    token_data = doc.to_dict()
+                    if 'token' in token_data:
+                        tokens.append(token_data['token'])
         except Exception as e:
             logging.error(f"Erro ao buscar tokens para usuários {user_ids}: {e}")
         
@@ -60,12 +62,7 @@ class NotificationService:
             tokens = self._get_all_student_tokens()
         elif target_type == 'class' and target_ids and self.enrollment_service:
             class_id = target_ids[0]
-            
-            # --- DIAGNÓSTICO ---
-            print(f"[DIAGNÓSTICO] Buscando alunos para a turma ID: {class_id}")
             student_ids = self.enrollment_service.get_student_ids_by_class_id(class_id)
-            print(f"[DIAGNÓSTICO] Alunos encontrados na turma: {student_ids}")
-
             tokens = self._get_tokens_for_users(student_ids)
         elif target_type == 'individual' and target_ids:
             tokens = self._get_tokens_for_users(target_ids)
