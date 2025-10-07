@@ -10,7 +10,6 @@ class NotificationService:
     def save_token(self, user_id, token):
         """Salva ou atualiza o token de notificação de um usuário."""
         try:
-            # O ID do documento é o próprio user_id para fácil acesso
             token_ref = self.tokens_collection.document(user_id)
             token_ref.set({'token': token, 'user_id': user_id}, merge=True)
             return True
@@ -21,17 +20,21 @@ class NotificationService:
     def _get_tokens_for_users(self, user_ids):
         """Busca os tokens de notificação para uma lista de IDs de usuário."""
         tokens = []
-        # O Firestore permite buscar até 30 documentos por vez com o operador 'in'
-        # Para listas maiores, seria necessário dividir em lotes (chunks)
         if not user_ids:
             return []
         
         try:
-            # Busca todos os documentos cujos IDs estão na lista de user_ids
+            # --- DIAGNÓSTICO ---
+            print(f"[DIAGNÓSTICO] Buscando tokens para os seguintes IDs de usuário: {user_ids}")
+            
             for doc_snapshot in self.tokens_collection.where('user_id', 'in', user_ids).stream():
                 token_data = doc_snapshot.to_dict()
                 if 'token' in token_data:
                     tokens.append(token_data['token'])
+            
+            # --- DIAGNÓSTICO ---
+            print(f"[DIAGNÓSTICO] Tokens encontrados: {len(tokens)}")
+
         except Exception as e:
             logging.error(f"Erro ao buscar tokens para usuários {user_ids}: {e}")
         
@@ -56,18 +59,20 @@ class NotificationService:
         if target_type == 'all':
             tokens = self._get_all_student_tokens()
         elif target_type == 'class' and target_ids and self.enrollment_service:
-            # Assumindo que target_ids contém o ID da turma
             class_id = target_ids[0]
+            
+            # --- DIAGNÓSTICO ---
+            print(f"[DIAGNÓSTICO] Buscando alunos para a turma ID: {class_id}")
             student_ids = self.enrollment_service.get_student_ids_by_class_id(class_id)
+            print(f"[DIAGNÓSTICO] Alunos encontrados na turma: {student_ids}")
+
             tokens = self._get_tokens_for_users(student_ids)
         elif target_type == 'individual' and target_ids:
-            # Assumindo que target_ids contém os IDs dos alunos
             tokens = self._get_tokens_for_users(target_ids)
 
         if not tokens:
-            return {"success": 0, "failure": 0, "total": 0, "error": "Nenhum destinatário encontrado."}
+            return {"success": 0, "failure": 0, "total": 0, "error": "Nenhum destinatário com token de notificação encontrado."}
 
-        # O Firebase FCM pode enviar para até 500 dispositivos de uma vez com `send_multicast`
         message = messaging.MulticastMessage(
             notification=messaging.Notification(
                 title=title,

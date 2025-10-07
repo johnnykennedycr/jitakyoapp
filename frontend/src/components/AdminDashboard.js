@@ -113,13 +113,11 @@ export function renderAdminDashboard(targetElement, user) {
     
     // --- LÓGICA DO COMPONENTE ---
     
-    // Elementos das abas
     const tabOverview = document.getElementById('tab-overview');
     const tabNotifications = document.getElementById('tab-notifications');
     const contentOverview = document.getElementById('content-overview');
     const contentNotifications = document.getElementById('content-notifications');
 
-    // Elementos do formulário de notificação
     const form = document.getElementById('notification-form');
     const statusDiv = document.getElementById('notification-status');
     const sendButton = document.getElementById('send-notification-btn');
@@ -133,13 +131,10 @@ export function renderAdminDashboard(targetElement, user) {
 
     let selectedStudentId = null;
 
-    // --- FUNÇÕES ---
-
-    // Popula o seletor de turmas
     const populateClassSelector = async () => {
         try {
             const response = await fetchWithAuth('/api/admin/classes/');
-            const classes = await response.json(); // Extrai o JSON da resposta
+            const classes = await response.json();
 
             classSelect.innerHTML = '<option value="">Selecione uma turma</option>';
 
@@ -160,15 +155,18 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
-    // Busca e exibe alunos
     const handleStudentSearch = debounce(async (event) => {
         const searchTerm = event.target.value.trim();
         studentSearchResults.innerHTML = '';
         if (searchTerm.length < 3) return;
 
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Capitaliza a primeira letra para busca case-insensitive no backend
+        const capitalizedSearchTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
+
         try {
-            const response = await fetchWithAuth(`/api/admin/students/search?name=${searchTerm}`);
-            const students = await response.json(); // Extrai o JSON da resposta
+            const response = await fetchWithAuth(`/api/admin/students/search?name=${capitalizedSearchTerm}`);
+            const students = await response.json();
 
             if (students.length > 0) {
                 students.forEach(student => {
@@ -193,7 +191,6 @@ export function renderAdminDashboard(targetElement, user) {
         }
     }, 500);
 
-    // Envio do formulário
     const handleFormSubmit = async (event) => {
         event.preventDefault();
         statusDiv.textContent = 'Enviando...';
@@ -231,12 +228,11 @@ export function renderAdminDashboard(targetElement, user) {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            const result = await response.json(); // Extrai o JSON da resposta
+            const result = await response.json();
 
             statusDiv.textContent = `Sucesso! ${result.message || 'Notificações enviadas.'}`;
             statusDiv.className = 'text-green-400';
             form.reset();
-            // Reseta a UI de seleção
             classSelectorContainer.classList.add('hidden');
             studentSelectorContainer.classList.add('hidden');
             selectedStudentId = null;
@@ -252,7 +248,6 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
-    // Lógica para alternar abas
     const handleTabClick = (activeTab, inactiveTab, activeContent, inactiveContent) => {
         activeTab.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-400 border-blue-400';
         inactiveTab.className = 'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500';
@@ -260,7 +255,6 @@ export function renderAdminDashboard(targetElement, user) {
         inactiveContent.classList.add('hidden');
     };
     
-    // --- EVENT LISTENERS ---
     tabOverview.addEventListener('click', () => handleTabClick(tabOverview, tabNotifications, contentOverview, contentNotifications));
     tabNotifications.addEventListener('click', () => handleTabClick(tabNotifications, tabOverview, contentNotifications, contentOverview));
     form.addEventListener('submit', handleFormSubmit);
@@ -274,10 +268,8 @@ export function renderAdminDashboard(targetElement, user) {
         });
     });
 
-    // --- INICIALIZAÇÃO ---
-    populateClassSelector(); // Carrega as turmas ao renderizar o componente
+    populateClassSelector();
     
-    // Retorna a função de limpeza
     return () => {
         tabOverview.removeEventListener('click', () => {});
         tabNotifications.removeEventListener('click', () => {});
