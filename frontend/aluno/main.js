@@ -2,15 +2,14 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, getMessa
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
-// IMPORTANTE: Chave pública do Mercado Pago
 const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 
 
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
 let userProfile = null;
-let mp = null; // Instância do Mercado Pago
-let currentBrick = null; // Armazena a instância do brick atual para poder destruí-la
+let mp = null; 
+let currentBrick = null; 
 
 // --- ELEMENTOS DO DOM ---
 let authContainer;
@@ -37,62 +36,45 @@ async function fetchWithAuth(endpoint, options = {}) {
     return response.json();
 }
 
-// --- LÓGICA DE NOTIFICAÇÕES ---
-async function requestNotificationPermission() {
-    console.log("Verificando permissão para notificações...");
-    // Apenas mostra o banner se a permissão for 'default'
-    if ('Notification' in window && Notification.permission === 'default') {
-        const banner = document.createElement('div');
-        banner.id = 'notification-banner';
-        banner.className = 'fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between items-center shadow-lg z-50';
-        banner.innerHTML = `
-            <p>Deseja receber notificações sobre novidades e avisos?</p>
-            <div>
-                <button id="allow-notifications" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Sim</button>
-                <button id="deny-notifications" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Agora não</button>
-            </div>
-        `;
-        document.body.appendChild(banner);
-
-        document.getElementById('allow-notifications').addEventListener('click', async () => {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                console.log('Permissão para notificações concedida.');
-                const token = await getMessagingToken();
-                if (token) {
-                    try {
-                        await fetchWithAuth('/api/student/save-push-token', {
-                            method: 'POST',
-                            body: JSON.stringify({ token: token })
-                        });
-                        console.log('Token de notificação salvo no backend.');
-                    } catch (error) {
-                        console.error('Falha ao salvar token de notificação no backend:', error);
-                    }
-                }
+// --- LÓGICA DE NOTIFICAÇÕES (COM DIAGNÓSTICO) ---
+async function requestAndSavePushToken() {
+    console.log("[DIAGNÓSTICO] Iniciando processo de obtenção de token.");
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log('[DIAGNÓSTICO] Permissão de notificação concedida.');
+            const currentToken = await getMessagingToken();
+            if (currentToken) {
+                console.log('[DIAGNÓSTICO] Token FCM gerado:', currentToken);
+                await sendTokenToServer(currentToken);
+            } else {
+                console.error('[DIAGNÓSTICO] ERRO: Não foi possível obter o token. A permissão foi concedida, mas o token não foi gerado.');
             }
-            banner.remove();
-        });
-
-        document.getElementById('deny-notifications').addEventListener('click', () => {
-            banner.remove();
-        });
-    } else if (Notification.permission === 'granted') {
-        // Se a permissão já foi dada, apenas garante que o token está salvo
-        console.log('Permissão já concedida. Garantindo que o token está salvo.');
-        const token = await getMessagingToken();
-        if (token) {
-            await fetchWithAuth('/api/student/save-push-token', {
-                method: 'POST',
-                body: JSON.stringify({ token: token })
-            });
+        } else {
+            console.warn('[DIAGNÓSTICO] Permissão de notificação não concedida.');
         }
+    } catch (error) {
+        console.error('[DIAGNÓSTICO] ERRO ao solicitar permissão ou obter token:', error);
+    }
+}
+
+async function sendTokenToServer(token) {
+    try {
+        console.log("[DIAGNÓSTICO] Enviando token para o servidor...");
+        await fetchWithAuth('/api/student/save-push-token', {
+            method: 'POST',
+            body: JSON.stringify({ token: token }),
+        });
+        console.log('[DIAGNÓSTICO] Token enviado para o servidor com sucesso.');
+    } catch (error) {
+        console.error('[DIAGNÓSTICO] ERRO ao enviar token para o servidor:', error);
     }
 }
 
 
 // --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
 function renderLoginScreen() {
+    // ... (código existente sem alterações)
     if (!authContainer) return;
     authContainer.innerHTML = `
         <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
@@ -131,6 +113,7 @@ function renderLoginScreen() {
 }
 
 function renderAppScreen() {
+    // ... (código existente sem alterações)
     if (!appContainer) return;
     appContainer.innerHTML = `
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -164,19 +147,15 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <!-- MODAL DE NOTIFICAÇÕES -->
         <div id="notifications-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-auto">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold text-gray-800">Notificações</h3>
                     <button id="close-notifications-modal" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto">
-                    <!-- As notificações serão inseridas aqui -->
-                </div>
+                <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
             </div>
         </div>
-        <!-- Outros modais (pagamento, sucesso) -->
         <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
              <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;"></div>
         </div>
@@ -200,7 +179,6 @@ function renderAppScreen() {
     setupTabListeners();
     setupModalListeners();
     
-    // Configura os listeners do novo modal de notificações
     document.getElementById('notification-icon').addEventListener('click', loadNotifications);
     document.getElementById('close-notifications-modal').addEventListener('click', () => {
         document.getElementById('notifications-modal').classList.add('hidden');
@@ -217,11 +195,36 @@ function renderAppScreen() {
 
     loadClasses();
     loadPayments();
-    requestNotificationPermission();
+    
+    // Mostra o banner de permissão SE a permissão for 'default'
+    if (Notification.permission === 'default') {
+        const banner = document.createElement('div');
+        banner.id = 'notification-banner';
+        banner.className = 'fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between items-center shadow-lg z-50';
+        banner.innerHTML = `
+            <p>Deseja receber notificações sobre novidades e avisos?</p>
+            <div>
+                <button id="allow-notifications" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mr-2">Sim</button>
+                <button id="deny-notifications" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Agora não</button>
+            </div>
+        `;
+        document.body.appendChild(banner);
+        document.getElementById('allow-notifications').addEventListener('click', () => {
+            requestAndSavePushToken();
+            banner.remove();
+        });
+        document.getElementById('deny-notifications').addEventListener('click', () => banner.remove());
+    } else if (Notification.permission === 'granted') {
+        // Se a permissão já foi dada, tenta obter e salvar o token silenciosamente
+        requestAndSavePushToken();
+    }
 }
 
-// --- NOVA FUNÇÃO PARA CARREGAR E EXIBIR NOTIFICAÇÕES REAIS ---
+
+// --- LÓGICA DE NOTIFICAÇÕES (continuação) ---
+
 async function loadNotifications() {
+    // ... (código existente sem alterações)
     const modal = document.getElementById('notifications-modal');
     const list = document.getElementById('notifications-list');
     const badge = document.getElementById('notification-badge');
@@ -234,7 +237,7 @@ async function loadNotifications() {
         
         if (notifications && notifications.length > 0) {
             list.innerHTML = notifications.map(notif => {
-                const date = new Date(notif.created_at);
+                const date = new Date(notif.created_at._seconds * 1000);
                 const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 return `
                     <div class="p-3 ${notif.read ? 'bg-gray-100' : 'bg-blue-50'} rounded-lg border-l-4 ${notif.read ? 'border-gray-300' : 'border-blue-500'}">
@@ -264,6 +267,8 @@ async function loadNotifications() {
     }
 }
 
+// --- OUTRAS FUNÇÕES (loadClasses, loadPayments, formatDate, etc.) ---
+// ... (código existente sem alterações)
 
 function setupTabListeners() {
     const tabPending = document.getElementById('tab-pending');
@@ -290,7 +295,6 @@ function setupModalListeners() {
     const paymentModal = document.getElementById('payment-modal');
     const successModal = document.getElementById('success-modal');
     
-    // Usar delegação de eventos para o botão de fechar, já que o conteúdo do modal é recriado
     paymentModal.addEventListener('click', (event) => {
         if (event.target.id === 'close-modal-button' || event.target === paymentModal) {
             paymentModal.classList.add('hidden');
@@ -353,7 +357,6 @@ async function loadPayments() {
 
 function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
-    // O backend agora envia um objeto com segundos, então precisamos converter
     if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
         dateString = new Date(dateString._seconds * 1000).toISOString();
     }
@@ -409,7 +412,7 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 
 function renderPaymentStatus(payment) {
     if (!payment || !payment.status) return '';
-    const dueDate = new Date(payment.due_date);
+    const dueDate = new Date(payment.due_date._seconds * 1000);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -422,13 +425,11 @@ function renderPaymentStatus(payment) {
     return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendente</span>`;
 }
 
-// --- LÓGICA DE PAGAMENTO EM DUAS ETAPAS ---
-
 function handlePayment(paymentId, paymentAmount) {
+    // ... (código existente sem alterações)
     const modal = document.getElementById('payment-modal');
     const modalContent = document.getElementById('payment-modal-content');
 
-    // Etapa 1: Renderiza o formulário para pedir o CPF
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6">
             <h3 class="text-2xl font-bold text-gray-800">Informações para Pagamento</h3>
@@ -457,6 +458,7 @@ function handlePayment(paymentId, paymentAmount) {
 }
 
 async function initializeBrick(paymentId, paymentAmount, cpf) {
+    // ... (código existente sem alterações)
     const modalContent = document.getElementById('payment-modal-content');
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6">
