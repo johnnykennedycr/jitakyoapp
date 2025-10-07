@@ -138,15 +138,11 @@ export function renderAdminDashboard(targetElement, user) {
     // Popula o seletor de turmas
     const populateClassSelector = async () => {
         try {
-            const classes = await fetchWithAuth('/api/admin/classes/');
-            
-            // --- DIAGNÓSTICO ADICIONADO AQUI ---
-            console.log("Dados recebidos da API para popular o seletor de turmas:", classes);
+            const response = await fetchWithAuth('/api/admin/classes/');
+            const classes = await response.json(); // Extrai o JSON da resposta
 
-            // Reseta o seletor
             classSelect.innerHTML = '<option value="">Selecione uma turma</option>';
 
-            // Verifica se a resposta é um array antes de tentar iterar
             if (Array.isArray(classes)) {
                 classes.forEach(c => {
                     const option = document.createElement('option');
@@ -171,7 +167,9 @@ export function renderAdminDashboard(targetElement, user) {
         if (searchTerm.length < 3) return;
 
         try {
-            const students = await fetchWithAuth(`/api/admin/students/search?name=${searchTerm}`);
+            const response = await fetchWithAuth(`/api/admin/students/search?name=${searchTerm}`);
+            const students = await response.json(); // Extrai o JSON da resposta
+
             if (students.length > 0) {
                 students.forEach(student => {
                     const item = document.createElement('div');
@@ -233,7 +231,9 @@ export function renderAdminDashboard(targetElement, user) {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            statusDiv.textContent = `Sucesso! ${response.message || 'Notificações enviadas.'}`;
+            const result = await response.json(); // Extrai o JSON da resposta
+
+            statusDiv.textContent = `Sucesso! ${result.message || 'Notificações enviadas.'}`;
             statusDiv.className = 'text-green-400';
             form.reset();
             // Reseta a UI de seleção
