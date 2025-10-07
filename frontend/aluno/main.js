@@ -40,6 +40,7 @@ async function fetchWithAuth(endpoint, options = {}) {
 // --- LÓGICA DE NOTIFICAÇÕES ---
 async function requestNotificationPermission() {
     console.log("Verificando permissão para notificações...");
+    // Apenas mostra o banner se a permissão for 'default'
     if ('Notification' in window && Notification.permission === 'default') {
         const banner = document.createElement('div');
         banner.id = 'notification-banner';
@@ -54,7 +55,6 @@ async function requestNotificationPermission() {
         document.body.appendChild(banner);
 
         document.getElementById('allow-notifications').addEventListener('click', async () => {
-            console.log("Usuário clicou em 'Sim'");
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
                 console.log('Permissão para notificações concedida.');
@@ -75,9 +75,18 @@ async function requestNotificationPermission() {
         });
 
         document.getElementById('deny-notifications').addEventListener('click', () => {
-            console.log("Usuário clicou em 'Agora não'");
             banner.remove();
         });
+    } else if (Notification.permission === 'granted') {
+        // Se a permissão já foi dada, apenas garante que o token está salvo
+        console.log('Permissão já concedida. Garantindo que o token está salvo.');
+        const token = await getMessagingToken();
+        if (token) {
+            await fetchWithAuth('/api/student/save-push-token', {
+                method: 'POST',
+                body: JSON.stringify({ token: token })
+            });
+        }
     }
 }
 
@@ -127,7 +136,6 @@ function renderAppScreen() {
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="flex justify-between items-center py-6">
                 <h1 class="text-3xl font-bold text-gray-900">Olá, <span id="user-name"></span>!</h1>
-                <!-- ÍCONE DE NOTIFICAÇÃO ADICIONADO -->
                 <div class="flex items-center space-x-4">
                     <button id="notification-icon" class="relative text-gray-500 hover:text-gray-700">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -139,8 +147,7 @@ function renderAppScreen() {
                 </div>
             </header>
             <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
-                <!-- Conteúdo principal (turmas, faturas) -->
-                 <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md">
+                <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-4">Minhas Turmas</h2>
                     <div id="classes-list" class="space-y-4"></div>
                 </section>
@@ -200,9 +207,10 @@ function renderAppScreen() {
     });
 
     appContainer.addEventListener('click', (event) => {
-        if (event.target.classList.contains('pay-button')) {
-            const paymentId = event.target.dataset.paymentId;
-            const paymentAmount = event.target.dataset.paymentAmount;
+        const button = event.target.closest('.pay-button');
+        if (button) {
+            const paymentId = button.dataset.paymentId;
+            const paymentAmount = button.dataset.paymentAmount;
             handlePayment(paymentId, paymentAmount);
         }
     });
@@ -212,31 +220,48 @@ function renderAppScreen() {
     requestNotificationPermission();
 }
 
-// --- NOVA FUNÇÃO PARA CARREGAR NOTIFICAÇÕES ---
-function loadNotifications() {
+// --- NOVA FUNÇÃO PARA CARREGAR E EXIBIR NOTIFICAÇÕES REAIS ---
+async function loadNotifications() {
     const modal = document.getElementById('notifications-modal');
     const list = document.getElementById('notifications-list');
-    
-    // Por enquanto, apenas exibe dados de exemplo
-    list.innerHTML = `
-        <div class="p-3 bg-gray-50 rounded-lg">
-            <p class="font-semibold text-gray-800">Aula Cancelada</p>
-            <p class="text-sm text-gray-600">A aula de Judô Adulto de hoje foi cancelada. Entraremos em contato para remarcar.</p>
-            <p class="text-xs text-gray-400 text-right mt-1">Há 2 horas</p>
-        </div>
-        <div class="p-3 bg-gray-50 rounded-lg">
-            <p class="font-semibold text-gray-800">Novo Exame de Faixa</p>
-            <p class="text-sm text-gray-600">As inscrições para o próximo exame de faixa estão abertas! Não perca o prazo.</p>
-            <p class="text-xs text-gray-400 text-right mt-1">Ontem</p>
-        </div>
-    `;
-    
-    // Simula uma contagem de notificações não lidas
     const badge = document.getElementById('notification-badge');
-    badge.textContent = '2';
-    badge.classList.remove('hidden');
 
+    list.innerHTML = '<p class="text-gray-500">Carregando...</p>';
     modal.classList.remove('hidden');
+
+    try {
+        const notifications = await fetchWithAuth('/api/student/notifications');
+        
+        if (notifications && notifications.length > 0) {
+            list.innerHTML = notifications.map(notif => {
+                const date = new Date(notif.created_at);
+                const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                return `
+                    <div class="p-3 ${notif.read ? 'bg-gray-100' : 'bg-blue-50'} rounded-lg border-l-4 ${notif.read ? 'border-gray-300' : 'border-blue-500'}">
+                        <p class="font-semibold text-gray-800">${notif.title}</p>
+                        <p class="text-sm text-gray-600">${notif.body}</p>
+                        <p class="text-xs text-gray-400 text-right mt-1">${formattedDate}</p>
+                    </div>
+                `;
+            }).join('');
+            
+            const unreadCount = notifications.filter(n => !n.read).length;
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+        } else {
+            list.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Nenhuma notificação encontrada.</p>';
+            badge.classList.add('hidden');
+        }
+
+    } catch (error) {
+        console.error("Erro ao buscar notificações:", error);
+        list.innerHTML = '<p class="text-sm text-red-500 text-center py-4">Não foi possível carregar as notificações.</p>';
+    }
 }
 
 
@@ -265,6 +290,7 @@ function setupModalListeners() {
     const paymentModal = document.getElementById('payment-modal');
     const successModal = document.getElementById('success-modal');
     
+    // Usar delegação de eventos para o botão de fechar, já que o conteúdo do modal é recriado
     paymentModal.addEventListener('click', (event) => {
         if (event.target.id === 'close-modal-button' || event.target === paymentModal) {
             paymentModal.classList.add('hidden');
@@ -327,6 +353,10 @@ async function loadPayments() {
 
 function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
+    // O backend agora envia um objeto com segundos, então precisamos converter
+    if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
+        dateString = new Date(dateString._seconds * 1000).toISOString();
+    }
     const date = new Date(dateString);
     if (isNaN(date)) return 'Data inválida';
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -414,9 +444,6 @@ function handlePayment(paymentId, paymentAmount) {
                 </button>
             </form>
         </div>
-        <div id="payment-step-2" class="hidden">
-            <!-- O Brick será renderizado aqui -->
-        </div>
     `;
 
     modal.classList.remove('hidden');
@@ -425,7 +452,6 @@ function handlePayment(paymentId, paymentAmount) {
     cpfForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const cpf = document.getElementById('cpf').value;
-        // Inicia a Etapa 2: Inicializa o Brick de Pagamento
         initializeBrick(paymentId, paymentAmount, cpf);
     });
 }
@@ -472,14 +498,14 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
             },
             callbacks: {
                 onReady: () => { console.log("Brick de pagamento pronto!"); },
-                onSubmit: async (formData) => {
+                onSubmit: async ({ formData }) => {
                     document.getElementById('payment-error-container').classList.add('hidden');
                     try {
                         const response = await fetchWithAuth(`/api/student/payments/process`, {
                             method: 'POST',
                             body: JSON.stringify({
                                 paymentId: paymentId,
-                                mercadoPagoData: formData
+                                mercadoPagoData: { formData }
                             }),
                         });
                         
@@ -493,7 +519,6 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
                             document.getElementById('payment-error-message').textContent = message;
                             document.getElementById('payment-error-container').classList.remove('hidden');
                         }
-
                     } catch (error) {
                         document.getElementById('payment-error-message').textContent = "Ocorreu um erro de comunicação. Por favor, tente novamente.";
                         document.getElementById('payment-error-container').classList.remove('hidden');
@@ -508,7 +533,6 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
         };
         
         currentBrick = await mp.bricks().create("payment", "payment-brick-container", settings);
-
     } catch (error) {
         console.error("Erro ao criar preferência de pagamento:", error);
         document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-semibold">Não foi possível gerar o link de pagamento. Tente novamente mais tarde.</p>';
