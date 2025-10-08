@@ -14,7 +14,7 @@ function debounce(func, wait) {
 }
 
 /**
- * Renderiza o dashboard do administrador com abas para Visão Geral, Notificações e Histórico.
+ * Renderiza o dashboard do administrador com abas para Visão Geral e Notificações.
  * @param {HTMLElement} targetElement - O elemento onde o conteúdo será inserido.
  * @param {object} user - O objeto de perfil do usuário.
  * @returns {Function} Uma função de limpeza para remover os event listeners.
@@ -41,9 +41,6 @@ export function renderAdminDashboard(targetElement, user) {
                         <button id="tab-notifications" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-400 border-blue-400">
                             Notificações
                         </button>
-                        <button id="tab-history" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-400 hover:text-gray-200 hover:border-gray-500">
-                            Histórico de Envios
-                        </button>
                     </nav>
                 </div>
 
@@ -52,11 +49,12 @@ export function renderAdminDashboard(targetElement, user) {
                     <p class="text-gray-300">Aqui você pode ver um resumo das atividades da academia.</p>
                 </div>
 
-                <div id="content-notifications" class="mt-6">
-                    <!-- Formulário de Envio de Notificação -->
+                <div id="content-notifications" class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Coluna Esquerda: Formulário de Envio -->
                     <div class="max-w-xl bg-gray-800 p-6 rounded-lg shadow-lg">
-                         <h2 class="text-xl font-semibold text-gray-100 mb-4">Enviar Notificação Push</h2>
+                        <h2 class="text-xl font-semibold text-gray-100 mb-4">Enviar Notificação Push</h2>
                         <form id="notification-form">
+                            <!-- SELEÇÃO DE DESTINATÁRIO -->
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-300 mb-2">Enviar para:</label>
                                 <div class="flex space-x-4">
@@ -89,13 +87,10 @@ export function renderAdminDashboard(targetElement, user) {
                         </form>
                         <div id="notification-status" class="mt-4 text-sm"></div>
                     </div>
-                </div>
-
-                <div id="content-history" class="hidden mt-6">
-                    <!-- Histórico de Envios -->
+                    <!-- Coluna Direita: Histórico de Envios -->
                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-semibold text-gray-100 mb-4">Histórico de Envios</h2>
-                        <div id="history-list" class="space-y-4 max-h-96 overflow-y-auto">
+                        <div id="history-list" class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             <!-- O histórico será inserido aqui -->
                         </div>
                     </div>
@@ -109,12 +104,10 @@ export function renderAdminDashboard(targetElement, user) {
     const tabs = {
         overview: document.getElementById('tab-overview'),
         notifications: document.getElementById('tab-notifications'),
-        history: document.getElementById('tab-history'),
     };
     const contents = {
         overview: document.getElementById('content-overview'),
         notifications: document.getElementById('content-notifications'),
-        history: document.getElementById('content-history'),
     };
 
     const form = document.getElementById('notification-form');
@@ -139,7 +132,7 @@ export function renderAdminDashboard(targetElement, user) {
             tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${isActive ? 'text-blue-400 border-blue-400' : 'text-gray-400 hover:text-gray-200 hover:border-gray-500'}`;
             contents[key].classList.toggle('hidden', !isActive);
         });
-        if (activeTabKey === 'history') {
+         if (activeTabKey === 'notifications') {
             loadNotificationHistory();
         }
     };
@@ -272,6 +265,8 @@ export function renderAdminDashboard(targetElement, user) {
             selectedStudentId = null;
             selectedStudentDiv.textContent = '';
             document.querySelector('input[name="targetType"][value="all"]').checked = true;
+            // Recarrega o histórico após o envio
+            loadNotificationHistory();
 
         } catch (error) {
             console.error("Erro ao enviar notificação:", error);
@@ -285,7 +280,6 @@ export function renderAdminDashboard(targetElement, user) {
     // --- EVENT LISTENERS ---
     tabs.overview.addEventListener('click', () => switchTab('overview'));
     tabs.notifications.addEventListener('click', () => switchTab('notifications'));
-    tabs.history.addEventListener('click', () => switchTab('history'));
     form.addEventListener('submit', handleFormSubmit);
     studentSearchInput.addEventListener('input', handleStudentSearch);
     
@@ -304,7 +298,6 @@ export function renderAdminDashboard(targetElement, user) {
     return () => {
         tabs.overview.removeEventListener('click', () => {});
         tabs.notifications.removeEventListener('click', () => {});
-        tabs.history.removeEventListener('click', () => {});
         form.removeEventListener('submit', handleFormSubmit);
         studentSearchInput.removeEventListener('input', handleStudentSearch);
         targetTypeRadios.forEach(radio => radio.removeEventListener('change', () => {}));
