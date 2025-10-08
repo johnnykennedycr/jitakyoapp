@@ -20,9 +20,19 @@ const VAPID_KEY = 'BDJXmwLSObDCGq6dgVYQLOlMchriI3KFFzsQqR5G2wLh1Y1jyR_oCYmlG2yGj
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const messaging = getMessaging(app);
 
 // Função para obter o token, agora exportada daqui
-const getMessagingToken = () => getToken(messaging, { vapidKey: VAPID_KEY });
+const getMessagingToken = async () => {
+    try {
+        const messaging = getMessaging(app);
+        // O Service Worker a ser usado é o 'sw.js'
+        const serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js');
+        return await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration });
+    } catch (error) {
+        console.error("Erro ao obter o token de mensagem:", error);
+        return null;
+    }
+};
 
 export { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getMessagingToken };
+

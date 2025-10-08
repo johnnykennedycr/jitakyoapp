@@ -350,7 +350,6 @@ async function loadPayments() {
 
 function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
-    // CORREÇÃO: Trata o formato de data do Firestore
     if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
         dateString = new Date(dateString._seconds * 1000).toISOString();
     }
@@ -405,7 +404,7 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
-    if (!payment || !payment.status || !payment.due_date) return '';
+    if (!payment || !payment.status || !payment.due_date || !payment.due_date._seconds) return '';
     // CORREÇÃO: Trata o formato de data do Firestore
     const dueDate = new Date(payment.due_date._seconds * 1000);
     const today = new Date();

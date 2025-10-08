@@ -3,14 +3,14 @@
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
 
-// --- LÓGICA DE CACHE (Sua lógica original, mantida) ---
-const CACHE_NAME = 'jitakyo-aluno-cache-v1';
+// --- LÓGICA DE CACHE ---
+const CACHE_NAME = 'jitakyo-aluno-cache-v2'; // Versão do cache atualizada
 const urlsToCache = [
     '/',
     '/index.html',
     '/main.js',
     '/firebase.js',
-    // Adicione aqui outros arquivos estáticos importantes (CSS, ícones, etc.)
+    '/manifest.json',
     '/icons/web-app-manifest-192x192.png',
     '/icons/web-app-manifest-512x512.png'
 ];
@@ -19,7 +19,7 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Service Worker: Cache aberto');
+                console.log('Service Worker: Cache aberto e pronto para instalar.');
                 return cache.addAll(urlsToCache);
             })
     );
@@ -38,6 +38,7 @@ self.addEventListener('fetch', event => {
             })
     );
 });
+
 
 // --- LÓGICA DE NOTIFICAÇÕES (Nova lógica integrada) ---
 
@@ -71,4 +72,3 @@ messaging.onBackgroundMessage((payload) => {
 
     self.registration.showNotification(notificationTitle, notificationOptions);
 });
-
