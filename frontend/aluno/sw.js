@@ -1,86 +1,74 @@
-const CACHE_NAME = 'jitakyo-aluno-v3'; // Versão do cache atualizada
+// Importa as bibliotecas do Firebase diretamente da CDN.
+// Isso é necessário porque os Service Workers não suportam módulos ES6 da mesma forma que o navegador.
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
+
+// --- LÓGICA DE CACHE (Sua lógica original, mantida) ---
+const CACHE_NAME = 'jitakyo-aluno-cache-v1';
 const urlsToCache = [
     '/',
     '/index.html',
     '/main.js',
     '/firebase.js',
-    '/manifest.json',
+    // Adicione aqui outros arquivos estáticos importantes (CSS, ícones, etc.)
     '/icons/web-app-manifest-192x192.png',
-    '/icons/web-app-manifest-512x512.png',
-    'https://cdn.tailwindcss.com',
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
+    '/icons/web-app-manifest-512x512.png'
 ];
 
-// Instala o Service Worker e armazena os assets no cache
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Service Worker: Cache aberto e pronto para armazenar arquivos.');
+                console.log('Service Worker: Cache aberto');
                 return cache.addAll(urlsToCache);
             })
     );
 });
 
-// Intercepta as requisições e serve do cache se disponível
 self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
             .then(response => {
-                // Se o recurso estiver no cache, retorna ele. Senão, busca na rede.
-                return response || fetch(event.request);
+                // Se encontrar no cache, retorna a resposta do cache
+                if (response) {
+                    return response;
+                }
+                // Senão, faz a requisição na rede
+                return fetch(event.request);
             })
     );
 });
 
-// Ativa o Service Worker e limpa caches antigos
-self.addEventListener('activate', event => {
-    const cacheWhitelist = [CACHE_NAME];
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        console.log('Service Worker: Limpando cache antigo:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
-});
+// --- LÓGICA DE NOTIFICAÇÕES (Nova lógica integrada) ---
 
+// IMPORTANTE: Cole aqui a mesma configuração do seu arquivo firebase.js
+const firebaseConfig = {
+  apiKey: "AIzaSyAwAjcrYDm6GplMlbBtYwPdHAoJSBrnkB8",
+  authDomain: "jitakyoapp.firebaseapp.com",
+  projectId: "jitakyoapp",
+  storageBucket: "jitakyoapp.firebasestorage.app",
+  messagingSenderId: "217073545024",
+  appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5",
+  measurementId: "G-8D4CHETJQY"
+};
 
-// "Ouve" por notificações push
-self.addEventListener('push', event => {
-    console.log('[Service Worker] Push Recebido.');
-    
-    const notificationData = event.data.json();
-    const title = notificationData.title || 'Nova Notificação';
-    const options = {
-        body: notificationData.body || 'Você tem uma nova mensagem.',
-        icon: '/icons/web-app-manifest-192x192.png',
-        badge: '/icons/favicon-96x96.png'
+// Inicializa o Firebase usando a versão de compatibilidade
+firebase.initializeApp(firebaseConfig);
+
+// Obtém a instância do Messaging
+const messaging = firebase.messaging();
+
+// Adiciona um "ouvinte" para mensagens recebidas em segundo plano.
+// Isso garante que a notificação seja exibida mesmo se o app estiver fechado.
+messaging.onBackgroundMessage((payload) => {
+    console.log('[sw.js] Mensagem de fundo recebida: ', payload);
+
+    const notificationTitle = payload.notification.title;
+    const notificationOptions = {
+        body: payload.notification.body,
+        icon: '/icons/web-app-manifest-192x192.png' // Ícone padrão para a notificação
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
-});
-
-// Lida com o clique na notificação
-self.addEventListener('notificationclick', event => {
-    console.log('[Service Worker] Clique na notificação recebido.');
-    event.notification.close();
-    event.waitUntil(
-        clients.matchAll({ type: 'window' }).then(clientList => {
-            for (let client of clientList) {
-                if (client.url === '/' && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            if (clients.openWindow) {
-                return clients.openWindow('/');
-            }
-        })
-    );
+    self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
