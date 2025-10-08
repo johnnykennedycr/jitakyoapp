@@ -8,8 +8,8 @@ const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
 let userProfile = null;
-let mp = null;
-let currentBrick = null;
+let mp = null; 
+let currentBrick = null; 
 
 // --- ELEMENTOS DO DOM ---
 let authContainer;
@@ -36,40 +36,45 @@ async function fetchWithAuth(endpoint, options = {}) {
     return response.json();
 }
 
-// --- LÓGICA DE NOTIFICAÇÕES ---
+// --- LÓGICA DE NOTIFICAÇÕES (COM DIAGNÓSTICO) ---
 async function requestAndSavePushToken() {
+    console.log("[DIAGNÓSTICO] Iniciando processo de obtenção de token.");
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
+            console.log('[DIAGNÓSTICO] Permissão de notificação concedida.');
             const currentToken = await getMessagingToken();
             if (currentToken) {
+                console.log('[DIAGNÓSTICO] Token FCM gerado:', currentToken);
                 await sendTokenToServer(currentToken);
             } else {
-                console.error('Não foi possível obter o token de notificação.');
+                console.error('[DIAGNÓSTICO] ERRO: Não foi possível obter o token. A permissão foi concedida, mas o token não foi gerado.');
             }
         } else {
-            console.warn('Permissão de notificação não concedida.');
+            console.warn('[DIAGNÓSTICO] Permissão de notificação não concedida.');
         }
     } catch (error) {
-        console.error('Erro ao solicitar permissão ou obter token:', error);
+        console.error('[DIAGNÓSTICO] ERRO ao solicitar permissão ou obter token:', error);
     }
 }
 
 async function sendTokenToServer(token) {
     try {
+        console.log("[DIAGNÓSTICO] Enviando token para o servidor...");
         await fetchWithAuth('/api/student/save-push-token', {
             method: 'POST',
             body: JSON.stringify({ token: token }),
         });
-        console.log('Token de notificação salvo no servidor.');
+        console.log('[DIAGNÓSTICO] Token enviado para o servidor com sucesso.');
     } catch (error) {
-        console.error('Erro ao enviar token de notificação para o servidor:', error);
+        console.error('[DIAGNÓSTICO] ERRO ao enviar token para o servidor:', error);
     }
 }
 
 
 // --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
 function renderLoginScreen() {
+    // ... (código existente sem alterações)
     if (!authContainer) return;
     authContainer.innerHTML = `
         <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
@@ -108,6 +113,7 @@ function renderLoginScreen() {
 }
 
 function renderAppScreen() {
+    // ... (código existente sem alterações)
     if (!appContainer) return;
     appContainer.innerHTML = `
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -141,18 +147,15 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <!-- MODAL DE NOTIFICAÇÕES -->
         <div id="notifications-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-auto">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold text-gray-800">Notificações</h3>
                     <button id="close-notifications-modal" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto">
-                </div>
+                <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
             </div>
         </div>
-        <!-- Outros modais (pagamento, sucesso) -->
         <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
              <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;"></div>
         </div>
@@ -193,6 +196,7 @@ function renderAppScreen() {
     loadClasses();
     loadPayments();
     
+    // Mostra o banner de permissão SE a permissão for 'default'
     if (Notification.permission === 'default') {
         const banner = document.createElement('div');
         banner.id = 'notification-banner';
@@ -211,6 +215,7 @@ function renderAppScreen() {
         });
         document.getElementById('deny-notifications').addEventListener('click', () => banner.remove());
     } else if (Notification.permission === 'granted') {
+        // Se a permissão já foi dada, tenta obter e salvar o token silenciosamente
         requestAndSavePushToken();
     }
 }
@@ -219,6 +224,7 @@ function renderAppScreen() {
 // --- LÓGICA DE NOTIFICAÇÕES (continuação) ---
 
 async function loadNotifications() {
+    // ... (código existente sem alterações)
     const modal = document.getElementById('notifications-modal');
     const list = document.getElementById('notifications-list');
     const badge = document.getElementById('notification-badge');
@@ -262,6 +268,7 @@ async function loadNotifications() {
 }
 
 // --- OUTRAS FUNÇÕES (loadClasses, loadPayments, formatDate, etc.) ---
+// ... (código existente sem alterações)
 
 function setupTabListeners() {
     const tabPending = document.getElementById('tab-pending');
@@ -350,7 +357,6 @@ async function loadPayments() {
 
 function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
-    // CORREÇÃO: Trata o formato de data do Firestore
     if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
         dateString = new Date(dateString._seconds * 1000).toISOString();
     }
@@ -406,7 +412,6 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 
 function renderPaymentStatus(payment) {
     if (!payment || !payment.status || !payment.due_date) return '';
-    // CORREÇÃO: Trata o formato de data do Firestore
     const dueDate = new Date(payment.due_date._seconds * 1000);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -421,6 +426,7 @@ function renderPaymentStatus(payment) {
 }
 
 function handlePayment(paymentId, paymentAmount) {
+    // ... (código existente sem alterações)
     const modal = document.getElementById('payment-modal');
     const modalContent = document.getElementById('payment-modal-content');
 
@@ -452,6 +458,7 @@ function handlePayment(paymentId, paymentAmount) {
 }
 
 async function initializeBrick(paymentId, paymentAmount, cpf) {
+    // ... (código existente sem alterações)
     const modalContent = document.getElementById('payment-modal-content');
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6">
