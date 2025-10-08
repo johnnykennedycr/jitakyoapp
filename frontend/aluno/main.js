@@ -262,7 +262,6 @@ async function loadNotifications() {
 }
 
 // --- OUTRAS FUNÇÕES (loadClasses, loadPayments, formatDate, etc.) ---
-// ... (código existente sem alterações)
 
 function setupTabListeners() {
     const tabPending = document.getElementById('tab-pending');
@@ -351,6 +350,7 @@ async function loadPayments() {
 
 function formatDate(dateString) {
     if (!dateString) return 'Data inválida';
+    // CORREÇÃO: Trata o formato de data do Firestore
     if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
         dateString = new Date(dateString._seconds * 1000).toISOString();
     }
@@ -405,7 +405,8 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
-    if (!payment || !payment.status) return '';
+    if (!payment || !payment.status || !payment.due_date) return '';
+    // CORREÇÃO: Trata o formato de data do Firestore
     const dueDate = new Date(payment.due_date._seconds * 1000);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -420,7 +421,6 @@ function renderPaymentStatus(payment) {
 }
 
 function handlePayment(paymentId, paymentAmount) {
-    // ... (código existente sem alterações)
     const modal = document.getElementById('payment-modal');
     const modalContent = document.getElementById('payment-modal-content');
 
@@ -452,7 +452,6 @@ function handlePayment(paymentId, paymentAmount) {
 }
 
 async function initializeBrick(paymentId, paymentAmount, cpf) {
-    // ... (código existente sem alterações)
     const modalContent = document.getElementById('payment-modal-content');
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6">

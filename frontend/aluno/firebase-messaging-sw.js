@@ -1,4 +1,3 @@
-// Importa as funções do Firebase para o Service Worker
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getMessaging } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-sw.js";
 
@@ -12,7 +11,6 @@ const firebaseConfig = {
   appId: "1:217073545024:web:80e4d80f30b55ecfaed4a5",
   measurementId: "G-8D4CHETJQY"
 };
-
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
