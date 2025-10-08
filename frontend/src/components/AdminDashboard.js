@@ -51,7 +51,7 @@ export function renderAdminDashboard(targetElement, user) {
 
                 <div id="content-notifications" class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Coluna Esquerda: Formulário de Envio -->
-                    <div class="max-w-xl bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-semibold text-gray-100 mb-4">Enviar Notificação Push</h2>
                         <form id="notification-form">
                             <!-- SELEÇÃO DE DESTINATÁRIO -->
@@ -165,6 +165,7 @@ export function renderAdminDashboard(targetElement, user) {
             const history = await response.json();
             if (history && history.length > 0) {
                  historyList.innerHTML = history.map(log => {
+                    // --- CORREÇÃO DA DATA APLICADA AQUI ---
                     const date = new Date(log.sent_at._seconds * 1000);
                     const formattedDate = date.toLocaleString('pt-BR');
                     return `
