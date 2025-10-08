@@ -1,13 +1,15 @@
 import logging
 from datetime import datetime, timezone
-from firebase_admin import messaging
+from firebase_admin import messaging, firestore
 
 class NotificationService:
-    def __init__(self, db, enrollment_service=None):
+    def __init__(self, db, enrollment_service=None, user_service=None):
         self.db = db
         self.tokens_collection = self.db.collection('push_tokens')
         self.users_collection = self.db.collection('users')
+        self.log_collection = self.db.collection('sent_notifications_log') # Nova coleção para o log do admin
         self.enrollment_service = enrollment_service
+        self.user_service = user_service
 
     def save_token(self, user_id, token):
         """Salva ou atualiza o token de notificação de um usuário."""
@@ -19,12 +21,11 @@ class NotificationService:
             logging.error(f"Erro ao salvar token para o usuário {user_id}: {e}")
             return False
 
-    def _get_tokens_for_users(self, user_ids):
-        """Busca os tokens de notificação para uma lista de IDs de usuário."""
-        tokens = []
-        user_id_map = {} # Mapeia token para user_id
+    def _get_tokens_and_ids(self, user_ids):
+        """Busca os tokens e IDs de uma lista de usuários."""
+        tokens_map = {}
         if not user_ids:
-            return [], {}
+            return tokens_map
         
         try:
             refs_to_get = [self.tokens_collection.document(uid) for uid in user_ids]
@@ -34,65 +35,39 @@ class NotificationService:
                 if doc.exists:
                     token_data = doc.to_dict()
                     if 'token' in token_data:
-                        token = token_data['token']
-                        tokens.append(token)
-                        user_id_map[token] = doc.id
+                        tokens_map[doc.id] = token_data['token']
         except Exception as e:
             logging.error(f"Erro ao buscar tokens para usuários {user_ids}: {e}")
         
-        return tokens, user_id_map
+        return tokens_map
 
-    def _get_all_student_tokens(self):
-        """Busca todos os tokens de notificação salvos no sistema."""
-        tokens = []
-        user_id_map = {}
+    def _get_all_student_tokens_and_ids(self):
+        """Busca todos os tokens e IDs de alunos."""
+        tokens_map = {}
         try:
             all_tokens_docs = self.tokens_collection.stream()
             for doc in all_tokens_docs:
                 token_data = doc.to_dict()
                 if 'token' in token_data:
-                    token = token_data['token']
-                    tokens.append(token)
-                    user_id_map[token] = doc.id
+                    tokens_map[doc.id] = token_data['token']
         except Exception as e:
             logging.error(f"Erro ao buscar todos os tokens: {e}")
-        return tokens, user_id_map
-        
-    def _save_notification_for_users(self, user_ids, title, body):
-        """Salva uma cópia da notificação para cada usuário em uma subcoleção."""
-        batch = self.db.batch()
-        for user_id in user_ids:
-            user_ref = self.users_collection.document(user_id)
-            notification_ref = user_ref.collection('notifications').document()
-            batch.set(notification_ref, {
-                'title': title,
-                'body': body,
-                'read': False,
-                'created_at': datetime.now(timezone.utc)
-            })
-        try:
-            batch.commit()
-            logging.info(f"Notificação salva para {len(user_ids)} usuários.")
-        except Exception as e:
-            logging.error(f"Erro ao salvar notificação em lote: {e}")
-
+        return tokens_map
 
     def send_targeted_notification(self, title, body, target_type='all', target_ids=None):
-        """Envia uma notificação e salva uma cópia para o histórico."""
-        tokens = []
-        user_id_map = {}
-        target_user_ids = []
-
+        """Envia uma notificação e salva o histórico para o aluno e para o admin."""
+        tokens_map = {}
         if target_type == 'all':
-            tokens, user_id_map = self._get_all_student_tokens()
-            target_user_ids = list(user_id_map.values())
+            tokens_map = self._get_all_student_tokens_and_ids()
         elif target_type == 'class' and target_ids and self.enrollment_service:
             class_id = target_ids[0]
-            target_user_ids = self.enrollment_service.get_student_ids_by_class_id(class_id)
-            tokens, user_id_map = self._get_tokens_for_users(target_user_ids)
+            student_ids = self.enrollment_service.get_student_ids_by_class_id(class_id)
+            tokens_map = self._get_tokens_and_ids(student_ids)
         elif target_type == 'individual' and target_ids:
-            target_user_ids = target_ids
-            tokens, user_id_map = self._get_tokens_for_users(target_user_ids)
+            tokens_map = self._get_tokens_and_ids(target_ids)
+
+        tokens = list(tokens_map.values())
+        user_ids = list(tokens_map.keys())
 
         if not tokens:
             return {"success": 0, "failure": 0, "total": 0, "error": "Nenhum destinatário com token de notificação encontrado."}
@@ -105,20 +80,51 @@ class NotificationService:
         try:
             response = messaging.send_multicast(message)
             
-            # Identifica para quais usuários a notificação foi enviada com sucesso
-            successful_tokens = [tokens[i] for i, res in enumerate(response.responses) if res.success]
-            successful_user_ids = [user_id_map[token] for token in successful_tokens if token in user_id_map]
-
-            # Salva a notificação apenas para quem recebeu
-            if successful_user_ids:
-                self._save_notification_for_users(successful_user_ids, title, body)
-
-            return {
-                "success": response.success_count, 
-                "failure": response.failure_count,
-                "total": len(tokens)
+            # --- LÓGICA DE HISTÓRICO ADICIONADA ---
+            now = datetime.now(timezone.utc)
+            notification_data = {
+                'title': title,
+                'body': body,
+                'created_at': now,
+                'read': False
             }
+
+            # Salva a notificação para cada aluno que recebeu
+            batch = self.db.batch()
+            for user_id in user_ids:
+                user_notif_ref = self.users_collection.document(user_id).collection('notifications').document()
+                batch.set(user_notif_ref, notification_data)
+            batch.commit()
+
+            # Salva um log do envio para o admin
+            log_data = {
+                'title': title,
+                'body': body,
+                'sent_at': now,
+                'target_type': target_type,
+                'target_ids': target_ids,
+                'success_count': response.success_count,
+                'failure_count': response.failure_count,
+                'total_recipients': len(tokens)
+            }
+            self.log_collection.add(log_data)
+
+            return {"success": response.success_count, "failure": response.failure_count, "total": len(tokens)}
         except Exception as e:
-            logging.error(f"Erro ao enviar multicast de notificação: {e}")
+            logging.error(f"Erro ao enviar e salvar notificação: {e}")
             raise
+
+    def get_sent_notification_history(self):
+        """Busca o histórico de notificações enviadas para o painel do admin."""
+        history = []
+        try:
+            # Ordena pelas mais recentes e limita a 50 para performance
+            docs = self.log_collection.order_by('sent_at', direction=firestore.Query.DESCENDING).limit(50).stream()
+            for doc in docs:
+                log_data = doc.to_dict()
+                log_data['id'] = doc.id
+                history.append(log_data)
+        except Exception as e:
+            logging.error(f"Erro ao buscar histórico de notificações: {e}")
+        return history
 

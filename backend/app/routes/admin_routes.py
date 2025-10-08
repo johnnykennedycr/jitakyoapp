@@ -126,6 +126,20 @@ def send_notification():
     except Exception as e:
         logging.error(f"Erro ao enviar notificações: {e}", exc_info=True)
         return jsonify(error=f"Falha ao enviar notificações: {e}"), 500
+    
+# --- NOVA ROTA PARA HISTÓRICO ---
+@admin_api_bp.route('/notifications/history', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def get_notification_history():
+    """Busca o histórico de notificações enviadas."""
+    try:
+        history = notification_service.get_sent_notification_history()
+        return jsonify(history), 200
+    except Exception as e:
+        logging.error(f"Erro ao buscar histórico de notificações: {e}", exc_info=True)
+        return jsonify(error=f"Falha ao buscar histórico: {e}"), 500
+
 
 
 # --- Rotas de Gerenciamento de Professores ---
