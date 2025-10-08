@@ -55,7 +55,6 @@ def create_app():
     user_service = UserService(db, mail=mail)
     teacher_service = TeacherService(db, user_service=user_service)
     training_class_service = TrainingClassService(db, teacher_service=teacher_service)
-    notification_service = NotificationService(db) # <-- NOVO
     
     # Nível 1
     enrollment_service = EnrollmentService(db, user_service=user_service, training_class_service=training_class_service)
@@ -63,6 +62,10 @@ def create_app():
     # Nível 2
     attendance_service = AttendanceService(db, user_service, enrollment_service, training_class_service)
     payment_service = PaymentService(db, enrollment_service, user_service, training_class_service)
+    
+    # --- CORREÇÃO APLICADA AQUI ---
+    # O NotificationService precisa do enrollment_service para buscar alunos por turma.
+    notification_service = NotificationService(db, enrollment_service=enrollment_service)
 
     # Resolução de dependência circular
     user_service.set_enrollment_service(enrollment_service)
@@ -77,9 +80,9 @@ def create_app():
 
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service) # <-- ATUALIZADO
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
-    init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service, notification_service) # <-- ATUALIZADO
+    init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service, notification_service)
     init_webhook_bp(payment_service)
 
     app.register_blueprint(user_api_bp) 
