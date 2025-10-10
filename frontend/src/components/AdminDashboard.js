@@ -29,17 +29,17 @@ export function renderAdminDashboard(targetElement, user) {
     targetElement.innerHTML = `
         <div class="p-4 md:p-8">
             <!-- Cabeçalho -->
-            <h1 class="text-gray-800 font-bold text-2xl">Dashboard</h1>
-            <p class="mt-1 text-gray-600">Bem-vindo(a) de volta, ${user.name}!</p>
+            <h1 class="text-white font-bold text-2xl">Dashboard</h1>
+            <p class="mt-1 text-gray-300">Bem-vindo(a) de volta, ${user.name}!</p>
 
             <!-- Sistema de Abas -->
             <div class="mt-6">
-                <div class="border-b border-gray-200">
+                <div class="border-b border-gray-700">
                     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button id="tab-overview" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 border-transparent">
+                        <button id="tab-overview" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-400 hover:text-white border-transparent">
                             Visão Geral
                         </button>
-                        <button id="tab-notifications" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">
+                        <button id="tab-notifications" class="whitespace-nowrap py-4 px-1 border-b-2 font-semibold text-sm text-white border-blue-500">
                             Notificações
                         </button>
                     </nav>
@@ -47,7 +47,7 @@ export function renderAdminDashboard(targetElement, user) {
 
                 <!-- Conteúdo das Abas -->
                 <div id="content-overview" class="hidden mt-6">
-                    <p class="text-gray-600">Aqui você pode ver um resumo das atividades da academia.</p>
+                    <p class="text-gray-300">Aqui você pode ver um resumo das atividades da academia.</p>
                 </div>
 
                 <div id="content-notifications" class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -129,7 +129,8 @@ export function renderAdminDashboard(targetElement, user) {
     const switchTab = (activeTabKey) => {
         Object.keys(tabs).forEach(key => {
             const isActive = key === activeTabKey;
-            tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${isActive ? 'text-blue-600 border-blue-500' : 'text-gray-500 hover:text-gray-700 border-transparent'}`;
+            // ALTERAÇÃO: Classes de cor das abas atualizadas para melhor contraste.
+            tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 text-sm ${isActive ? 'font-semibold text-white border-blue-500' : 'font-medium text-gray-400 hover:text-white border-transparent'}`;
             contents[key].classList.toggle('hidden', !isActive);
         });
          if (activeTabKey === 'notifications') {
@@ -319,3 +320,4 @@ export function renderAdminDashboard(targetElement, user) {
         targetTypeRadios.forEach(radio => radio.removeEventListener('change', () => {}));
     };
 }
+

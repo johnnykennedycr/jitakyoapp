@@ -76,7 +76,23 @@ class EnrollmentService:
         except Exception as e:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
         return enrollments_details
-        
+    
+    # --- MÉTODO ADICIONADO ---
+    # Este é o método que estava faltando e causava o erro.
+    def get_enrollments_by_class_id(self, class_id):
+        """Busca todas as matrículas ativas de uma turma específica."""
+        enrollments = []
+        try:
+            docs = self.collection.where(filter=firestore.And([
+                firestore.FieldFilter('class_id', '==', class_id),
+                firestore.FieldFilter('status', '==', 'active')
+            ])).stream()
+            for doc in docs:
+                enrollments.append(Enrollment.from_dict(doc.to_dict(), doc.id))
+        except Exception as e:
+            print(f"Erro ao buscar matrículas da turma {class_id}: {e}")
+        return enrollments
+
     def get_student_ids_by_class_id(self, class_id):
         """Retorna uma lista de IDs de alunos matriculados em uma turma."""
         student_ids = []
@@ -142,4 +158,3 @@ class EnrollmentService:
         except Exception as e:
             print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             raise e
-
