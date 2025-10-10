@@ -11,7 +11,6 @@ class AttendanceService:
         self.training_class_service = training_class_service
         self.collection = self.db.collection('attendance')
 
-    # --- NOVO MÉTODO ---
     def get_available_semesters(self, class_id):
         """
         Busca e retorna uma lista de anos e semestres únicos que possuem
@@ -22,14 +21,12 @@ class AttendanceService:
             semesters = set()
             for doc in docs:
                 record_data = doc.to_dict()
-                # Garante que o campo 'date' é um objeto datetime
                 if isinstance(record_data.get('date'), datetime):
                     record_date = record_data.get('date').date()
                     year = record_date.year
                     semester = 1 if record_date.month <= 6 else 2
                     semesters.add((year, semester))
             
-            # Ordena a lista para que o mais recente apareça primeiro
             sorted_semesters = sorted(list(semesters), key=lambda x: (x[0], x[1]), reverse=True)
             return [{"year": year, "semester": semester} for year, semester in sorted_semesters]
         except Exception as e:
@@ -75,7 +72,8 @@ class AttendanceService:
 
     def create_or_update_attendance(self, data):
         """
-        Cria ou atualiza um registro de chamada para uma turma em uma data específica.
+        Cria ou atualiza um registro de chamada para uma turma em uma data específica,
+        validando se a data corresponde a um dia de aula da turma.
         """
         try:
             class_id = data.get('class_id')
@@ -86,10 +84,30 @@ class AttendanceService:
                 raise ValueError("class_id e date são obrigatórios.")
 
             attendance_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+            # --- VALIDAÇÃO DO DIA DA SEMANA ---
+            target_class = self.training_class_service.get_class_by_id(class_id)
+            if not target_class or not target_class.schedule:
+                raise ValueError("Turma não encontrada ou não possui horários definidos.")
+
+            scheduled_days_of_week = {slot.day_of_week for slot in target_class.schedule}
+            
+            weekday_map_to_str = {
+                0: 'Segunda', 1: 'Terça', 2: 'Quarta', 3: 'Quinta',
+                4: 'Sexta', 5: 'Sábado', 6: 'Domingo'
+            }
+            attendance_day_name = weekday_map_to_str.get(attendance_date.weekday())
+
+            if attendance_day_name not in scheduled_days_of_week:
+                raise ValueError(
+                    f"Não é possível registrar chamada em uma {attendance_day_name}. "
+                    f"Aulas para esta turma são somente em: {', '.join(sorted(scheduled_days_of_week))}."
+                )
+            # --- FIM DA VALIDAÇÃO ---
+
             doc_id = f"{class_id}_{date_str}"
             doc_ref = self.collection.document(doc_id)
 
-            # Convertendo a data para um objeto datetime para salvar no Firestore
             attendance_datetime = datetime.combine(attendance_date, datetime.min.time())
 
             attendance_data = {
@@ -157,4 +175,3 @@ class AttendanceService:
         except Exception as e:
             print(f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}")
             raise e
-
