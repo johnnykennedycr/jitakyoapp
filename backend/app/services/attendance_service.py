@@ -99,9 +99,11 @@ class AttendanceService:
             attendance_day_name = weekday_map_to_str.get(attendance_date.weekday())
 
             if attendance_day_name not in scheduled_days_of_week:
+                # A mensagem de erro agora é mais detalhada, incluindo a data selecionada.
+                data_formatada = attendance_date.strftime('%d/%m/%Y')
                 raise ValueError(
-                    f"Não é possível registrar chamada em uma {attendance_day_name}. "
-                    f"Aulas para esta turma são somente em: {', '.join(sorted(scheduled_days_of_week))}."
+                    f"A data selecionada ({data_formatada}) é uma {attendance_day_name}. "
+                    f"As aulas para esta turma ocorrem somente em: {', '.join(sorted(scheduled_days_of_week))}."
                 )
             # --- FIM DA VALIDAÇÃO ---
 
@@ -175,3 +177,4 @@ class AttendanceService:
         except Exception as e:
             print(f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}")
             raise e
+
