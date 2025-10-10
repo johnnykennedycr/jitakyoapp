@@ -25,17 +25,18 @@ export function renderAdminDashboard(targetElement, user) {
         return () => {};
     }
 
+    // ALTERAÇÃO: Removidas todas as classes "dark:" para alinhar com o tema claro do sistema.
     targetElement.innerHTML = `
         <div class="p-4 md:p-8">
             <!-- Cabeçalho -->
-            <h1 class="text-gray-800 dark:text-gray-50 font-bold text-2xl">Dashboard</h1>
-            <p class="mt-1 text-gray-600 dark:text-gray-300">Bem-vindo(a) de volta, ${user.name}!</p>
+            <h1 class="text-gray-800 font-bold text-2xl">Dashboard</h1>
+            <p class="mt-1 text-gray-600">Bem-vindo(a) de volta, ${user.name}!</p>
 
             <!-- Sistema de Abas -->
             <div class="mt-6">
-                <div class="border-b border-gray-200 dark:border-gray-700">
+                <div class="border-b border-gray-200">
                     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button id="tab-overview" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-transparent">
+                        <button id="tab-overview" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 border-transparent">
                             Visão Geral
                         </button>
                         <button id="tab-notifications" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">
@@ -46,39 +47,39 @@ export function renderAdminDashboard(targetElement, user) {
 
                 <!-- Conteúdo das Abas -->
                 <div id="content-overview" class="hidden mt-6">
-                    <p class="text-gray-600 dark:text-gray-300">Aqui você pode ver um resumo das atividades da academia.</p>
+                    <p class="text-gray-600">Aqui você pode ver um resumo das atividades da academia.</p>
                 </div>
 
                 <div id="content-notifications" class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Coluna Esquerda: Formulário de Envio -->
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Enviar Notificação Push</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Enviar Notificação Push</h2>
                         <form id="notification-form">
                             <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Enviar para:</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Enviar para:</label>
                                 <div class="flex space-x-4">
-                                    <label class="flex items-center"><input type="radio" name="targetType" value="all" class="text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600" checked><span class="ml-2 text-gray-700 dark:text-gray-300">Todos</span></label>
-                                    <label class="flex items-center"><input type="radio" name="targetType" value="class" class="text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600"><span class="ml-2 text-gray-700 dark:text-gray-300">Turma</span></label>
-                                    <label class="flex items-center"><input type="radio" name="targetType" value="individual" class="text-blue-600 bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600"><span class="ml-2 text-gray-700 dark:text-gray-300">Aluno</span></label>
+                                    <label class="flex items-center"><input type="radio" name="targetType" value="all" class="text-blue-600 bg-gray-100 border-gray-300" checked><span class="ml-2 text-gray-700">Todos</span></label>
+                                    <label class="flex items-center"><input type="radio" name="targetType" value="class" class="text-blue-600 bg-gray-100 border-gray-300"><span class="ml-2 text-gray-700">Turma</span></label>
+                                    <label class="flex items-center"><input type="radio" name="targetType" value="individual" class="text-blue-600 bg-gray-100 border-gray-300"><span class="ml-2 text-gray-700">Aluno</span></label>
                                 </div>
                             </div>
                             <div id="class-selector-container" class="hidden mb-4">
-                                <label for="class-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione a Turma</label>
-                                <select id="class-select" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white"></select>
+                                <label for="class-select" class="block text-sm font-medium text-gray-700 mb-1">Selecione a Turma</label>
+                                <select id="class-select" class="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-gray-900"></select>
                             </div>
                             <div id="student-selector-container" class="hidden mb-4 relative">
-                                <label for="student-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar Aluno</label>
-                                <input type="text" id="student-search" placeholder="Digite o nome do aluno..." class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white">
-                                <div id="student-search-results" class="absolute z-10 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md mt-1 max-h-60 overflow-y-auto"></div>
-                                <div id="selected-student" class="mt-2 text-sm text-gray-600 dark:text-gray-300"></div>
+                                <label for="student-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar Aluno</label>
+                                <input type="text" id="student-search" placeholder="Digite o nome do aluno..." class="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-gray-900">
+                                <div id="student-search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto"></div>
+                                <div id="selected-student" class="mt-2 text-sm text-gray-600"></div>
                             </div>
                             <div class="mb-4">
-                                <label for="notification-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título</label>
-                                <input type="text" id="notification-title" name="title" required class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white">
+                                <label for="notification-title" class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                <input type="text" id="notification-title" name="title" required class="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-gray-900">
                             </div>
                             <div class="mb-6">
-                                <label for="notification-body" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mensagem</label>
-                                <textarea id="notification-body" name="body" rows="4" required class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white"></textarea>
+                                <label for="notification-body" class="block text-sm font-medium text-gray-700 mb-1">Mensagem</label>
+                                <textarea id="notification-body" name="body" rows="4" required class="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-gray-900"></textarea>
                             </div>
                             <div class="flex items-center justify-end">
                                 <button type="submit" id="send-notification-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Enviar Notificação</button>
@@ -87,8 +88,8 @@ export function renderAdminDashboard(targetElement, user) {
                         <div id="notification-status" class="mt-4 text-sm"></div>
                     </div>
                     <!-- Coluna Direita: Histórico de Envios -->
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Histórico de Envios</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Histórico de Envios</h2>
                         <div id="history-list" class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             <!-- O histórico será inserido aqui -->
                         </div>
@@ -128,7 +129,7 @@ export function renderAdminDashboard(targetElement, user) {
     const switchTab = (activeTabKey) => {
         Object.keys(tabs).forEach(key => {
             const isActive = key === activeTabKey;
-            tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${isActive ? 'text-blue-600 border-blue-500' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-transparent'}`;
+            tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${isActive ? 'text-blue-600 border-blue-500' : 'text-gray-500 hover:text-gray-700 border-transparent'}`;
             contents[key].classList.toggle('hidden', !isActive);
         });
          if (activeTabKey === 'notifications') {
@@ -158,24 +159,35 @@ export function renderAdminDashboard(targetElement, user) {
     };
     
     const loadNotificationHistory = async () => {
-        historyList.innerHTML = '<p class="text-gray-600 dark:text-gray-300">Carregando histórico...</p>';
+        historyList.innerHTML = '<p class="text-gray-600">Carregando histórico...</p>';
         try {
             const response = await fetchWithAuth('/api/admin/notifications/history');
             const history = await response.json();
             if (history && history.length > 0) {
                  historyList.innerHTML = history.map(log => {
+                    // ALTERAÇÃO: Lógica de formatação de data aprimorada.
                     let formattedDate = 'Data inválida';
-                    if (log.sent_at && typeof log.sent_at._seconds === 'number') {
-                        const date = new Date(log.sent_at._seconds * 1000);
-                        if (!isNaN(date)) {
-                            formattedDate = date.toLocaleString('pt-BR');
+                    if (log.sent_at) {
+                        // Tenta criar a data a partir do objeto do Firestore ou de uma string
+                        const dateInput = log.sent_at._seconds ? log.sent_at._seconds * 1000 : log.sent_at;
+                        const date = new Date(dateInput);
+
+                        // Verifica se a data criada é válida
+                        if (!isNaN(date.getTime())) {
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mês é 0-indexado
+                            const year = date.getFullYear();
+                            const hours = String(date.getHours()).padStart(2, '0');
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
                         }
                     }
+                    
                     return `
-                        <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-                            <p class="font-semibold text-gray-800 dark:text-white">${log.title}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-300">${log.body}</p>
-                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 flex justify-between">
+                        <div class="p-3 bg-gray-100 rounded-md">
+                            <p class="font-semibold text-gray-800">${log.title}</p>
+                            <p class="text-sm text-gray-600">${log.body}</p>
+                            <div class="text-xs text-gray-500 mt-2 flex justify-between">
                                 <span>Enviado em: ${formattedDate}</span>
                                 <span>Sucesso: ${log.success_count} / ${log.total_recipients}</span>
                             </div>
@@ -183,7 +195,7 @@ export function renderAdminDashboard(targetElement, user) {
                     `;
                 }).join('');
             } else {
-                historyList.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhuma notificação foi enviada ainda.</p>';
+                historyList.innerHTML = '<p class="text-gray-500">Nenhuma notificação foi enviada ainda.</p>';
             }
         } catch (error) {
             console.error("Erro ao carregar histórico de notificações:", error);
@@ -203,7 +215,7 @@ export function renderAdminDashboard(targetElement, user) {
             if (students.length > 0) {
                 students.forEach(student => {
                     const item = document.createElement('div');
-                    item.className = 'p-2 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer text-gray-800 dark:text-white';
+                    item.className = 'p-2 hover:bg-gray-200 cursor-pointer text-gray-800';
                     item.textContent = student.name;
                     item.dataset.id = student.id;
                     item.addEventListener('click', () => {
@@ -215,7 +227,7 @@ export function renderAdminDashboard(targetElement, user) {
                     studentSearchResults.appendChild(item);
                 });
             } else {
-                studentSearchResults.innerHTML = '<div class="p-2 text-gray-500 dark:text-gray-400">Nenhum aluno encontrado.</div>';
+                studentSearchResults.innerHTML = '<div class="p-2 text-gray-500">Nenhum aluno encontrado.</div>';
             }
         } catch (error) {
             console.error("Erro ao buscar alunos:", error);
@@ -307,4 +319,3 @@ export function renderAdminDashboard(targetElement, user) {
         targetTypeRadios.forEach(radio => radio.removeEventListener('change', () => {}));
     };
 }
-
