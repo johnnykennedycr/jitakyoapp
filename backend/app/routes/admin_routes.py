@@ -454,24 +454,34 @@ def get_un_enrolled_students(class_id):
         print(f"Erro em get_un_enrolled_students: {e}")
         return jsonify(error=str(e)), 500
 
-# --- ROTAS PARA CHAMADA (ATTENDANCE) ---
+# --- ROTAS PARA CHAMADA (ATTENDANCE) - CORRIGIDO ---
 @admin_api_bp.route('/attendance', methods=['POST'])
 @login_required
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'teacher')
 def save_attendance():
+    """Cria ou atualiza um registro de chamada."""
     data = request.get_json()
     if not data or 'class_id' not in data or 'date' not in data:
         return jsonify({"error": "Dados de chamada inválidos"}), 400
+    
     try:
-        if attendance_service.create_or_update_attendance(data):
-            return jsonify({"success": True, "message": "Chamada salva com sucesso."}), 201
-        return jsonify({"error": "Não foi possível salvar a chamada"}), 500
+        attendance_service.create_or_update_attendance(data)
+        return jsonify({"success": True, "message": "Chamada salva com sucesso."}), 201
+    
+    except ValueError as ve:
+        # Erro de validação esperado (ex: dia da semana incorreto)
+        logging.warning(f"Erro de validação ao salvar chamada: {ve}")
+        return jsonify({"error": str(ve)}), 400
+    
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Erro inesperado no servidor
+        logging.error(f"Erro inesperado ao salvar chamada: {e}", exc_info=True)
+        return jsonify({"error": "Ocorreu uma falha interna ao salvar a chamada."}), 500
+
 
 @admin_api_bp.route('/classes/<class_id>/attendance-semesters', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'teacher')
 def get_attendance_semesters(class_id):
     try:
         semesters = attendance_service.get_available_semesters(class_id)
@@ -482,7 +492,7 @@ def get_attendance_semesters(class_id):
 
 @admin_api_bp.route('/classes/<class_id>/attendance-history', methods=['GET'])
 @login_required
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'teacher')
 def get_attendance_history(class_id):
     try:
         year = request.args.get('year', type=int)
@@ -736,4 +746,3 @@ def update_branding_settings():
     except Exception as e:
         print(f"Erro ao salvar configurações: {e}")
         return jsonify(error=str(e)), 500
-
