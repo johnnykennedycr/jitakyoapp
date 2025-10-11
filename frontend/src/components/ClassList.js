@@ -154,9 +154,23 @@ async function handleDeleteClick(classId, className) {
 async function openTakeAttendanceModal(classId, className) {
     showLoading();
     try {
-        const response = await fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`);
-        if (!response.ok) throw new Error('Falha ao buscar alunos matriculados.');
-        const students = await response.json();
+        // Busca alunos e detalhes da turma em paralelo para otimizar o carregamento
+        const [studentsRes, classRes] = await Promise.all([
+            fetchWithAuth(`/api/admin/classes/${classId}/enrolled-students`),
+            fetchWithAuth(`/api/admin/classes/${classId}`)
+        ]);
+
+        if (!studentsRes.ok) throw new Error('Falha ao buscar alunos matriculados.');
+        if (!classRes.ok) throw new Error('Falha ao buscar detalhes da turma.');
+
+        const students = await studentsRes.json();
+        const trainingClass = await classRes.json();
+
+        // Mapeia os dias da semana da turma para números (Domingo=0, Segunda=1, etc.)
+        const weekdayMap = { 'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3, 'Quinta': 4, 'Sexta': 5, 'Sábado': 6 };
+        const validWeekdays = (trainingClass.schedule || []).map(slot => weekdayMap[slot.day_of_week]);
+        const validDaysString = (trainingClass.schedule || []).map(s => s.day_of_week).join(', ');
+
         const today = new Date().toISOString().split('T')[0];
 
         const studentsHtml = students.length > 0
@@ -175,6 +189,7 @@ async function openTakeAttendanceModal(classId, className) {
                 <div class="mb-4">
                     <label for="attendance-date" class="block text-sm font-medium text-gray-700">Data da Chamada</label>
                     <input type="date" id="attendance-date" name="attendance_date" value="${today}" class="mt-1 block w-full p-2 border rounded-md" required>
+                    <div id="date-validation-message" class="text-red-500 text-sm mt-1 h-4"></div>
                 </div>
                 <h4 class="text-lg font-medium text-gray-800 mb-2">Alunos Matriculados</h4>
                 <div class="max-h-60 overflow-y-auto border rounded-md bg-white">
@@ -186,6 +201,39 @@ async function openTakeAttendanceModal(classId, className) {
             </form>
         `;
         showModal(`Chamada para ${className}`, formHtml);
+
+        // --- LÓGICA DE VALIDAÇÃO DA DATA ---
+        const dateInput = document.getElementById('attendance-date');
+        const saveButton = document.querySelector('#take-attendance-form button[type="submit"]');
+        const validationMessage = document.getElementById('date-validation-message');
+
+        const validateDate = () => {
+            const selectedDateStr = dateInput.value;
+            if (!selectedDateStr) {
+                validationMessage.textContent = 'Por favor, selecione uma data.';
+                saveButton.disabled = true;
+                return;
+            }
+
+            // Cria a data de forma segura para evitar problemas de fuso horário
+            const parts = selectedDateStr.split('-');
+            const selectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            const dayOfWeek = selectedDate.getUTCDay(); // Usa getUTCDay() para consistência
+
+            if (validWeekdays.includes(dayOfWeek)) {
+                validationMessage.textContent = '';
+                saveButton.disabled = false;
+            } else {
+                validationMessage.textContent = `Data inválida. Aulas somente em: ${validDaysString}.`;
+                saveButton.disabled = true;
+            }
+        };
+
+        dateInput.addEventListener('input', validateDate);
+        
+        // Executa a validação na data inicial ao abrir o modal
+        validateDate();
+
     } catch (error) {
         showModal('Erro', `<p>${error.message}</p>`);
     } finally {
