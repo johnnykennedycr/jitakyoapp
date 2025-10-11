@@ -366,7 +366,7 @@ function formatDate(dateSource) {
     if (typeof dateSource === 'object' && dateSource.hasOwnProperty('_seconds')) {
         date = new Date(dateSource._seconds * 1000);
     } 
-    // Tenta tratar como string (ex: ISO 8601)
+    // Tenta tratar como string (ex: ISO 8601 ou o formato GMT)
     else {
         date = new Date(dateSource);
     }
@@ -425,7 +425,7 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
-    if (!payment || !payment.status || !payment.due_date) return ''; // Apenas checa se a data existe
+    if (!payment || !payment.status || !payment.due_date) return '';
 
     let dueDate;
     // Lógica unificada para tratar a data
