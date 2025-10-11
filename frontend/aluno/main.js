@@ -310,12 +310,22 @@ async function loadClasses() {
     try {
         const classes = await fetchWithAuth('/api/student/classes');
         if (classes && classes.length > 0) {
-            classesList.innerHTML = classes.map(c => `
-                <div class="border-b pb-2">
-                    <h3 class="font-bold text-lg">${c.class_name || 'Turma sem nome'}</h3>
+            classesList.innerHTML = classes.map(c => {
+                // Formata os horários para exibição de forma segura
+                const scheduleHtml = (c.schedule && Array.isArray(c.schedule) && c.schedule.length > 0)
+                    ? `<div class="text-sm text-gray-500 mt-2 space-y-1">
+                        ${c.schedule.map(s => `<div>${s.day_of_week || ''}: ${s.start_time || ''} - ${s.end_time || ''}</div>`).join('')}
+                      </div>`
+                    : '<p class="text-sm text-gray-500 mt-2">Horários não definidos.</p>';
+
+                return `
+                <div class="border-b last:border-b-0 pb-4 mb-4">
+                    <h3 class="font-bold text-lg text-gray-800">${c.class_name || 'Turma sem nome'}</h3>
                     <p class="text-sm text-gray-600">Professor: ${c.teacher_name || 'Não informado'}</p>
+                    ${scheduleHtml}
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else {
             classesList.innerHTML = '<p class="text-gray-500">Você não está matriculado em nenhuma turma.</p>';
         }
