@@ -429,10 +429,16 @@ export async function renderClassList(targetElement) {
 					method: 'POST',
 					body: JSON.stringify(payload)
 				});
+
+                // Verifica se a resposta NÃO foi bem sucedida (status code não é 2xx)
 				if (!response.ok) {
                     const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
                     throw new Error(errorMessage);
                 }
+
+                // Opcional: Se a operação foi bem sucedida, pode fechar o modal e atualizar a lista, se necessário
+                // Neste caso, o modal já foi fechado. Nada mais a fazer.
+
 			} catch (error) {
                 showModal('Erro ao Salvar Chamada', `<p>${error.message}</p>`);
 			} finally {

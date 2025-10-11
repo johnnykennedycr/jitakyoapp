@@ -465,14 +465,14 @@ def save_attendance():
         return jsonify({"error": "Dados de chamada inválidos"}), 400
     
     try:
-        if attendance_service.create_or_update_attendance(data):
-            return jsonify({"success": True, "message": "Chamada salva com sucesso."}), 201
-        # Este retorno é improvável de acontecer se o serviço sempre levanta exceção em caso de falha.
-        return jsonify({"error": "Não foi possível salvar a chamada"}), 500
+        attendance_service.create_or_update_attendance(data)
+        return jsonify({"success": True, "message": "Chamada salva com sucesso."}), 201
+    
     except ValueError as ve:
         # Erro de validação esperado (ex: dia da semana incorreto)
         logging.warning(f"Erro de validação ao salvar chamada: {ve}")
         return jsonify({"error": str(ve)}), 400
+    
     except Exception as e:
         # Erro inesperado no servidor
         logging.error(f"Erro inesperado ao salvar chamada: {e}", exc_info=True)
@@ -746,3 +746,4 @@ def update_branding_settings():
     except Exception as e:
         print(f"Erro ao salvar configurações: {e}")
         return jsonify(error=str(e)), 500
+
