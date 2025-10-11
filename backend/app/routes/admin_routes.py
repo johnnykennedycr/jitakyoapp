@@ -471,14 +471,10 @@ def save_attendance():
     except ValueError as ve:
         # Erro de validação esperado (ex: dia da semana incorreto)
         logging.warning(f"Erro de validação ao salvar chamada: {ve}")
-        # --- DEBUG PRINT ---
-        print(f"DEBUG: Caught ValueError in route: {str(ve)}")
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
         # Erro inesperado no servidor
         logging.error(f"Erro inesperado ao salvar chamada: {e}", exc_info=True)
-        # --- DEBUG PRINT ---
-        print(f"DEBUG: Caught generic Exception in route: {str(e)}")
         return jsonify({"error": "Ocorreu uma falha interna ao salvar a chamada."}), 500
 
 

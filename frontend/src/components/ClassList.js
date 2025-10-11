@@ -395,19 +395,12 @@ export async function renderClassList(targetElement) {
         e.preventDefault();
         const form = e.target;
 
-        // --- NOVA FUNÇÃO HELPER PARA TRATAR ERROS ---
         const handleApiError = async (response, defaultMessage) => {
             const contentType = response.headers.get("content-type");
-             // --- DEBUG CONSOLE.LOG ---
-            console.log('DEBUG: handleApiError received response. Content-Type:', contentType);
             if (contentType && contentType.indexOf("application/json") !== -1) {
                 const errorData = await response.json();
-                // --- DEBUG CONSOLE.LOG ---
-                console.log('DEBUG: Parsed JSON error data:', errorData);
                 return errorData.error || defaultMessage;
             } else {
-                 // --- DEBUG CONSOLE.LOG ---
-                console.log('DEBUG: Response is not JSON. Falling back to status text.');
                 return `Erro no servidor: ${response.status} ${response.statusText}`;
             }
         };
@@ -437,18 +430,11 @@ export async function renderClassList(targetElement) {
 				});
 
 				if (!response.ok) {
-                    // --- DEBUG CONSOLE.LOG ---
-                    console.log('DEBUG: Response not OK. Status:', response.status);
                     const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
-                     // --- DEBUG CONSOLE.LOG ---
-                    console.log('DEBUG: Error message from handleApiError:', errorMessage);
                     throw new Error(errorMessage);
                 }
 
 			} catch (error) {
-                // --- DEBUG CONSOLE.LOG ---
-                console.error('DEBUG: Caught error in frontend:', error);
-                console.error('DEBUG: Error message property:', error.message);
                 showModal('Erro ao Salvar Chamada', `<p>${error.message}</p>`);
 			} finally {
 				hideLoading();
