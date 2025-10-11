@@ -68,7 +68,6 @@ async function openClassForm(classId = null) {
     finally { hideLoading(); }
 }
 
-// --- FUNÇÕES ATUALIZADAS E CORRIGIDAS ---
 async function openEnrollStudentModal(classId, className) {
     const modalBodyHtml = `
         <form id="enroll-student-form" data-class-id="${classId}">
@@ -146,9 +145,9 @@ async function openEnrolledStudentsModal(classId, className) {
 
 async function handleDeleteClick(classId, className) {
     showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar a turma <strong>${className}</strong>?</p>
-         <div class="text-right mt-6">
-              <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-              <button data-action="confirm-delete" data-class-id="${classId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+             <div class="text-right mt-6">
+                   <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                   <button data-action="confirm-delete" data-class-id="${classId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
 
@@ -401,30 +400,32 @@ export async function renderClassList(targetElement) {
             const attendanceDate = form.elements.attendance_date.value;
             const presentStudentIds = Array.from(form.querySelectorAll('input[name="present_students"]:checked')).map(cb => cb.value);
     
-        if (!attendanceDate) {
-            showModal('Atenção', '<p>Por favor, selecione uma data para a chamada.</p>');
-            return;
-        }
+			if (!attendanceDate) {
+				showModal('Atenção', '<p>Por favor, selecione uma data para a chamada.</p>');
+				return;
+			}
     
-        hideModal();
-        showLoading();
-        try {
-            const payload = {
-                class_id: classId,
-                date: attendanceDate,
-                present_student_ids: presentStudentIds
-            };
-            const response = await fetchWithAuth('/api/admin/attendance', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) throw await response.json();
-            
-        } catch (error) {
-            showModal('Erro', `<p>Erro ao salvar chamada: ${error.error || 'Ocorreu uma falha.'}</p>`);
-        } finally {
-            hideLoading();
-        }
+			hideModal();
+			showLoading();
+			try {
+				const payload = {
+					class_id: classId,
+					date: attendanceDate,
+					present_student_ids: presentStudentIds
+				};
+				const response = await fetchWithAuth('/api/admin/attendance', {
+					method: 'POST',
+					body: JSON.stringify(payload)
+				});
+				if (!response.ok) throw await response.json();
+				
+			} catch (error) {
+                // A mensagem de erro agora vem diretamente do backend.
+				const errorMessage = error.error || 'Ocorreu uma falha ao tentar salvar a chamada.';
+                showModal('Erro ao Salvar Chamada', `<p>${errorMessage}</p>`);
+			} finally {
+				hideLoading();
+			}
 
         } else if (form.id === 'enroll-student-form') {
             const classId = form.dataset.classId;
@@ -443,7 +444,8 @@ export async function renderClassList(targetElement) {
                 });
                 if (!response.ok) throw await response.json();
             } catch (error) {
-                showModal('Erro', `<p>Erro ao matricular aluno: ${error.error || 'Ocorreu uma falha.'}</p>`);
+                const errorMessage = error.error || 'Ocorreu uma falha ao matricular o aluno.';
+                showModal('Erro na Matrícula', `<p>${errorMessage}</p>`);
             } finally {
                 hideLoading();
             }
@@ -472,7 +474,8 @@ export async function renderClassList(targetElement) {
                 const response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
                 if (!response.ok) throw await response.json();
             } catch (error) {
-                showModal('Erro', `<p>Erro ao salvar turma: ${error.error || 'Ocorreu uma falha.'}</p>`);
+                const errorMessage = error.error || 'Ocorreu uma falha ao salvar a turma.';
+                showModal('Erro ao Salvar Turma', `<p>${errorMessage}</p>`);
             } finally {
                 await renderCards();
                 hideLoading();
@@ -492,4 +495,3 @@ export async function renderClassList(targetElement) {
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
-
