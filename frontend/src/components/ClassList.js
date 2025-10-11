@@ -433,7 +433,9 @@ export async function renderClassList(targetElement) {
                 // Verifica se a resposta NÃO foi bem sucedida (status code não é 2xx)
 				if (!response.ok) {
                     const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
+                    console.log(errorMessage);
                     throw new Error(errorMessage);
+                    
                 }
 
                 // Opcional: Se a operação foi bem sucedida, pode fechar o modal e atualizar a lista, se necessário
