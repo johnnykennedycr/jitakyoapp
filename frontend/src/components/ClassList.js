@@ -398,10 +398,16 @@ export async function renderClassList(targetElement) {
         // --- NOVA FUNÇÃO HELPER PARA TRATAR ERROS ---
         const handleApiError = async (response, defaultMessage) => {
             const contentType = response.headers.get("content-type");
+             // --- DEBUG CONSOLE.LOG ---
+            console.log('DEBUG: handleApiError received response. Content-Type:', contentType);
             if (contentType && contentType.indexOf("application/json") !== -1) {
                 const errorData = await response.json();
+                // --- DEBUG CONSOLE.LOG ---
+                console.log('DEBUG: Parsed JSON error data:', errorData);
                 return errorData.error || defaultMessage;
             } else {
+                 // --- DEBUG CONSOLE.LOG ---
+                console.log('DEBUG: Response is not JSON. Falling back to status text.');
                 return `Erro no servidor: ${response.status} ${response.statusText}`;
             }
         };
@@ -430,18 +436,19 @@ export async function renderClassList(targetElement) {
 					body: JSON.stringify(payload)
 				});
 
-                // Verifica se a resposta NÃO foi bem sucedida (status code não é 2xx)
 				if (!response.ok) {
+                    // --- DEBUG CONSOLE.LOG ---
+                    console.log('DEBUG: Response not OK. Status:', response.status);
                     const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
-                    console.log(errorMessage);
+                     // --- DEBUG CONSOLE.LOG ---
+                    console.log('DEBUG: Error message from handleApiError:', errorMessage);
                     throw new Error(errorMessage);
-                    
                 }
 
-                // Opcional: Se a operação foi bem sucedida, pode fechar o modal e atualizar a lista, se necessário
-                // Neste caso, o modal já foi fechado. Nada mais a fazer.
-
 			} catch (error) {
+                // --- DEBUG CONSOLE.LOG ---
+                console.error('DEBUG: Caught error in frontend:', error);
+                console.error('DEBUG: Error message property:', error.message);
                 showModal('Erro ao Salvar Chamada', `<p>${error.message}</p>`);
 			} finally {
 				hideLoading();
