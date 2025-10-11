@@ -395,19 +395,6 @@ export async function renderClassList(targetElement) {
         e.preventDefault();
         const form = e.target;
 
-        // --- FUNÇÃO DE TRATAMENTO DE ERRO ATUALIZADA ---
-        const handleApiError = async (response, defaultMessage) => {
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.error) {
-                    return errorData.error;
-                }
-            } catch (e) {
-                // Ignora o erro se o corpo não for JSON
-            }
-            return `Erro ${response.status}: ${response.statusText}` || defaultMessage;
-        };
-
         if (form.id === 'take-attendance-form') {
             const classId = form.dataset.classId;
             const attendanceDate = form.elements.attendance_date.value;
@@ -432,7 +419,15 @@ export async function renderClassList(targetElement) {
 				});
 
 				if (!response.ok) {
-                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
+                    let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData && errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // Ignora o erro se o corpo não for JSON, mantém a mensagem de status.
+                    }
                     throw new Error(errorMessage);
                 }
 
@@ -458,7 +453,13 @@ export async function renderClassList(targetElement) {
                     method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount, due_day: due_day })
                 });
                 if (!response.ok) {
-                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao matricular o aluno.');
+                    let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData && errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) { /* Mantém a mensagem de status */ }
                     throw new Error(errorMessage);
                 }
             } catch (error) {
@@ -490,7 +491,13 @@ export async function renderClassList(targetElement) {
             try {
                 const response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
                 if (!response.ok) {
-                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a turma.');
+                    let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData && errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) { /* Mantém a mensagem de status */ }
                     throw new Error(errorMessage);
                 }
             } catch (error) {
