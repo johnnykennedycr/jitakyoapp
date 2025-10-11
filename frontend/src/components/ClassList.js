@@ -395,6 +395,17 @@ export async function renderClassList(targetElement) {
         e.preventDefault();
         const form = e.target;
 
+        // --- NOVA FUNÇÃO HELPER PARA TRATAR ERROS ---
+        const handleApiError = async (response, defaultMessage) => {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                const errorData = await response.json();
+                return errorData.error || defaultMessage;
+            } else {
+                return `Erro no servidor: ${response.status} ${response.statusText}`;
+            }
+        };
+
         if (form.id === 'take-attendance-form') {
             const classId = form.dataset.classId;
             const attendanceDate = form.elements.attendance_date.value;
@@ -407,19 +418,20 @@ export async function renderClassList(targetElement) {
     
 			hideModal();
 			showLoading();
+            let response;
 			try {
 				const payload = {
 					class_id: classId,
 					date: attendanceDate,
 					present_student_ids: presentStudentIds
 				};
-				const response = await fetchWithAuth('/api/admin/attendance', {
+				response = await fetchWithAuth('/api/admin/attendance', {
 					method: 'POST',
 					body: JSON.stringify(payload)
 				});
 				if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a chamada.');
+                    throw new Error(errorMessage);
                 }
 			} catch (error) {
                 showModal('Erro ao Salvar Chamada', `<p>${error.message}</p>`);
@@ -438,13 +450,14 @@ export async function renderClassList(targetElement) {
             };
             hideModal();
             showLoading();
+            let response;
             try {
-                const response = await fetchWithAuth('/api/admin/enrollments', {
+                response = await fetchWithAuth('/api/admin/enrollments', {
                     method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount, due_day: due_day })
                 });
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao matricular o aluno.');
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 showModal('Erro na Matrícula', `<p>${error.message}</p>`);
@@ -472,11 +485,12 @@ export async function renderClassList(targetElement) {
 
             hideModal();
             showLoading();
+            let response;
             try {
-                const response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
+                response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                    const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a turma.');
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 showModal('Erro ao Salvar Turma', `<p>${error.message}</p>`);
@@ -499,3 +513,4 @@ export async function renderClassList(targetElement) {
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
+
