@@ -398,16 +398,13 @@ export async function renderClassList(targetElement) {
         // --- FUNÇÃO DE TRATAMENTO DE ERRO ATUALIZADA ---
         const handleApiError = async (response, defaultMessage) => {
             try {
-                // Tenta ler o corpo da resposta como JSON.
                 const errorData = await response.json();
-                // Se for um JSON válido e tiver a propriedade 'error', retorna essa mensagem.
                 if (errorData && errorData.error) {
                     return errorData.error;
                 }
             } catch (e) {
-                // Se a leitura do JSON falhar, ignora o erro e continua para o fallback.
+                // Ignora o erro se o corpo não for JSON
             }
-            // Fallback: Se não conseguiu ler a mensagem do JSON, retorna o status do erro.
             return `Erro ${response.status}: ${response.statusText}` || defaultMessage;
         };
 
