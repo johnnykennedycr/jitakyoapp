@@ -395,14 +395,20 @@ export async function renderClassList(targetElement) {
         e.preventDefault();
         const form = e.target;
 
+        // --- FUNÇÃO DE TRATAMENTO DE ERRO ATUALIZADA ---
         const handleApiError = async (response, defaultMessage) => {
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") !== -1) {
+            try {
+                // Tenta ler o corpo da resposta como JSON.
                 const errorData = await response.json();
-                return errorData.error || defaultMessage;
-            } else {
-                return `Erro no servidor: ${response.status} ${response.statusText}`;
+                // Se for um JSON válido e tiver a propriedade 'error', retorna essa mensagem.
+                if (errorData && errorData.error) {
+                    return errorData.error;
+                }
+            } catch (e) {
+                // Se a leitura do JSON falhar, ignora o erro e continua para o fallback.
             }
+            // Fallback: Se não conseguiu ler a mensagem do JSON, retorna o status do erro.
+            return `Erro ${response.status}: ${response.statusText}` || defaultMessage;
         };
 
         if (form.id === 'take-attendance-form') {
@@ -417,14 +423,13 @@ export async function renderClassList(targetElement) {
     
 			hideModal();
 			showLoading();
-            let response;
 			try {
 				const payload = {
 					class_id: classId,
 					date: attendanceDate,
 					present_student_ids: presentStudentIds
 				};
-				response = await fetchWithAuth('/api/admin/attendance', {
+				const response = await fetchWithAuth('/api/admin/attendance', {
 					method: 'POST',
 					body: JSON.stringify(payload)
 				});
@@ -451,9 +456,8 @@ export async function renderClassList(targetElement) {
             };
             hideModal();
             showLoading();
-            let response;
             try {
-                response = await fetchWithAuth('/api/admin/enrollments', {
+                const response = await fetchWithAuth('/api/admin/enrollments', {
                     method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount, due_day: due_day })
                 });
                 if (!response.ok) {
@@ -486,9 +490,8 @@ export async function renderClassList(targetElement) {
 
             hideModal();
             showLoading();
-            let response;
             try {
-                response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
+                const response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
                 if (!response.ok) {
                     const errorMessage = await handleApiError(response, 'Ocorreu uma falha ao salvar a turma.');
                     throw new Error(errorMessage);
