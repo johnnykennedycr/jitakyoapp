@@ -358,13 +358,24 @@ async function loadPayments() {
     }
 }
 
-function formatDate(dateString) {
-    if (!dateString) return 'Data inválida';
-    if (typeof dateString === 'object' && dateString.hasOwnProperty('_seconds')) {
-        dateString = new Date(dateString._seconds * 1000).toISOString();
+function formatDate(dateSource) {
+    if (!dateSource) return 'Data inválida';
+
+    let date;
+    // Tenta tratar como objeto Firestore Timestamp ({ _seconds: ... })
+    if (typeof dateSource === 'object' && dateSource.hasOwnProperty('_seconds')) {
+        date = new Date(dateSource._seconds * 1000);
+    } 
+    // Tenta tratar como string (ex: ISO 8601)
+    else {
+        date = new Date(dateSource);
     }
-    const date = new Date(dateString);
-    if (isNaN(date)) return 'Data inválida';
+    
+    if (isNaN(date.getTime())) {
+        return 'Data inválida';
+    }
+    
+    // Usar UTC para evitar problemas de fuso horário que podem mudar o dia
     return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
@@ -414,20 +425,31 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
-    if (!payment || !payment.status || !payment.due_date || !payment.due_date._seconds) return '';
-    // CORREÇÃO: Trata o formato de data do Firestore
-    const dueDate = new Date(payment.due_date._seconds * 1000);
+    if (!payment || !payment.status || !payment.due_date) return ''; // Apenas checa se a data existe
+
+    let dueDate;
+    // Lógica unificada para tratar a data
+    if (typeof payment.due_date === 'object' && payment.due_date.hasOwnProperty('_seconds')) {
+        dueDate = new Date(payment.due_date._seconds * 1000);
+    } else {
+        dueDate = new Date(payment.due_date);
+    }
+
+    if (isNaN(dueDate.getTime())) return ''; // Retorna vazio se a data for inválida
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (payment.status === 'paid') {
         return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pago</span>`;
     }
+    // Compara apenas a data, ignorando a hora
     if (dueDate < today) {
         return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Atrasado</span>`;
     }
     return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendente</span>`;
 }
+
 
 function handlePayment(paymentId, paymentAmount) {
     const modal = document.getElementById('payment-modal');
