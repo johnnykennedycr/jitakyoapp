@@ -417,12 +417,12 @@ export async function renderClassList(targetElement) {
 					method: 'POST',
 					body: JSON.stringify(payload)
 				});
-				if (!response.ok) throw await response.json();
-				
+				if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                }
 			} catch (error) {
-                // A mensagem de erro agora vem diretamente do backend.
-				const errorMessage = error.error || 'Ocorreu uma falha ao tentar salvar a chamada.';
-                showModal('Erro ao Salvar Chamada', `<p>${errorMessage}</p>`);
+                showModal('Erro ao Salvar Chamada', `<p>${error.message}</p>`);
 			} finally {
 				hideLoading();
 			}
@@ -442,10 +442,12 @@ export async function renderClassList(targetElement) {
                 const response = await fetchWithAuth('/api/admin/enrollments', {
                     method: 'POST', body: JSON.stringify({ student_id: studentId, class_id: classId, discount_amount: discount, due_day: due_day })
                 });
-                if (!response.ok) throw await response.json();
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                }
             } catch (error) {
-                const errorMessage = error.error || 'Ocorreu uma falha ao matricular o aluno.';
-                showModal('Erro na Matrícula', `<p>${errorMessage}</p>`);
+                showModal('Erro na Matrícula', `<p>${error.message}</p>`);
             } finally {
                 hideLoading();
             }
@@ -472,10 +474,12 @@ export async function renderClassList(targetElement) {
             showLoading();
             try {
                 const response = await fetchWithAuth(url, { method, body: JSON.stringify(classData) });
-                if (!response.ok) throw await response.json();
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ocorreu uma falha desconhecida.');
+                }
             } catch (error) {
-                const errorMessage = error.error || 'Ocorreu uma falha ao salvar a turma.';
-                showModal('Erro ao Salvar Turma', `<p>${errorMessage}</p>`);
+                showModal('Erro ao Salvar Turma', `<p>${error.message}</p>`);
             } finally {
                 await renderCards();
                 hideLoading();
@@ -495,4 +499,5 @@ export async function renderClassList(targetElement) {
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
+
 
