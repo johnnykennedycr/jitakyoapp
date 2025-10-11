@@ -499,4 +499,3 @@ export async function renderClassList(targetElement) {
         modalBody.removeEventListener('submit', handleModalSubmit);
     };
 }
-
