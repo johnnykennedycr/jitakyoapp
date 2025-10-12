@@ -59,21 +59,19 @@ class EnrollmentService:
             for doc in enrollment_docs:
                 enrollment = Enrollment.from_dict(doc.to_dict(), doc.id)
                 
-                class_info = self.training_class_service.get_class_by_id(enrollment.class_id)
+                # Usamos a função que retorna um dicionário para garantir consistência
+                class_info_dict = self.training_class_service.get_class_by_id_as_dict(enrollment.class_id)
                 
-                teacher_name = "Professor não encontrado"
-                if class_info and hasattr(class_info, 'teacher_id') and class_info.teacher_id:
-                    teacher_info = self.user_service.get_user_by_id(class_info.teacher_id)
-                    if teacher_info:
-                        teacher_name = teacher_info.name
-
                 enrollment_dict = enrollment.to_dict()
-                enrollment_dict['class_name'] = class_info.name if class_info else "Turma desconhecida"
-                enrollment_dict['teacher_name'] = teacher_name
-                
-                # --- CORREÇÃO APLICADA AQUI ---
-                # Adiciona a grade de horários à resposta, convertendo os objetos para dicionários
-                enrollment_dict['schedule'] = [s.to_dict() for s in class_info.schedule] if class_info and hasattr(class_info, 'schedule') and class_info.schedule else []
+
+                if class_info_dict:
+                    enrollment_dict['class_name'] = class_info_dict.get('name', "Turma desconhecida")
+                    enrollment_dict['teacher_name'] = class_info_dict.get('teacher_name', "Não informado")
+                    enrollment_dict['schedule'] = class_info_dict.get('schedule', [])
+                else:
+                    enrollment_dict['class_name'] = "Turma desconhecida"
+                    enrollment_dict['teacher_name'] = "Não informado"
+                    enrollment_dict['schedule'] = []
 
                 enrollments_details.append(enrollment_dict)
                 
@@ -81,8 +79,6 @@ class EnrollmentService:
             print(f"Erro ao buscar matrículas do aluno {student_id}: {e}")
         return enrollments_details
     
-    # --- MÉTODO ADICIONADO ---
-    # Este é o método que estava faltando e causava o erro.
     def get_enrollments_by_class_id(self, class_id):
         """Busca todas as matrículas ativas de uma turma específica."""
         enrollments = []
