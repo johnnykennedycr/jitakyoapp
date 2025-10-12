@@ -425,25 +425,28 @@ function renderPaymentsTable(container, payments, isPaidTable) {
 }
 
 function renderPaymentStatus(payment) {
-    if (!payment || !payment.status || !payment.due_date) return '';
+    // A função agora recebe o objeto de pagamento inteiro
+    if (!payment || !payment.status) return '';
 
+    // --- CORREÇÃO APLICADA AQUI ---
+    // Determina a data de vencimento, seja do campo `due_date` ou construída
     let dueDate;
-    // Lógica unificada para tratar a data
-    if (typeof payment.due_date === 'object' && payment.due_date.hasOwnProperty('_seconds')) {
-        dueDate = new Date(payment.due_date._seconds * 1000);
-    } else {
+    if (payment.due_date) {
         dueDate = new Date(payment.due_date);
+    } else if (payment.reference_year && payment.reference_month && payment.due_day) {
+        dueDate = new Date(Date.UTC(payment.reference_year, payment.reference_month - 1, payment.due_day));
+    } else {
+        return ''; // Não é possível determinar o status
     }
 
-    if (isNaN(dueDate.getTime())) return ''; // Retorna vazio se a data for inválida
+    if (isNaN(dueDate.getTime())) return ''; // Data inválida
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     if (payment.status === 'paid') {
         return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pago</span>`;
     }
-    // Compara apenas a data, ignorando a hora
     if (dueDate < today) {
         return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Atrasado</span>`;
     }
