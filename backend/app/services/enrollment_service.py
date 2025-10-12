@@ -51,7 +51,7 @@ class EnrollmentService:
         return Enrollment.from_dict(enrollment_data, doc_ref.id)
 
     def get_enrollments_by_student_id(self, student_id):
-        """Busca todas as matrículas de um aluno, enriquecidas com nomes da turma e do professor."""
+        """Busca todas as matrículas de um aluno, enriquecidas com nomes da turma, professor e horários."""
         enrollments_details = []
         try:
             enrollment_docs = self.collection.where(filter=firestore.FieldFilter('student_id', '==', student_id)).stream()
@@ -71,6 +71,10 @@ class EnrollmentService:
                 enrollment_dict['class_name'] = class_info.name if class_info else "Turma desconhecida"
                 enrollment_dict['teacher_name'] = teacher_name
                 
+                # --- CORREÇÃO APLICADA AQUI ---
+                # Adiciona a grade de horários à resposta, convertendo os objetos para dicionários
+                enrollment_dict['schedule'] = [s.to_dict() for s in class_info.schedule] if class_info and hasattr(class_info, 'schedule') and class_info.schedule else []
+
                 enrollments_details.append(enrollment_dict)
                 
         except Exception as e:
@@ -158,3 +162,4 @@ class EnrollmentService:
         except Exception as e:
             print(f"Erro ao deletar matrículas do aluno {student_id}: {e}")
             raise e
+
