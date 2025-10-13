@@ -234,6 +234,15 @@ export function renderAdminDashboard(targetElement, user) {
 
         try {
             const summaryData = await fetchWithAuth('/api/admin/dashboard-summary');
+            
+            // --- DEBUG: Mostra a resposta completa da API no console ---
+            console.log("Dados recebidos do dashboard:", summaryData);
+
+            // --- CORREÇÃO E VALIDAÇÃO ---
+            // Verifica se a resposta da API tem a estrutura esperada antes de tentar renderizar.
+            if (!summaryData || !summaryData.kpis || !summaryData.charts || !summaryData.lists) {
+                throw new Error("A resposta da API para o dashboard é inválida ou está malformada.");
+            }
 
             overviewContent.innerHTML = `
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -279,7 +288,7 @@ export function renderAdminDashboard(targetElement, user) {
 
         } catch (error) {
             console.error("Erro ao carregar dados do dashboard:", error);
-            overviewContent.innerHTML = '<p class="text-red-500">Não foi possível carregar os dados do dashboard.</p>';
+            overviewContent.innerHTML = `<p class="text-red-500 font-semibold">Não foi possível carregar os dados do dashboard: ${error.message}</p>`;
         }
     };
 
