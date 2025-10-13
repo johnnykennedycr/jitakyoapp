@@ -18,6 +18,7 @@ let chartJsPromise = null;
 function loadChartJs() {
     if (!chartJsPromise) {
         chartJsPromise = new Promise((resolve, reject) => {
+            // Se Chart.js já estiver carregado, resolve imediatamente.
             if (window.Chart) {
                 return resolve();
             }
@@ -244,19 +245,15 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
-    // --- NOVA FUNÇÃO PARA CONFIGURAR OS BOTÕES DE AÇÃO RÁPIDA ---
     const setupActionButtons = () => {
-        document.getElementById('quick-add-student').addEventListener('click', () => {
-            // Simula o clique no item de navegação "Alunos"
-            document.querySelector('a[data-nav-item="Alunos"]')?.click();
+        document.getElementById('quick-add-student')?.addEventListener('click', () => {
+            document.querySelector('[data-nav-item="Alunos"]')?.click();
         });
-        document.getElementById('quick-add-teacher').addEventListener('click', () => {
-            // Simula o clique no item de navegação "Professores"
-            document.querySelector('a[data-nav-item="Professores"]')?.click();
+        document.getElementById('quick-add-teacher')?.addEventListener('click', () => {
+            document.querySelector('[data-nav-item="Professores"]')?.click();
         });
-        document.getElementById('quick-add-payment').addEventListener('click', () => {
-            // Simula o clique no item de navegação "Financeiro"
-            document.querySelector('a[data-nav-item="Financeiro"]')?.click();
+        document.getElementById('quick-add-payment')?.addEventListener('click', () => {
+            document.querySelector('[data-nav-item="Financeiro"]')?.click();
         });
     };
 
@@ -318,7 +315,7 @@ export function renderAdminDashboard(targetElement, user) {
             renderKpiCards(summaryData.kpis);
             renderCharts(summaryData.charts);
             renderLists(summaryData.lists, summaryData.kpis);
-            setupActionButtons(); // <-- CHAMA A NOVA FUNÇÃO AQUI
+            setupActionButtons();
 
         } catch (error) {
             console.error("Erro ao carregar dados do dashboard:", error);
