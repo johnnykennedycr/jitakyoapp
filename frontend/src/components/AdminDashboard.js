@@ -283,11 +283,7 @@ export function renderAdminDashboard(targetElement, user) {
                     <div id="kpi-total-overdue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h3 class="text-lg font-semibold text-gray-700 mb-4">Ações Rápidas</h3>
-                        <div class="flex flex-col space-y-2">
-                           <button id="quick-add-student" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Aluno</button>
-                           <button id="quick-add-teacher" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Professor</button>
-                           <button id="quick-add-payment" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Registrar Pagamento</button>
-                        </div>
+                        
                     </div>
                 </div>
 
