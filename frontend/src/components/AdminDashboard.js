@@ -244,21 +244,7 @@ export function renderAdminDashboard(targetElement, user) {
             birthdayList.innerHTML = '<p class="text-sm text-gray-500">Nenhum aniversariante nos próximos 7 dias.</p>';
         }
     };
-
-    // --- CORREÇÃO APLICADA AQUI ---
-    const setupActionButtons = () => {
-        document.getElementById('quick-add-student')?.addEventListener('click', () => {
-            // Procura pelo elemento de navegação que contém o texto "Alunos"
-            document.querySelector('[data-nav-item="Alunos"]')?.click();
-        });
-        document.getElementById('quick-add-teacher')?.addEventListener('click', () => {
-            document.querySelector('[data-nav-item="Professores"]')?.click();
-        });
-        document.getElementById('quick-add-payment')?.addEventListener('click', () => {
-            document.querySelector('[data-nav-item="Financeiro"]')?.click();
-        });
-    };
-
+    
     const loadDashboardData = async () => {
         const overviewContent = document.getElementById('content-overview');
         overviewContent.innerHTML = '<p class="text-gray-300">Carregando resumo da academia...</p>';
@@ -277,11 +263,10 @@ export function renderAdminDashboard(targetElement, user) {
             }
 
             overviewContent.innerHTML = `
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     <div id="kpi-active-students" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
                     <div id="kpi-monthly-revenue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
                     <div id="kpi-total-overdue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
-                    
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -310,7 +295,6 @@ export function renderAdminDashboard(targetElement, user) {
             renderKpiCards(summaryData.kpis);
             renderCharts(summaryData.charts);
             renderLists(summaryData.lists, summaryData.kpis);
-            setupActionButtons();
 
         } catch (error) {
             console.error("Erro ao carregar dados do dashboard:", error);
