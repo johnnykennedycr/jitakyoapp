@@ -18,7 +18,6 @@ let chartJsPromise = null;
 function loadChartJs() {
     if (!chartJsPromise) {
         chartJsPromise = new Promise((resolve, reject) => {
-            // Se Chart.js já estiver carregado, resolve imediatamente.
             if (window.Chart) {
                 return resolve();
             }
@@ -245,26 +244,39 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
+    // --- NOVA FUNÇÃO PARA CONFIGURAR OS BOTÕES DE AÇÃO RÁPIDA ---
+    const setupActionButtons = () => {
+        document.getElementById('quick-add-student').addEventListener('click', () => {
+            // Simula o clique no item de navegação "Alunos"
+            document.querySelector('a[data-nav-item="Alunos"]')?.click();
+        });
+        document.getElementById('quick-add-teacher').addEventListener('click', () => {
+            // Simula o clique no item de navegação "Professores"
+            document.querySelector('a[data-nav-item="Professores"]')?.click();
+        });
+        document.getElementById('quick-add-payment').addEventListener('click', () => {
+            // Simula o clique no item de navegação "Financeiro"
+            document.querySelector('a[data-nav-item="Financeiro"]')?.click();
+        });
+    };
 
     const loadDashboardData = async () => {
         const overviewContent = document.getElementById('content-overview');
         overviewContent.innerHTML = '<p class="text-gray-300">Carregando resumo da academia...</p>';
         
         try {
-            // Executa o carregamento do script e da API em paralelo para otimizar
-            const [apiResponse, _] = await Promise.all([
+            const [response, _] = await Promise.all([
                 fetchWithAuth('/api/admin/dashboard-summary'),
-                loadChartJs() // Garante que a biblioteca Chart.js esteja pronta
+                loadChartJs()
             ]);
             
-            const summaryData = await apiResponse.json();
+            const summaryData = await response.json();
             console.log("Dados recebidos do dashboard:", summaryData);
 
             if (!summaryData || !summaryData.kpis || !summaryData.charts || !summaryData.lists) {
                 throw new Error("A resposta da API para o dashboard é inválida ou está malformada.");
             }
 
-            // A partir daqui, temos certeza que 'summaryData' é um objeto válido e 'window.Chart' existe.
             overviewContent.innerHTML = `
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div id="kpi-active-students" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
@@ -273,9 +285,9 @@ export function renderAdminDashboard(targetElement, user) {
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h3 class="text-lg font-semibold text-gray-700 mb-4">Ações Rápidas</h3>
                         <div class="flex flex-col space-y-2">
-                           <button onclick="document.querySelector('[data-nav-item=Alunos]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Aluno</button>
-                           <button onclick="document.querySelector('[data-nav-item=Professores]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Professor</button>
-                           <button onclick="document.querySelector('[data-nav-item=Financeiro]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Registrar Pagamento</button>
+                           <button id="quick-add-student" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Aluno</button>
+                           <button id="quick-add-teacher" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Professor</button>
+                           <button id="quick-add-payment" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Registrar Pagamento</button>
                         </div>
                     </div>
                 </div>
@@ -306,6 +318,7 @@ export function renderAdminDashboard(targetElement, user) {
             renderKpiCards(summaryData.kpis);
             renderCharts(summaryData.charts);
             renderLists(summaryData.lists, summaryData.kpis);
+            setupActionButtons(); // <-- CHAMA A NOVA FUNÇÃO AQUI
 
         } catch (error) {
             console.error("Erro ao carregar dados do dashboard:", error);
