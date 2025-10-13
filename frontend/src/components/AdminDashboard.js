@@ -256,7 +256,7 @@ export function renderAdminDashboard(targetElement, user) {
             ]);
             
             const summaryData = await response.json();
-            console.log("Dados recebidos do dashboard:", summaryData);
+            
 
             if (!summaryData || !summaryData.kpis || !summaryData.charts || !summaryData.lists) {
                 throw new Error("A resposta da API para o dashboard é inválida ou está malformada.");
