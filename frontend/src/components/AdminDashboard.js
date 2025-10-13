@@ -281,10 +281,7 @@ export function renderAdminDashboard(targetElement, user) {
                     <div id="kpi-active-students" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
                     <div id="kpi-monthly-revenue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
                     <div id="kpi-total-overdue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Ações Rápidas</h3>
-                        
-                    </div>
+                    
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
