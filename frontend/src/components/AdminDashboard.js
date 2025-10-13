@@ -245,8 +245,10 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
+    // --- CORREÇÃO APLICADA AQUI ---
     const setupActionButtons = () => {
         document.getElementById('quick-add-student')?.addEventListener('click', () => {
+            // Procura pelo elemento de navegação que contém o texto "Alunos"
             document.querySelector('[data-nav-item="Alunos"]')?.click();
         });
         document.getElementById('quick-add-teacher')?.addEventListener('click', () => {
