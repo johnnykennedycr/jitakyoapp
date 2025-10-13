@@ -13,6 +13,26 @@ function debounce(func, wait) {
     };
 }
 
+// --- LÓGICA DE CARREGAMENTO DE SCRIPTS EXTERNOS ---
+let chartJsPromise = null;
+function loadChartJs() {
+    if (!chartJsPromise) {
+        chartJsPromise = new Promise((resolve, reject) => {
+            // Se Chart.js já estiver carregado, resolve imediatamente.
+            if (window.Chart) {
+                return resolve();
+            }
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Falha ao carregar a biblioteca de gráficos."));
+            document.head.appendChild(script);
+        });
+    }
+    return chartJsPromise;
+}
+
+
 /**
  * Renderiza o dashboard do administrador com abas para Visão Geral e Notificações.
  * @param {HTMLElement} targetElement - O elemento onde o conteúdo será inserido.
@@ -25,9 +45,7 @@ export function renderAdminDashboard(targetElement, user) {
         return () => {};
     }
 
-    // Inclui o script do Chart.js para renderização dos gráficos
     targetElement.innerHTML = `
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <div class="p-4 md:p-8">
             <!-- Cabeçalho -->
             <h1 class="text-white font-bold text-2xl">Dashboard</h1>
@@ -231,20 +249,22 @@ export function renderAdminDashboard(targetElement, user) {
     const loadDashboardData = async () => {
         const overviewContent = document.getElementById('content-overview');
         overviewContent.innerHTML = '<p class="text-gray-300">Carregando resumo da academia...</p>';
-
+        
         try {
-            // --- CORREÇÃO APLICADA AQUI ---
-            // Primeiro, obtemos a resposta da API.
-            const response = await fetchWithAuth('/api/admin/dashboard-summary');
-            // Depois, extraímos o JSON da resposta.
-            const summaryData = await response.json();
+            // Executa o carregamento do script e da API em paralelo para otimizar
+            const [apiResponse, _] = await Promise.all([
+                fetchWithAuth('/api/admin/dashboard-summary'),
+                loadChartJs() // Garante que a biblioteca Chart.js esteja pronta
+            ]);
             
+            const summaryData = await apiResponse.json();
             console.log("Dados recebidos do dashboard:", summaryData);
 
             if (!summaryData || !summaryData.kpis || !summaryData.charts || !summaryData.lists) {
                 throw new Error("A resposta da API para o dashboard é inválida ou está malformada.");
             }
 
+            // A partir daqui, temos certeza que 'summaryData' é um objeto válido e 'window.Chart' existe.
             overviewContent.innerHTML = `
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div id="kpi-active-students" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
