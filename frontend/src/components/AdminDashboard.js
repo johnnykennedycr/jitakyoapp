@@ -233,13 +233,14 @@ export function renderAdminDashboard(targetElement, user) {
         overviewContent.innerHTML = '<p class="text-gray-300">Carregando resumo da academia...</p>';
 
         try {
-            const summaryData = await fetchWithAuth('/api/admin/dashboard-summary');
+            // --- CORREÇÃO APLICADA AQUI ---
+            // Primeiro, obtemos a resposta da API.
+            const response = await fetchWithAuth('/api/admin/dashboard-summary');
+            // Depois, extraímos o JSON da resposta.
+            const summaryData = await response.json();
             
-            // --- DEBUG: Mostra a resposta completa da API no console ---
             console.log("Dados recebidos do dashboard:", summaryData);
 
-            // --- CORREÇÃO E VALIDAÇÃO ---
-            // Verifica se a resposta da API tem a estrutura esperada antes de tentar renderizar.
             if (!summaryData || !summaryData.kpis || !summaryData.charts || !summaryData.lists) {
                 throw new Error("A resposta da API para o dashboard é inválida ou está malformada.");
             }
@@ -311,7 +312,8 @@ export function renderAdminDashboard(targetElement, user) {
 
     const populateClassSelector = async () => {
         try {
-            const classes = await fetchWithAuth('/api/admin/classes/');
+            const response = await fetchWithAuth('/api/admin/classes/');
+            const classes = await response.json();
             classSelect.innerHTML = '<option value="">Selecione uma turma</option>';
             if (Array.isArray(classes)) {
                 classes.forEach(c => {
@@ -330,7 +332,8 @@ export function renderAdminDashboard(targetElement, user) {
     const loadNotificationHistory = async () => {
         historyList.innerHTML = '<p class="text-gray-600">Carregando histórico...</p>';
         try {
-            const history = await fetchWithAuth('/api/admin/notifications/history');
+            const response = await fetchWithAuth('/api/admin/notifications/history');
+            const history = await response.json();
             if (history && history.length > 0) {
                 historyList.innerHTML = history.map(log => {
                     let formattedDate = 'Data inválida';
@@ -365,7 +368,8 @@ export function renderAdminDashboard(targetElement, user) {
         studentSearchResults.innerHTML = '';
         if (searchTerm.length < 2) return;
         try {
-            const students = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
+            const response = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
+            const students = await response.json();
             if (students.length > 0) {
                 students.forEach(student => {
                     const item = document.createElement('div');
@@ -421,10 +425,11 @@ export function renderAdminDashboard(targetElement, user) {
         }
 
         try {
-            const result = await fetchWithAuth('/api/admin/notifications', {
+            const response = await fetchWithAuth('/api/admin/notifications', {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
+            const result = await response.json();
             statusDiv.textContent = `Sucesso! ${result.message || 'Notificações enviadas.'}`;
             statusDiv.className = 'text-green-500';
             form.reset();
