@@ -1,9 +1,10 @@
 import os
 import calendar
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 import logging
 from firebase_admin import firestore
 import mercadopago
+from collections import defaultdict
 
 class PaymentService:
     def __init__(self, db, enrollment_service=None, user_service=None, training_class_service=None):
@@ -32,7 +33,6 @@ class PaymentService:
         payment_data = payment_doc.to_dict()
         description = payment_data.get('description', f"{payment_data.get('type', 'Fatura')} - {payment_data.get('reference_month')}/{payment_data.get('reference_year')}")
 
-        # IMPORTANTE: A URL base da sua API precisa estar configurada como uma variável de ambiente.
         base_api_url = os.getenv("BASE_API_URL", "https://jitakyoapp-217073545024.southamerica-east1.run.app")
 
         preference_data = {
@@ -57,11 +57,7 @@ class PaymentService:
                 "excluded_payment_methods": [],
                 "excluded_payment_types": []
             },
-            # --- MELHORIA 1: REFERÊNCIA EXTERNA ---
-            # Vincula esta transação do Mercado Pago ao ID da sua fatura interna.
             "external_reference": payment_id,
-            # --- MELHORIA 2: NOTIFICAÇÃO WEBHOOK ---
-            # Informa ao Mercado Pago qual URL notificar quando o status do pagamento mudar.
             "notification_url": f"{base_api_url}/api/payments/webhook"
         }
         
@@ -154,11 +150,9 @@ class PaymentService:
                 mp_payment_id = notification_data["data"]["id"]
                 print(f"INFO: Recebida notificação de pagamento para o ID: {mp_payment_id}")
                 
-                # Busca os detalhes completos do pagamento na API do Mercado Pago
                 payment_info_response = self.sdk.payment().get(mp_payment_id)
                 payment_info = payment_info_response["response"]
                 
-                # Pega a nossa referência interna (o ID da nossa fatura)
                 external_reference = payment_info.get("external_reference")
                 payment_status = payment_info.get("status")
 
@@ -166,7 +160,6 @@ class PaymentService:
                     print(f"AVISO: Webhook para o pagamento {mp_payment_id} não possui referência externa. Ignorando.")
                     return False
 
-                # Se o pagamento foi aprovado, atualiza o status na nossa base de dados
                 if payment_status == "approved":
                     payment_doc_ref = self.collection.document(external_reference)
                     payment_doc = payment_doc_ref.get()
@@ -190,8 +183,6 @@ class PaymentService:
             logging.error(f"Erro ao processar notificação de webhook: {e}", exc_info=True)
             return False
 
-
-    # O resto dos seus métodos...
     def generate_monthly_payments(self, year, month):
         try:
             active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
@@ -372,4 +363,95 @@ class PaymentService:
             created_count += 1
             
         return created_count
+
+    # --- NOVOS MÉTODOS PARA O DASHBOARD ---
+
+    def get_financial_summary_for_dashboard(self):
+        """Calcula o faturamento do mês atual e o total de inadimplência."""
+        now = datetime.now(timezone.utc)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        total_paid_this_month = 0
+        total_overdue = 0
+
+        try:
+            # Calcula faturamento do mês
+            paid_docs = self.collection.where(filter=firestore.And([
+                firestore.FieldFilter('status', '==', 'paid'),
+                firestore.FieldFilter('payment_date', '>=', start_of_month)
+            ])).stream()
+            for doc in paid_docs:
+                total_paid_this_month += doc.to_dict().get('amount', 0)
+
+            # Calcula inadimplência total
+            overdue_docs = self.collection.where(filter=firestore.And([
+                firestore.FieldFilter('status', '==', 'pending'),
+                firestore.FieldFilter('due_date', '<', now)
+            ])).stream()
+            for doc in overdue_docs:
+                total_overdue += doc.to_dict().get('amount', 0)
+
+            return {
+                "total_paid_this_month": total_paid_this_month,
+                "total_overdue": total_overdue
+            }
+        except Exception as e:
+            print(f"Erro ao calcular resumo financeiro do dashboard: {e}")
+            return {"total_paid_this_month": 0, "total_overdue": 0}
+
+    def get_recent_payments(self, limit=5):
+        """Busca os pagamentos mais recentes."""
+        recent_payments = []
+        try:
+            # Busca os alunos para enriquecer os dados
+            all_students = {s.id: s.name for s in self.user_service.get_users_by_role('student')}
+
+            docs = self.collection.where('status', '==', 'paid') \
+                                 .order_by('payment_date', direction=firestore.Query.DESCENDING) \
+                                 .limit(limit).stream()
+            for doc in docs:
+                payment_data = doc.to_dict()
+                payment_data['id'] = doc.id
+                payment_data['student_name'] = all_students.get(payment_data.get('student_id'), "Aluno Desconhecido")
+                recent_payments.append(payment_data)
+            return recent_payments
+        except Exception as e:
+            print(f"Erro ao buscar pagamentos recentes: {e}")
+            return []
+            
+    def get_students_by_discipline(self):
+        """Conta o número de alunos matriculados por modalidade."""
+        counts = defaultdict(int)
+        try:
+            active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
+            
+            # Mapeia class_id para discipline para evitar buscas repetidas
+            all_classes = self.training_class_service.get_all_classes()
+            class_discipline_map = {c['id']: c.get('discipline', 'Sem Modalidade') for c in all_classes}
+            
+            student_disciplines = defaultdict(set)
+            
+            # Para cada matrícula, associa o aluno à modalidade da turma
+            for enrollment in active_enrollments:
+                student_id = enrollment['student_id']
+                class_id = enrollment['class_id']
+                discipline = class_discipline_map.get(class_id)
+                if discipline:
+                    student_disciplines[student_id].add(discipline)
+            
+            # Conta quantos alunos únicos existem em cada modalidade
+            for disciplines in student_disciplines.values():
+                for discipline in disciplines:
+                    counts[discipline] += 1
+            
+            # Formata a saída para o gráfico
+            sorted_disciplines = sorted(counts.keys())
+            chart_data = {
+                'labels': sorted_disciplines,
+                'data': [counts[d] for d in sorted_disciplines]
+            }
+            return chart_data
+        except Exception as e:
+            print(f"Erro ao contar alunos por modalidade: {e}")
+            return {'labels': [], 'data': []}
 

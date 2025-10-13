@@ -1,5 +1,6 @@
 import string
 import secrets
+from datetime import datetime, timedelta
 from firebase_admin import auth, firestore
 from flask_mail import Message
 from app.models.user import User
@@ -39,6 +40,10 @@ class UserService:
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
+            # Adiciona a data de nascimento se ela for enviada
+            if 'birth_date' in user_data:
+                 db_user_data['birth_date'] = datetime.strptime(user_data['birth_date'], '%Y-%m-%d')
+
             self.collection.document(uid).set(db_user_data)
             
             # 3. Criar matrículas, se houver
@@ -106,8 +111,8 @@ class UserService:
             # Esta abordagem busca por prefixo.
             end_term = search_term + '\uf8ff'
             query = self.collection.where(filter=firestore.FieldFilter('role', '==', 'student')) \
-                                    .where(filter=firestore.FieldFilter('name', '>=', search_term)) \
-                                    .where(filter=firestore.FieldFilter('name', '<=', end_term))
+                                        .where(filter=firestore.FieldFilter('name', '>=', search_term)) \
+                                        .where(filter=firestore.FieldFilter('name', '<=', end_term))
             docs = query.stream()
             for doc in docs:
                 students.append(User.from_dict(doc.to_dict(), doc.id))
@@ -129,6 +134,9 @@ class UserService:
                 auth_update_data['email'] = data['email']
             if 'role' in data:
                 update_data['role'] = data['role']
+            if 'birth_date' in data and data['birth_date']:
+                update_data['birth_date'] = datetime.strptime(data['birth_date'], '%Y-%m-%d')
+
 
             if update_data:
                 update_data['updated_at'] = firestore.SERVER_TIMESTAMP
@@ -152,8 +160,10 @@ class UserService:
             if self.enrollment_service:
                 enrollments = self.enrollment_service.get_enrollments_by_student_id(uid)
                 for enrollment in enrollments:
-                    enrollment_ref = self.enrollment_service.collection.document(enrollment.id)
-                    batch.delete(enrollment_ref)
+                    # Assumindo que o serviço retorna objetos com um atributo 'id'
+                    if hasattr(enrollment, 'id'):
+                        enrollment_ref = self.enrollment_service.collection.document(enrollment.id)
+                        batch.delete(enrollment_ref)
 
             # 2. Deleta o documento do utilizador no Firestore
             user_ref = self.collection.document(uid)
@@ -169,3 +179,101 @@ class UserService:
         except Exception as e:
             print(f"Erro ao deletar utilizador {uid}: {e}")
             return False
+
+    # --- NOVOS MÉTODOS PARA O DASHBOARD ---
+
+    def count_active_students(self):
+        """Conta o número de alunos únicos com pelo menos uma matrícula ativa."""
+        if not self.enrollment_service:
+            print("AVISO: EnrollmentService não está disponível para contar alunos ativos.")
+            return 0
+        try:
+            active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
+            # Usa um set para contar apenas os IDs de estudantes únicos
+            active_student_ids = {e['student_id'] for e in active_enrollments}
+            return len(active_student_ids)
+        except Exception as e:
+            print(f"Erro ao contar alunos ativos: {e}")
+            return 0
+
+    def get_upcoming_birthdays(self, days_ahead=7):
+        """Busca alunos que fazem aniversário nos próximos X dias."""
+        upcoming = []
+        try:
+            today = datetime.now()
+            # Busca todos os usuários. Em uma aplicação maior, otimizar essa busca seria ideal.
+            all_users = self.get_all_users() 
+            students = [u for u in all_users if u.role == 'student' and hasattr(u, 'birth_date') and u.birth_date]
+
+            for student in students:
+                # Assegura que birth_date é um objeto datetime
+                if isinstance(student.birth_date, datetime):
+                    # Ignora o ano para comparar apenas o mês e o dia
+                    birthday_this_year = student.birth_date.replace(year=today.year)
+                    
+                    # Se o aniversário já passou este ano, verifica no próximo ano
+                    if birthday_this_year < today:
+                        birthday_next_year = birthday_this_year.replace(year=today.year + 1)
+                        time_to_birthday = birthday_next_year - today
+                    else:
+                        time_to_birthday = birthday_this_year - today
+                    
+                    if 0 <= time_to_birthday.days < days_ahead:
+                        student_dict = student.to_dict()
+                        student_dict['days_until_birthday'] = time_to_birthday.days
+                        # Formata a data de aniversário para exibição
+                        student_dict['birth_date_formatted'] = student.birth_date.strftime('%d/%m')
+                        upcoming.append(student_dict)
+            
+            # Ordena pelos aniversariantes mais próximos primeiro
+            upcoming.sort(key=lambda x: x['days_until_birthday'])
+            return upcoming
+        except Exception as e:
+            print(f"Erro ao buscar próximos aniversariantes: {e}")
+            return []
+
+    def get_new_students_per_month(self, num_months=6):
+        """Conta novos alunos (role='student') por mês nos últimos 'num_months'."""
+        try:
+            # Dicionário para armazenar contagem: { 'YYYY-MM': count }
+            counts = {}
+            today = datetime.now()
+            
+            # Prepara os labels e a contagem inicial para os últimos 'num_months'
+            for i in range(num_months):
+                # Volta no tempo mês a mês
+                dt = today - timedelta(days=i * 30.5) # Aproximação mais precisa
+                month_key = dt.strftime('%Y-%m')
+                counts[month_key] = 0
+            
+            # Define o limite de tempo para a busca no banco de dados
+            start_date_limit = today - timedelta(days=num_months * 30.5)
+            
+            # Busca otimizada no Firestore
+            query = self.collection.where(filter=firestore.And([
+                firestore.FieldFilter('role', '==', 'student'),
+                firestore.FieldFilter('created_at', '>=', start_date_limit)
+            ])).stream()
+
+            for doc in query:
+                student_data = doc.to_dict()
+                created_at = student_data.get('created_at')
+                
+                # 'created_at' pode ser um SERVER_TIMESTAMP que vira datetime no Python
+                if isinstance(created_at, datetime):
+                    month_key = created_at.strftime('%Y-%m')
+                    if month_key in counts:
+                        counts[month_key] += 1
+            
+            # Ordena os meses cronologicamente para o gráfico
+            sorted_months = sorted(counts.keys())
+            
+            # Formata a saída para ser facilmente consumida por uma biblioteca de gráficos
+            chart_data = {
+                'labels': [datetime.strptime(m, '%Y-%m').strftime('%b/%y') for m in sorted_months],
+                'data': [counts[m] for m in sorted_months]
+            }
+            return chart_data
+        except Exception as e:
+            print(f"Erro ao contar novos alunos por mês: {e}")
+            return {'labels': [], 'data': []}

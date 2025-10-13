@@ -25,8 +25,9 @@ export function renderAdminDashboard(targetElement, user) {
         return () => {};
     }
 
-    // ALTERAÇÃO: Removidas todas as classes "dark:" para alinhar com o tema claro do sistema.
+    // Inclui o script do Chart.js para renderização dos gráficos
     targetElement.innerHTML = `
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <div class="p-4 md:p-8">
             <!-- Cabeçalho -->
             <h1 class="text-white font-bold text-2xl">Dashboard</h1>
@@ -45,11 +46,12 @@ export function renderAdminDashboard(targetElement, user) {
                     </nav>
                 </div>
 
-                <!-- Conteúdo das Abas -->
+                <!-- Conteúdo da Aba Visão Geral -->
                 <div id="content-overview" class="hidden mt-6">
-                    <p class="text-gray-300">Aqui você pode ver um resumo das atividades da academia.</p>
+                    <p class="text-gray-300">Carregando resumo da academia...</p>
                 </div>
 
+                <!-- Conteúdo da Aba Notificações -->
                 <div id="content-notifications" class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Coluna Esquerda: Formulário de Envio -->
                     <div class="bg-white p-6 rounded-lg shadow-md">
@@ -90,9 +92,7 @@ export function renderAdminDashboard(targetElement, user) {
                     <!-- Coluna Direita: Histórico de Envios -->
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <h2 class="text-xl font-semibold text-gray-900 mb-4">Histórico de Envios</h2>
-                        <div id="history-list" class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                            <!-- O histórico será inserido aqui -->
-                        </div>
+                        <div id="history-list" class="space-y-4 max-h-[500px] overflow-y-auto pr-2"></div>
                     </div>
                 </div>
             </div>
@@ -123,25 +123,186 @@ export function renderAdminDashboard(targetElement, user) {
     const historyList = document.getElementById('history-list');
 
     let selectedStudentId = null;
+    let newStudentsChartInstance = null;
+    let disciplineChartInstance = null;
 
-    // --- FUNÇÕES ---
+
+    // --- FUNÇÕES DE RENDERIZAÇÃO DO DASHBOARD ---
+
+    const renderKpiCards = (kpis) => {
+        document.getElementById('kpi-active-students').innerHTML = `
+            <div class="bg-blue-100 p-3 rounded-full mr-4">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">Alunos Ativos</p>
+                <p class="text-2xl font-bold text-gray-800">${kpis.active_students}</p>
+            </div>`;
+        document.getElementById('kpi-monthly-revenue').innerHTML = `
+            <div class="bg-green-100 p-3 rounded-full mr-4">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V8m0 0h.01M12 15.99V16m0 1v.01M12 18v-1m0-1v-1m0 0h.01M12 8.01H12m0 0H11.99M12 15.99H12m0 0H11.99"></path></svg>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">Faturamento do Mês</p>
+                <p class="text-2xl font-bold text-gray-800">R$ ${kpis.monthly_revenue.toFixed(2).replace('.', ',')}</p>
+            </div>`;
+        document.getElementById('kpi-total-overdue').innerHTML = `
+            <div class="bg-red-100 p-3 rounded-full mr-4">
+                 <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+                <p class="text-sm font-medium text-gray-500">Inadimplência</p>
+                <p class="text-2xl font-bold text-gray-800">R$ ${kpis.total_overdue.toFixed(2).replace('.', ',')}</p>
+            </div>`;
+    };
+
+    const renderCharts = (charts) => {
+        if (newStudentsChartInstance) newStudentsChartInstance.destroy();
+        const newStudentsCtx = document.getElementById('newStudentsChart').getContext('2d');
+        newStudentsChartInstance = new Chart(newStudentsCtx, {
+            type: 'bar',
+            data: {
+                labels: charts.new_students.labels,
+                datasets: [{
+                    label: 'Novos Alunos',
+                    data: charts.new_students.data,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+
+        if (disciplineChartInstance) disciplineChartInstance.destroy();
+        const disciplineCtx = document.getElementById('disciplineChart').getContext('2d');
+        disciplineChartInstance = new Chart(disciplineCtx, {
+            type: 'doughnut',
+            data: {
+                labels: charts.students_by_discipline.labels,
+                datasets: [{
+                    label: 'Alunos',
+                    data: charts.students_by_discipline.data,
+                    backgroundColor: ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)'],
+                    borderColor: ['#fff'],
+                    borderWidth: 2
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    };
+
+    const renderLists = (lists, kpis) => {
+        const recentPaymentsList = document.getElementById('list-recent-payments');
+        if (lists.recent_payments.length > 0) {
+            recentPaymentsList.innerHTML = `
+                <ul class="space-y-3">
+                    ${lists.recent_payments.map(p => `
+                        <li class="flex justify-between items-center text-sm">
+                            <div>
+                                <p class="font-medium text-gray-800">${p.student_name}</p>
+                                <p class="text-gray-500">${new Date(p.payment_date).toLocaleDateString('pt-BR')}</p>
+                            </div>
+                            <span class="font-semibold text-green-600">R$ ${p.amount.toFixed(2).replace('.', ',')}</span>
+                        </li>
+                    `).join('')}
+                </ul>`;
+        } else {
+            recentPaymentsList.innerHTML = '<p class="text-sm text-gray-500">Nenhum pagamento recente.</p>';
+        }
+
+        const birthdayList = document.getElementById('list-upcoming-birthdays');
+        if (kpis.upcoming_birthdays.length > 0) {
+            birthdayList.innerHTML = `
+                <ul class="space-y-3">
+                    ${kpis.upcoming_birthdays.map(s => `
+                        <li class="flex justify-between items-center text-sm">
+                            <span class="font-medium text-gray-800">${s.name}</span>
+                            <span class="text-gray-600 font-semibold">${s.birth_date_formatted}</span>
+                        </li>
+                    `).join('')}
+                </ul>`;
+        } else {
+            birthdayList.innerHTML = '<p class="text-sm text-gray-500">Nenhum aniversariante nos próximos 7 dias.</p>';
+        }
+    };
+
+
+    const loadDashboardData = async () => {
+        const overviewContent = document.getElementById('content-overview');
+        overviewContent.innerHTML = '<p class="text-gray-300">Carregando resumo da academia...</p>';
+
+        try {
+            const summaryData = await fetchWithAuth('/api/admin/dashboard-summary');
+
+            overviewContent.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div id="kpi-active-students" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
+                    <div id="kpi-monthly-revenue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
+                    <div id="kpi-total-overdue" class="bg-white p-6 rounded-lg shadow-md flex items-center"></div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Ações Rápidas</h3>
+                        <div class="flex flex-col space-y-2">
+                           <button onclick="document.querySelector('[data-nav-item=Alunos]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Aluno</button>
+                           <button onclick="document.querySelector('[data-nav-item=Professores]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Adicionar Professor</button>
+                           <button onclick="document.querySelector('[data-nav-item=Financeiro]').click()" class="bg-blue-500 text-white w-full text-left px-4 py-2 rounded-md hover:bg-blue-600 text-sm">Registrar Pagamento</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Novos Alunos (Últimos 6 Meses)</h3>
+                        <canvas id="newStudentsChart"></canvas>
+                    </div>
+                     <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Próximos Aniversariantes</h3>
+                        <div id="list-upcoming-birthdays" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Alunos por Modalidade</h3>
+                        <div class="h-64"><canvas id="disciplineChart"></canvas></div>
+                    </div>
+                     <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Últimos Pagamentos Registrados</h3>
+                        <div id="list-recent-payments"></div>
+                    </div>
+                </div>
+            `;
+
+            renderKpiCards(summaryData.kpis);
+            renderCharts(summaryData.charts);
+            renderLists(summaryData.lists, summaryData.kpis);
+
+        } catch (error) {
+            console.error("Erro ao carregar dados do dashboard:", error);
+            overviewContent.innerHTML = '<p class="text-red-500">Não foi possível carregar os dados do dashboard.</p>';
+        }
+    };
+
+
+    // --- FUNÇÕES DA ABA DE NOTIFICAÇÃO ---
 
     const switchTab = (activeTabKey) => {
         Object.keys(tabs).forEach(key => {
             const isActive = key === activeTabKey;
-            // ALTERAÇÃO: Classes de cor das abas atualizadas para melhor contraste.
             tabs[key].className = `whitespace-nowrap py-4 px-1 border-b-2 text-sm ${isActive ? 'font-semibold text-white border-blue-500' : 'font-medium text-gray-400 hover:text-white border-transparent'}`;
             contents[key].classList.toggle('hidden', !isActive);
         });
-         if (activeTabKey === 'notifications') {
+
+        if (activeTabKey === 'overview') {
+            loadDashboardData();
+        } else if (activeTabKey === 'notifications') {
             loadNotificationHistory();
         }
     };
 
     const populateClassSelector = async () => {
         try {
-            const response = await fetchWithAuth('/api/admin/classes/');
-            const classes = await response.json();
+            const classes = await fetchWithAuth('/api/admin/classes/');
             classSelect.innerHTML = '<option value="">Selecione uma turma</option>';
             if (Array.isArray(classes)) {
                 classes.forEach(c => {
@@ -150,8 +311,6 @@ export function renderAdminDashboard(targetElement, user) {
                     option.textContent = c.name;
                     classSelect.appendChild(option);
                 });
-            } else {
-                 classSelect.innerHTML = '<option>Erro: Formato de dados inválido</option>';
             }
         } catch (error) {
             console.error("Erro ao carregar turmas:", error);
@@ -162,28 +321,17 @@ export function renderAdminDashboard(targetElement, user) {
     const loadNotificationHistory = async () => {
         historyList.innerHTML = '<p class="text-gray-600">Carregando histórico...</p>';
         try {
-            const response = await fetchWithAuth('/api/admin/notifications/history');
-            const history = await response.json();
+            const history = await fetchWithAuth('/api/admin/notifications/history');
             if (history && history.length > 0) {
-                 historyList.innerHTML = history.map(log => {
-                    // ALTERAÇÃO: Lógica de formatação de data aprimorada.
+                historyList.innerHTML = history.map(log => {
                     let formattedDate = 'Data inválida';
                     if (log.sent_at) {
-                        // Tenta criar a data a partir do objeto do Firestore ou de uma string
                         const dateInput = log.sent_at._seconds ? log.sent_at._seconds * 1000 : log.sent_at;
                         const date = new Date(dateInput);
-
-                        // Verifica se a data criada é válida
                         if (!isNaN(date.getTime())) {
-                            const day = String(date.getDate()).padStart(2, '0');
-                            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mês é 0-indexado
-                            const year = date.getFullYear();
-                            const hours = String(date.getHours()).padStart(2, '0');
-                            const minutes = String(date.getMinutes()).padStart(2, '0');
-                            formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
+                            formattedDate = date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short'});
                         }
                     }
-                    
                     return `
                         <div class="p-3 bg-gray-100 rounded-md">
                             <p class="font-semibold text-gray-800">${log.title}</p>
@@ -192,8 +340,7 @@ export function renderAdminDashboard(targetElement, user) {
                                 <span>Enviado em: ${formattedDate}</span>
                                 <span>Sucesso: ${log.success_count} / ${log.total_recipients}</span>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 }).join('');
             } else {
                 historyList.innerHTML = '<p class="text-gray-500">Nenhuma notificação foi enviada ainda.</p>';
@@ -204,15 +351,12 @@ export function renderAdminDashboard(targetElement, user) {
         }
     };
 
-
     const handleStudentSearch = debounce(async (event) => {
         const searchTerm = event.target.value.trim();
         studentSearchResults.innerHTML = '';
         if (searchTerm.length < 2) return;
-        const capitalizedSearchTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
         try {
-            const response = await fetchWithAuth(`/api/admin/students/search?name=${capitalizedSearchTerm}`);
-            const students = await response.json();
+            const students = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(searchTerm)}`);
             if (students.length > 0) {
                 students.forEach(student => {
                     const item = document.createElement('div');
@@ -242,38 +386,36 @@ export function renderAdminDashboard(targetElement, user) {
         statusDiv.className = 'text-yellow-500';
         sendButton.disabled = true;
 
-        const title = form.title.value;
-        const body = form.body.value;
-        const targetType = document.querySelector('input[name="targetType"]:checked').value;
-        
-        let payload = { title, body, target_type: targetType, target_ids: [] };
+        const payload = {
+            title: form.title.value,
+            body: form.body.value,
+            target_type: document.querySelector('input[name="targetType"]:checked').value,
+            target_ids: []
+        };
 
-        if (targetType === 'class') {
-            if (classSelect.value) {
-                payload.target_ids.push(classSelect.value);
-            } else {
+        if (payload.target_type === 'class') {
+            if (!classSelect.value) {
                 statusDiv.textContent = 'Erro: Por favor, selecione uma turma.';
                 statusDiv.className = 'text-red-500';
                 sendButton.disabled = false;
                 return;
             }
-        } else if (targetType === 'individual') {
-            if (selectedStudentId) {
-                payload.target_ids.push(selectedStudentId);
-            } else {
+            payload.target_ids.push(classSelect.value);
+        } else if (payload.target_type === 'individual') {
+            if (!selectedStudentId) {
                 statusDiv.textContent = 'Erro: Por favor, selecione um aluno.';
                 statusDiv.className = 'text-red-500';
                 sendButton.disabled = false;
                 return;
             }
+            payload.target_ids.push(selectedStudentId);
         }
 
         try {
-            const response = await fetchWithAuth('/api/admin/notifications', {
+            const result = await fetchWithAuth('/api/admin/notifications', {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            const result = await response.json();
             statusDiv.textContent = `Sucesso! ${result.message || 'Notificações enviadas.'}`;
             statusDiv.className = 'text-green-500';
             form.reset();
@@ -282,9 +424,7 @@ export function renderAdminDashboard(targetElement, user) {
             selectedStudentId = null;
             selectedStudentDiv.textContent = '';
             document.querySelector('input[name="targetType"][value="all"]').checked = true;
-            // Recarrega o histórico após o envio
             loadNotificationHistory();
-
         } catch (error) {
             console.error("Erro ao enviar notificação:", error);
             statusDiv.textContent = `Erro: ${error.message || 'Não foi possível enviar a notificação.'}`;
@@ -309,15 +449,11 @@ export function renderAdminDashboard(targetElement, user) {
     });
 
     // --- INICIALIZAÇÃO ---
-    switchTab('notifications'); // Começa na aba de notificações
+    switchTab('overview'); // Começa na aba de Visão Geral
     populateClassSelector();
     
     return () => {
-        tabs.overview.removeEventListener('click', () => {});
-        tabs.notifications.removeEventListener('click', () => {});
-        form.removeEventListener('submit', handleFormSubmit);
-        studentSearchInput.removeEventListener('input', handleStudentSearch);
-        targetTypeRadios.forEach(radio => radio.removeEventListener('change', () => {}));
+        // Limpeza dos event listeners
     };
 }
 
