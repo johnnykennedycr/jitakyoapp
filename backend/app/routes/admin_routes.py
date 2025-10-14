@@ -1,3 +1,5 @@
+# backend/app/routes/admin_routes.py
+
 import logging
 import os
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash, current_app, g
@@ -413,19 +415,31 @@ def get_student(student_id):
         return jsonify(student.to_dict()), 200
     return jsonify(error="Aluno não encontrado."), 404
 
+# --- INÍCIO DA CORREÇÃO ---
 @admin_api_bp.route('/students/<string:student_id>', methods=['PUT'])
 @login_required
 @role_required('admin', 'super_admin')
 def update_student(student_id):
-    """API para atualizar um aluno."""
+    """API para atualizar um aluno, agora esperando os dados dentro de 'user_data'."""
     try:
-        data = request.get_json()
-        if user_service.update_user(student_id, data):
+        payload = request.get_json()
+        
+        # Padrão consistente com a rota de criação: extrai os dados de 'user_data'
+        user_data = payload.get('user_data')
+
+        # Validação para garantir que os dados necessários foram enviados
+        if user_data is None:
+            return jsonify(error="A chave 'user_data' contendo os dados do aluno é obrigatória."), 400
+        
+        # Passa apenas o dicionário com os dados do aluno para o serviço
+        if user_service.update_user(student_id, user_data):
             return jsonify(success=True), 200
+        
         return jsonify(error="Aluno não encontrado ou falha na atualização."), 404
     except Exception as e:
         print(f"Erro em update_student: {e}")
         return jsonify(error=str(e)), 500
+# --- FIM DA CORREÇÃO ---
 
 @admin_api_bp.route('/students/<string:student_id>', methods=['DELETE'])
 @login_required
@@ -786,4 +800,3 @@ def update_branding_settings():
     except Exception as e:
         print(f"Erro ao salvar configurações: {e}")
         return jsonify(error=str(e)), 500
-
