@@ -1,304 +1,685 @@
-import { fetchWithAuth } from '../lib/api.js';
-import { showModal, hideModal } from './Modal.js';
-import { showLoading, hideLoading } from './LoadingSpinner.js';
+import { db } from '../firebaseConfig.js';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { showToast } from '../utils/toast.js';
+import { showSpinner, hideSpinner } from '../utils/spinner.js';
+import { showModal, closeModal } from '../utils/modal.js';
 
-// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
-function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
-    const fieldId = `guardian-${Date.now()}-${Math.random()}`;
-    return `
-        <div class="dynamic-entry grid grid-cols-1 md:grid-cols-4 gap-2 mb-2 p-2 border rounded" id="${fieldId}">
-            <input type="text" name="guardian_name" placeholder="Nome do Responsável" value="${guardian.name}" class="p-2 border rounded-md" required>
-            <input type="text" name="guardian_kinship" placeholder="Parentesco" value="${guardian.kinship}" class="p-2 border rounded-md" required>
-            <input type="text" name="guardian_contact" placeholder="Contato (Telefone)" value="${guardian.contact}" class="p-2 border rounded-md" required>
-            <button type="button" data-action="remove-dynamic-entry" data-target="${fieldId}" class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 self-center">Remover</button>
+let students = [];
+let currentPage = 1;
+const rowsPerPage = 10;
+
+// Função principal que renderiza o componente de lista de alunos
+async function renderStudentList(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Alunos</h2>
+                <button id="add-student-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                    <i class="fas fa-plus mr-2"></i>Adicionar Aluno
+                </button>
+            </div>
+            <div class="mb-4">
+                <input type="text" id="student-search" placeholder="Buscar aluno por nome..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div id="students-table-container" class="overflow-x-auto">
+                <!-- A tabela de alunos será renderizada aqui -->
+            </div>
+            <div id="pagination-controls" class="mt-4 flex justify-end">
+                <!-- Os controles de paginação serão renderizados aqui -->
+            </div>
         </div>
     `;
+
+    document.getElementById('add-student-btn').addEventListener('click', renderAddStudentForm);
+    document.getElementById('student-search').addEventListener('input', handleSearch);
+
+    await fetchStudents();
 }
 
-async function openStudentForm(studentId = null) {
-    showLoading();
+// Busca os alunos do Firestore e armazena em cache
+async function fetchStudents() {
+    showSpinner();
     try {
-        const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
-            studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
-            fetchWithAuth('/api/admin/classes/'),
-            studentId ? fetchWithAuth(`/api/admin/students/${studentId}/enrollments`) : Promise.resolve(null)
-        ]);
-        const student = studentRes ? await studentRes.json() : null;
-        const allClasses = await classesRes.json();
-        const currentEnrollments = enrollmentsRes ? await enrollmentsRes.json() : [];
-        const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
-        const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
-        const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
-        const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
-        const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
-                <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
-            </div>`;
-        const passwordFieldHtml = studentId ? `
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
-                <input type="password" name="password" class="p-2 border rounded-md w-full">
-            </div>` : '';
-        const enrollmentsHtml = studentId ? `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
-            <div id="current-enrollments-container" class="space-y-2">
-                ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
-                    <div class="p-2 border rounded flex justify-between items-center">
-                        <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0}, Venc: dia ${e.due_day || 'N/A'})</span>
-                        <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
-                    </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
-            </div>
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-                <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
-                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
-                <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md">
-            </div>
-            <div class="text-right mt-2">
-                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar Matrícula</button>
-            </div>
-            ` : `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
-            <div class="space-y-2">
-                ${allClasses.map(c => `
-                    <div class="p-2 border rounded">
-                        <label class="flex items-center"><input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
-                            <span>${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
-                        <div class="enrollment-details hidden mt-2 pl-6 grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
-                            <input type="number" name="due_day" placeholder="Dia do Vencimento (padrão: ${c.default_due_day || 10})" min="1" max="31" class="p-2 border rounded-md w-full">
-                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full md:col-span-2">
-                        </div></div>`).join('')}</div>`;
-        const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
-        const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
-                ${nameAndEmailHtml}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
-                ${passwordFieldHtml}
-                <hr class="my-4"><div class="flex justify-between items-center mb-2">
-                    <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
-                <div id="guardians-container">${guardiansHtml}</div>
-                ${enrollmentsHtml}
-                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button></div></form>`;
-        showModal(title, formHtml);
-    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
-    finally { hideLoading(); }
+        const querySnapshot = await getDocs(collection(db, 'students'));
+        students = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Ordena os alunos por nome
+        students.sort((a, b) => a.name.localeCompare(b.name));
+        currentPage = 1; // Reseta para a primeira página após buscar os dados
+        renderTable();
+    } catch (error) {
+        console.error("Erro ao buscar alunos: ", error);
+        showToast('Erro ao carregar os alunos. Tente novamente mais tarde.', 'error');
+    } finally {
+        hideSpinner();
+    }
 }
 
-async function handleDeleteClick(studentId, studentName) {
-    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-             <div class="text-right mt-6">
-                   <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
-                   <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
-}
+// Renderiza a tabela de alunos com base nos dados em cache e na paginação
+function renderTable(filteredStudents = students) {
+    const tableContainer = document.getElementById('students-table-container');
+    if (!tableContainer) return;
 
-export async function renderStudentList(targetElement) {
-    targetElement.innerHTML = `
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-white">Gerenciamento de Alunos</h1>
-            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
-        </div>
-        <div id="table-container"><p>Carregando...</p></div>`;
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    const paginatedStudents = filteredStudents.slice(start, end);
 
-    const tableContainer = targetElement.querySelector('#table-container');
-
-    const renderTable = async () => {
-        showLoading();
-        try {
-            const response = await fetchWithAuth('/api/admin/students/');
-            const students = await response.json();
-            if (students.length === 0) {
-                tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
-                return;
-            }
-            tableContainer.innerHTML = `
-                <div class="bg-white rounded-md shadow overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turmas Matriculadas</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsáveis</th>
-                                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${students.map(student => `
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
-                                        <div class="text-xs text-gray-500">Idade: ${student.age !== null ? student.age : 'N/A'}</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div class="flex items-center justify-end space-x-2">
-                                            <button data-action="edit" data-student-id="${student.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Aluno">
-                                                <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                            </button>
-                                            <button data-action="delete" data-student-id="${student.id}" data-student-name="${student.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Aluno">
-                                                <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        } catch (error) {
-            console.error("Erro ao buscar alunos:", error);
-            targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
-        } finally {
-            hideLoading();
-        }
+    if (paginatedStudents.length === 0 && currentPage > 1) {
+        currentPage--;
+        renderTable(filteredStudents);
+        return;
     }
 
-    const handlePageClick = (e) => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const action = button.dataset.action;
-        const studentId = button.dataset.studentId;
-        const studentName = button.dataset.studentName;
-        if (action === 'add') openStudentForm();
-        if (action === 'edit') openStudentForm(studentId);
-        if (action === 'delete') handleDeleteClick(studentId, studentName);
-    };
-
-    const modalBody = document.getElementById('modal-body');
-
-    const handleFormSubmit = async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        if (form.id !== 'student-form') return;
-
-        const studentId = form.dataset.studentId;
-        const submitButton = form.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-        submitButton.textContent = 'Salvando...';
-        
-        try {
-            const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
-                name: entry.querySelector('[name="guardian_name"]').value,
-                kinship: entry.querySelector('[name="guardian_kinship"]').value,
-                contact: entry.querySelector('[name="guardian_contact"]').value,
-            }));
-            const userData = {
-                phone: form.elements.phone.value,
-                date_of_birth: form.elements.date_of_birth.value,
-                guardians: guardians,
-            };
-            let url = '/api/admin/students';
-            let method = 'POST';
-
-            if (studentId) {
-                url = `/api/admin/students/${studentId}`;
-                method = 'PUT';
-                const password = form.elements.password.value;
-                if (password) userData.password = password;
-                const response = await fetchWithAuth(url, { method, body: JSON.stringify(userData) });
-                if (!response.ok) throw await response.json();
-            } else {
-                userData.name = form.elements.name.value;
-                userData.email = form.elements.email.value;
-                const enrollmentsData = [];
-                form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
-                    const detailsDiv = checkbox.closest('.p-2');
-                    enrollmentsData.push({
-                        class_id: checkbox.value,
-                        base_monthly_fee: checkbox.dataset.fee,
-                        // --- CORREÇÃO APLICADA AQUI ---
-                        discount_amount: parseFloat(detailsDiv.querySelector('[name="discount_amount"]').value) || 0,
-                        discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
-                        due_day: parseInt(detailsDiv.querySelector('[name="due_day"]').value) || null,
-                    });
-                });
-                const payload = { user_data: userData, enrollments_data: enrollmentsData };
-                const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-                if (!response.ok) throw await response.json();
-            }
-            hideModal();
-            await renderTable();
-        } catch (error) {
-            showModal('Erro ao Salvar', `<p>${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Salvar';
-        }
-    };
-
-    const handleModalClick = async (e) => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const action = button.dataset.action;
-        
-        if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
-        if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
-        if (action === 'cancel-delete') hideModal();
-
-        if (action === 'confirm-delete') {
-            const studentIdToDelete = button.dataset.studentId;
-            hideModal(); 
-            showLoading();
-            try { 
-                const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
-                    throw new Error(errorData.error);
-                }
-            } catch (error) { 
-                showModal('Erro', `<p>${error.message}</p>`);
-            } finally { 
-                await renderTable(); 
-                hideLoading(); 
-            }
-        }
-
-        if (action === 'add-enrollment' || action === 'remove-enrollment') {
-            e.stopPropagation();
-            const studentId = document.querySelector('#student-form')?.dataset.studentId;
-            const isAdding = action === 'add-enrollment';
-            const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
-            const method = isAdding ? 'POST' : 'DELETE';
-            // --- CORREÇÃO APLICADA AQUI ---
-            const body = isAdding ? {
-                student_id: studentId,
-                class_id: document.querySelector('[name="new_class_id"]').value,
-                discount_amount: parseFloat(document.querySelector('[name="new_discount"]').value) || 0,
-                due_day: parseInt(document.querySelector('[name="new_due_day"]').value) || null,
-            } : null;
-            if (isAdding && !body.class_id) {
-                showModal('Atenção', '<p>Selecione uma turma para matricular.</p>');
-                return;
-            };
-            showLoading();
-            try { 
-                const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
-                if (!response.ok) throw await response.json();
-            } catch (error) { 
-                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
-            } finally { 
-                await openStudentForm(studentId); 
-            }
-        }
-    };
-
-    targetElement.addEventListener('click', handlePageClick);
-    modalBody.addEventListener('click', handleModalClick);
-    modalBody.addEventListener('submit', handleFormSubmit);
-    
-    await renderTable();
-
-    return () => {
-        targetElement.removeEventListener('click', handlePageClick);
-        modalBody.removeEventListener('click', handleModalClick);
-        modalBody.removeEventListener('submit', handleFormSubmit);
-    };
+    tableContainer.innerHTML = `
+        <table class="min-w-full bg-white">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nome</th>
+                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Telefone</th>
+                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="students-tbody" class="text-gray-700">
+                ${paginatedStudents.map(student => `
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td class="py-3 px-4">${student.name}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${student.status === 'active' ? 'Ativo' : 'Inativo'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">${student.contact?.phone || 'N/A'}</td>
+                        <td class="py-3 px-4">
+                            <button class="view-student-btn text-indigo-600 hover:text-indigo-900 mr-2" data-id="${student.id}" title="Visualizar"><i class="fas fa-eye"></i></button>
+                            <button class="edit-student-btn text-yellow-600 hover:text-yellow-900 mr-2" data-id="${student.id}" title="Editar"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="delete-student-btn text-red-600 hover:text-red-900" data-id="${student.id}" title="Excluir"><i class="fas fa-trash-alt"></i></button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        ${paginatedStudents.length === 0 ? '<p class="text-center py-4">Nenhum aluno encontrado.</p>' : ''}
+    `;
+    renderPaginationControls(filteredStudents.length);
+    attachTableEventListeners();
 }
+
+// Adiciona os event listeners aos botões da tabela
+function attachTableEventListeners() {
+    document.querySelectorAll('.view-student-btn').forEach(button => {
+        button.addEventListener('click', (e) => handleViewStudent(e.currentTarget.dataset.id));
+    });
+    document.querySelectorAll('.edit-student-btn').forEach(button => {
+        button.addEventListener('click', (e) => renderEditStudentForm(e.currentTarget.dataset.id));
+    });
+    document.querySelectorAll('.delete-student-btn').forEach(button => {
+        button.addEventListener('click', (e) => handleDeleteStudent(e.currentTarget.dataset.id));
+    });
+}
+
+// Renderiza os controles de paginação
+function renderPaginationControls(totalItems) {
+    const paginationContainer = document.getElementById('pagination-controls');
+    if (!paginationContainer) return;
+
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    if (totalPages <= 1) {
+        paginationContainer.innerHTML = '';
+        return;
+    }
+
+    let buttons = '';
+    for (let i = 1; i <= totalPages; i++) {
+        buttons += `<button class="page-btn px-4 py-2 mx-1 rounded-lg ${currentPage === i ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}" data-page="${i}">${i}</button>`;
+    }
+
+    paginationContainer.innerHTML = `
+        <button id="prev-page-btn" class="px-4 py-2 mx-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
+        ${buttons}
+        <button id="next-page-btn" class="px-4 py-2 mx-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+    `;
+
+    document.querySelectorAll('.page-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            currentPage = parseInt(e.target.dataset.page);
+            handleSearch(); // Re-renderiza a tabela com o filtro atual
+        });
+    });
+
+    const prevBtn = document.getElementById('prev-page-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                handleSearch();
+            }
+        });
+    }
+
+    const nextBtn = document.getElementById('next-page-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                handleSearch();
+            }
+        });
+    }
+}
+
+// Lida com a busca de alunos
+function handleSearch() {
+    const searchTerm = document.getElementById('student-search').value.toLowerCase();
+    const filtered = students.filter(student => student.name.toLowerCase().includes(searchTerm));
+    if(document.getElementById('student-search').value !== "" && currentPage !==1){
+        //Não faz nada para não bugar a paginação
+    }else{
+        currentPage = 1;
+    }
+    renderTable(filtered);
+}
+
+// Renderiza o formulário para adicionar um novo aluno em um modal
+function renderAddStudentForm() {
+    const formHtml = `
+        <form id="add-student-form" class="space-y-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Novo Aluno</h3>
+            
+            <!-- Informações Pessoais -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Informações Pessoais</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                        <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="birthDate" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                        <input type="date" id="birthDate" name="birthDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-700">Gênero</label>
+                        <select id="gender" name="gender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="male">Masculino</option>
+                            <option value="female">Feminino</option>
+                            <option value="other">Outro</option>
+                        </select>
+                    </div>
+                     <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="active">Ativo</option>
+                            <option value="inactive">Inativo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contato -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Contato</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
+                        <input type="tel" id="phone" name="phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="email" name="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endereço -->
+             <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Endereço</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div class="md:col-span-2">
+                        <label for="street" class="block text-sm font-medium text-gray-700">Rua</label>
+                        <input type="text" id="street" name="street" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="number" class="block text-sm font-medium text-gray-700">Número</label>
+                        <input type="text" id="number" name="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div class="md:col-span-1">
+                         <label for="complement" class="block text-sm font-medium text-gray-700">Complemento</label>
+                        <input type="text" id="complement" name="complement" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div class="md:col-span-2">
+                         <label for="neighborhood" class="block text-sm font-medium text-gray-700">Bairro</label>
+                        <input type="text" id="neighborhood" name="neighborhood" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="city" class="block text-sm font-medium text-gray-700">Cidade</label>
+                        <input type="text" id="city" name="city" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="state" class="block text-sm font-medium text-gray-700">Estado</label>
+                        <input type="text" id="state" name="state" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="zip" class="block text-sm font-medium text-gray-700">CEP</label>
+                        <input type="text" id="zip" name="zip" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contato de Emergência -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Contato de Emergência</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="emergencyName" class="block text-sm font-medium text-gray-700">Nome</label>
+                        <input type="text" id="emergencyName" name="emergencyName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="emergencyPhone" class="block text-sm font-medium text-gray-700">Telefone</label>
+                        <input type="tel" id="emergencyPhone" name="emergencyPhone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+             <!-- Documentos -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Documentos</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
+                        <input type="text" id="cpf" name="cpf" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="rg" class="block text-sm font-medium text-gray-700">RG</label>
+                        <input type="text" id="rg" name="rg" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+             <!-- Informações da Arte Marcial -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Informações da Arte Marcial</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div>
+                        <label for="rank" class="block text-sm font-medium text-gray-700">Faixa</label>
+                        <input type="text" id="rank" name="rank" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="startDate" class="block text-sm font-medium text-gray-700">Data de Início</label>
+                        <input type="date" id="startDate" name="startDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="lastGraduation" class="block text-sm font-medium text-gray-700">Última Graduação</label>
+                        <input type="date" id="lastGraduation" name="lastGraduation" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Observações -->
+            <div>
+                <h4 class="text-lg font-medium text-gray-800">Observações</h4>
+                <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+            </div>
+
+
+            <div class="flex justify-end pt-4">
+                <button type="button" id="cancel-add-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Salvar</button>
+            </div>
+        </form>
+    `;
+    showModal(formHtml);
+    document.getElementById('add-student-form').addEventListener('submit', handleAddStudentSubmit);
+    document.getElementById('cancel-add-btn').addEventListener('click', closeModal);
+}
+
+// Lida com o envio do formulário de adição
+async function handleAddStudentSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    showSpinner();
+
+    try {
+        const studentData = {
+            name: form.name.value,
+            status: form.status.value,
+            contact: {
+                phone: form.phone.value,
+                email: form.email.value,
+                emergencyName: form.emergencyName.value,
+                emergencyPhone: form.emergencyPhone.value,
+            },
+            address: {
+                street: form.street.value,
+                number: form.number.value,
+                complement: form.complement.value,
+                neighborhood: form.neighborhood.value,
+                city: form.city.value,
+                state: form.state.value,
+                zip: form.zip.value,
+            },
+            details: {
+                gender: form.gender.value,
+                cpf: form.cpf.value,
+                rg: form.rg.value,
+                notes: form.notes.value,
+            },
+            martialArtInfo: {
+                rank: form.rank.value,
+                startDate: form.startDate.value,
+                lastGraduation: form.lastGraduation.value,
+            },
+            birthDate: form.birthDate.value,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        // DEBUG: Log para verificar os dados antes de enviar
+        console.log('Dados do novo aluno para salvar:', studentData);
+        
+        await addDoc(collection(db, 'students'), studentData);
+        
+        hideSpinner();
+        showToast('Aluno adicionado com sucesso!');
+        closeModal();
+        await fetchStudents();
+    } catch (error) {
+        console.error("Erro ao adicionar aluno: ", error);
+        showToast('Erro ao adicionar aluno.', 'error');
+        hideSpinner();
+    }
+}
+
+
+// Renderiza o formulário de edição de um aluno em um modal
+function renderEditStudentForm(studentId) {
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        showToast('Aluno não encontrado.', 'error');
+        return;
+    }
+
+    const formHtml = `
+        <form id="edit-student-form" class="space-y-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Editar Aluno</h3>
+            
+             <!-- Informações Pessoais -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Informações Pessoais</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                        <input type="text" id="name" name="name" value="${student.name || ''}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="birthDate" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                        <input type="date" id="birthDate" name="birthDate" value="${student.birthDate || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-700">Gênero</label>
+                        <select id="gender" name="gender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="male" ${student.details?.gender === 'male' ? 'selected' : ''}>Masculino</option>
+                            <option value="female" ${student.details?.gender === 'female' ? 'selected' : ''}>Feminino</option>
+                            <option value="other" ${student.details?.gender === 'other' ? 'selected' : ''}>Outro</option>
+                        </select>
+                    </div>
+                     <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="active" ${student.status === 'active' ? 'selected' : ''}>Ativo</option>
+                            <option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inativo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contato -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Contato</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
+                        <input type="tel" id="phone" name="phone" value="${student.contact?.phone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="email" name="email" value="${student.contact?.email || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endereço -->
+             <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Endereço</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div class="md:col-span-2">
+                        <label for="street" class="block text-sm font-medium text-gray-700">Rua</label>
+                        <input type="text" id="street" name="street" value="${student.address?.street || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="number" class="block text-sm font-medium text-gray-700">Número</label>
+                        <input type="text" id="number" name="number" value="${student.address?.number || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div class="md:col-span-1">
+                         <label for="complement" class="block text-sm font-medium text-gray-700">Complemento</label>
+                        <input type="text" id="complement" name="complement" value="${student.address?.complement || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div class="md:col-span-2">
+                         <label for="neighborhood" class="block text-sm font-medium text-gray-700">Bairro</label>
+                        <input type="text" id="neighborhood" name="neighborhood" value="${student.address?.neighborhood || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="city" class="block text-sm font-medium text-gray-700">Cidade</label>
+                        <input type="text" id="city" name="city" value="${student.address?.city || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="state" class="block text-sm font-medium text-gray-700">Estado</label>
+                        <input type="text" id="state" name="state" value="${student.address?.state || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                         <label for="zip" class="block text-sm font-medium text-gray-700">CEP</label>
+                        <input type="text" id="zip" name="zip" value="${student.address?.zip || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contato de Emergência -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Contato de Emergência</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="emergencyName" class="block text-sm font-medium text-gray-700">Nome</label>
+                        <input type="text" id="emergencyName" name="emergencyName" value="${student.contact?.emergencyName || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="emergencyPhone" class="block text-sm font-medium text-gray-700">Telefone</label>
+                        <input type="tel" id="emergencyPhone" name="emergencyPhone" value="${student.contact?.emergencyPhone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+             <!-- Documentos -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Documentos</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
+                        <input type="text" id="cpf" name="cpf" value="${student.details?.cpf || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="rg" class="block text-sm font-medium text-gray-700">RG</label>
+                        <input type="text" id="rg" name="rg" value="${student.details?.rg || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+             <!-- Informações da Arte Marcial -->
+            <div class="border-b border-gray-200 pb-4">
+                <h4 class="text-lg font-medium text-gray-800">Informações da Arte Marcial</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div>
+                        <label for="rank" class="block text-sm font-medium text-gray-700">Faixa</label>
+                        <input type="text" id="rank" name="rank" value="${student.martialArtInfo?.rank || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="startDate" class="block text-sm font-medium text-gray-700">Data de Início</label>
+                        <input type="date" id="startDate" name="startDate" value="${student.martialArtInfo?.startDate || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="lastGraduation" class="block text-sm font-medium text-gray-700">Última Graduação</label>
+                        <input type="date" id="lastGraduation" name="lastGraduation" value="${student.martialArtInfo?.lastGraduation || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Observações -->
+            <div>
+                <h4 class="text-lg font-medium text-gray-800">Observações</h4>
+                <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">${student.details?.notes || ''}</textarea>
+            </div>
+
+            <div class="flex justify-end pt-4">
+                <button type="button" id="cancel-edit-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Salvar Alterações</button>
+            </div>
+        </form>
+    `;
+    showModal(formHtml);
+    const form = document.getElementById('edit-student-form');
+    form.addEventListener('submit', (e) => handleEditStudentSubmit(e, studentId));
+    document.getElementById('cancel-edit-btn').addEventListener('click', closeModal);
+}
+
+// Lida com o envio do formulário de edição
+async function handleEditStudentSubmit(event, studentId) {
+    event.preventDefault();
+    const form = event.target;
+    showSpinner();
+    try {
+        // Correção: Usar notação de ponto para atualizar campos aninhados de forma segura
+        const updatedData = {
+            name: form.name.value,
+            status: form.status.value,
+            birthDate: form.birthDate.value,
+            'contact.phone': form.phone.value,
+            'contact.email': form.email.value,
+            'contact.emergencyName': form.emergencyName.value,
+            'contact.emergencyPhone': form.emergencyPhone.value,
+            'address.street': form.street.value,
+            'address.number': form.number.value,
+            'address.complement': form.complement.value,
+            'address.neighborhood': form.neighborhood.value,
+            'address.city': form.city.value,
+            'address.state': form.state.value,
+            'address.zip': form.zip.value,
+            'details.gender': form.gender.value,
+            'details.cpf': form.cpf.value,
+            'details.rg': form.rg.value,
+            'details.notes': form.notes.value,
+            'martialArtInfo.rank': form.rank.value,
+            'martialArtInfo.startDate': form.startDate.value,
+            'martialArtInfo.lastGraduation': form.lastGraduation.value,
+            updatedAt: new Date()
+        };
+
+        // DEBUG: Log para verificar os dados antes de enviar
+        console.log('Dados formatados para atualização (dot notation):', updatedData);
+
+        const studentRef = doc(db, 'students', studentId);
+        await updateDoc(studentRef, updatedData);
+
+        hideSpinner();
+        showToast('Aluno atualizado com sucesso!');
+        closeModal();
+        await fetchStudents();
+    } catch (error) {
+        console.error("Erro ao atualizar aluno: ", error);
+        showToast('Erro ao atualizar aluno.', 'error');
+        hideSpinner();
+    }
+}
+
+// Lida com a exclusão de um aluno
+function handleDeleteStudent(studentId) {
+    const student = students.find(s => s.id === studentId);
+    const confirmationHtml = `
+        <div class="text-center">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Confirmar Exclusão</h3>
+            <p class="text-gray-600 mb-6">Você tem certeza que deseja excluir o aluno <strong>${student.name}</strong>? Esta ação não pode ser desfeita.</p>
+            <div class="flex justify-center">
+                <button id="cancel-delete-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
+                <button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Excluir</button>
+            </div>
+        </div>
+    `;
+    showModal(confirmationHtml);
+    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+        showSpinner();
+        try {
+            await deleteDoc(doc(db, 'students', studentId));
+            showToast('Aluno excluído com sucesso!');
+            await fetchStudents();
+        } catch (error) {
+            console.error("Erro ao excluir aluno: ", error);
+            showToast('Erro ao excluir aluno.', 'error');
+        } finally {
+            hideSpinner();
+            closeModal();
+        }
+    });
+    document.getElementById('cancel-delete-btn').addEventListener('click', closeModal);
+}
+
+// Exibe os detalhes de um aluno em um modal
+function handleViewStudent(studentId) {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    const detailsHtml = `
+        <div class="space-y-4">
+            <h3 class="text-2xl font-bold text-gray-800 border-b pb-2">${student.name}</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div><strong>Status:</strong> <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${student.status === 'active' ? 'Ativo' : 'Inativo'}</span></div>
+                <div><strong>Data de Nasc.:</strong> ${student.birthDate ? new Date(student.birthDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</div>
+                <div><strong>Gênero:</strong> ${student.details?.gender || 'N/A'}</div>
+                <div><strong>Telefone:</strong> ${student.contact?.phone || 'N/A'}</div>
+                <div><strong>Email:</strong> ${student.contact?.email || 'N/A'}</div>
+                <div><strong>CPF:</strong> ${student.details?.cpf || 'N/A'}</div>
+                <div><strong>RG:</strong> ${student.details?.rg || 'N/A'}</div>
+            </div>
+
+            <div class="pt-2">
+                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Endereço</h4>
+                <p>${student.address?.street || ''}, ${student.address?.number || ''} - ${student.address?.neighborhood || ''}</p>
+                <p>${student.address?.city || ''} - ${student.address?.state || ''}, ${student.address?.zip || ''}</p>
+            </div>
+
+            <div class="pt-2">
+                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Contato de Emergência</h4>
+                <p><strong>Nome:</strong> ${student.contact?.emergencyName || 'N/A'}</p>
+                <p><strong>Telefone:</strong> ${student.contact?.emergencyPhone || 'N/A'}</p>
+            </div>
+
+             <div class="pt-2">
+                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Informações Marciais</h4>
+                <p><strong>Faixa:</strong> ${student.martialArtInfo?.rank || 'N/A'}</p>
+                <p><strong>Início:</strong> ${student.martialArtInfo?.startDate ? new Date(student.martialArtInfo.startDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</p>
+                <p><strong>Última Graduação:</strong> ${student.martialArtInfo?.lastGraduation ? new Date(student.martialArtInfo.lastGraduation).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</p>
+            </div>
+            
+            <div class="pt-2">
+                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Observações</h4>
+                <p class="whitespace-pre-wrap">${student.details?.notes || 'Nenhuma observação.'}</p>
+            </div>
+
+            <div class="flex justify-end pt-4">
+                 <button type="button" id="close-view-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">Fechar</button>
+            </div>
+        </div>
+    `;
+    showModal(detailsHtml);
+    document.getElementById('close-view-btn').addEventListener('click', closeModal);
+}
+
+
+export { renderStudentList };
