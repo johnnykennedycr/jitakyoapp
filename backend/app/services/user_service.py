@@ -1,3 +1,5 @@
+# backend/app/services/user_service.py
+
 import string
 import secrets
 from datetime import datetime, timedelta
@@ -40,9 +42,18 @@ class UserService:
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
-            # Adiciona a data de nascimento se ela for enviada
-            if 'birth_date' in user_data:
-                 db_user_data['birth_date'] = datetime.strptime(user_data['birth_date'], '%Y-%m-%d')
+            
+            # --- INÍCIO DA CORREÇÃO ---
+            # Adiciona os campos phone e date_of_birth se existirem, usando as chaves corretas.
+            if 'phone' in user_data and user_data['phone']:
+                db_user_data['phone'] = user_data['phone']
+            
+            if 'date_of_birth' in user_data and user_data['date_of_birth']:
+                db_user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
+            
+            if 'guardians' in user_data:
+                 db_user_data['guardians'] = user_data['guardians']
+            # --- FIM DA CORREÇÃO ---
 
             self.collection.document(uid).set(db_user_data)
             
@@ -111,8 +122,8 @@ class UserService:
             # Esta abordagem busca por prefixo.
             end_term = search_term + '\uf8ff'
             query = self.collection.where(filter=firestore.FieldFilter('role', '==', 'student')) \
-                                        .where(filter=firestore.FieldFilter('name', '>=', search_term)) \
-                                        .where(filter=firestore.FieldFilter('name', '<=', end_term))
+                                    .where(filter=firestore.FieldFilter('name', '>=', search_term)) \
+                                    .where(filter=firestore.FieldFilter('name', '<=', end_term))
             docs = query.stream()
             for doc in docs:
                 students.append(User.from_dict(doc.to_dict(), doc.id))
@@ -134,8 +145,20 @@ class UserService:
                 auth_update_data['email'] = data['email']
             if 'role' in data:
                 update_data['role'] = data['role']
-            if 'birth_date' in data and data['birth_date']:
-                update_data['birth_date'] = datetime.strptime(data['birth_date'], '%Y-%m-%d')
+            
+            # --- INÍCIO DA CORREÇÃO ---
+            # Adiciona os campos phone e date_of_birth se existirem, usando as chaves corretas.
+            if 'phone' in data:
+                update_data['phone'] = data['phone']
+
+            if 'date_of_birth' in data and data['date_of_birth']:
+                update_data['date_of_birth'] = datetime.strptime(data['date_of_birth'], '%Y-%m-%d')
+            else: # Se a data for enviada como vazia, remove do banco
+                update_data['date_of_birth'] = firestore.DELETE_FIELD
+            
+            if 'guardians' in data:
+                 update_data['guardians'] = data['guardians']
+            # --- FIM DA CORREÇÃO ---
 
 
             if update_data:
@@ -203,13 +226,13 @@ class UserService:
             today = datetime.now()
             # Busca todos os usuários. Em uma aplicação maior, otimizar essa busca seria ideal.
             all_users = self.get_all_users() 
-            students = [u for u in all_users if u.role == 'student' and hasattr(u, 'birth_date') and u.birth_date]
+            students = [u for u in all_users if u.role == 'student' and hasattr(u, 'date_of_birth') and u.date_of_birth]
 
             for student in students:
-                # Assegura que birth_date é um objeto datetime
-                if isinstance(student.birth_date, datetime):
+                # Assegura que date_of_birth é um objeto datetime
+                if isinstance(student.date_of_birth, datetime):
                     # Ignora o ano para comparar apenas o mês e o dia
-                    birthday_this_year = student.birth_date.replace(year=today.year)
+                    birthday_this_year = student.date_of_birth.replace(year=today.year)
                     
                     # Se o aniversário já passou este ano, verifica no próximo ano
                     if birthday_this_year < today:
@@ -222,7 +245,7 @@ class UserService:
                         student_dict = student.to_dict()
                         student_dict['days_until_birthday'] = time_to_birthday.days
                         # Formata a data de aniversário para exibição
-                        student_dict['birth_date_formatted'] = student.birth_date.strftime('%d/%m')
+                        student_dict['birth_date_formatted'] = student.date_of_birth.strftime('%d/%m')
                         upcoming.append(student_dict)
             
             # Ordena pelos aniversariantes mais próximos primeiro
