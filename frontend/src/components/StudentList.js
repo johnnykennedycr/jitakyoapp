@@ -1,343 +1,316 @@
-import { createStudent, getStudents, updateStudent, deleteStudent } from '../services/studentService.js';
-import { getClasses } from '../services/classService.js';
-import { showToast } from '../utils/toast.js';
-import { showLoading, hideLoading } from '../utils/loading.js';
-import { format } from 'date-fns';
+import { fetchWithAuth } from '../lib/api.js';
+import { showModal, hideModal } from './Modal.js';
+import { showLoading, hideLoading } from './LoadingSpinner.js';
 
-const StudentList = {
-  async render() {
+// --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
+function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
+    const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
-      <div class="container mx-auto px-4 sm:px-8">
-        <div class="py-8">
-          <div>
-            <h2 class="text-2xl font-semibold leading-tight text-gray-200">Alunos</h2>
-          </div>
-          <div class="my-2 flex sm:flex-row flex-col">
-            <div class="flex flex-row mb-1 sm:mb-0">
-              </div>
-              <div class="block relative">
-                <span class="h-full absolute inset-y-0 left-0 flex items-center pl-2">
-                  <svg viewBox="0 0 24 24" class="h-4 w-4 fill-current text-gray-500">
-                    <path
-                      d="M10 4a6 6 0 100 12 6 6 0 000-12zm-8 6a8 8 0 1114.32 4.906l5.387 5.387a1 1 0 01-1.414 1.414l-5.387-5.387A8 8 0 012 10z">
-                    </path>
-                  </svg>
-                </span>
-                <input placeholder="Buscar alunos" id="search-input"
-                  class="appearance-none rounded-r rounded-l sm:rounded-l-none border border-gray-400 border-b block pl-8 pr-6 py-2 w-full bg-white text-sm placeholder-gray-400 text-gray-700 focus:bg-white focus:placeholder-gray-600 focus:text-gray-700 focus:outline-none" />
-              </div>
-              <button id="add-student-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-2">
-                Adicionar Aluno
-              </button>
-            </div>
-          </div>
-          <div class="-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto">
-            <div class="inline-block min-w-full shadow rounded-lg overflow-hidden">
-              <table class="min-w-full leading-normal">
-                <thead>
-                  <tr>
-                    <th
-                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th
-                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th
-                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Turmas
-                    </th>
-                    <th
-                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th
-                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody id="students-tbody">
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div class="dynamic-entry grid grid-cols-1 md:grid-cols-4 gap-2 mb-2 p-2 border rounded" id="${fieldId}">
+            <input type="text" name="guardian_name" placeholder="Nome do Responsável" value="${guardian.name}" class="p-2 border rounded-md" required>
+            <input type="text" name="guardian_kinship" placeholder="Parentesco" value="${guardian.kinship}" class="p-2 border rounded-md" required>
+            <input type="text" name="guardian_contact" placeholder="Contato (Telefone)" value="${guardian.contact}" class="p-2 border rounded-md" required>
+            <button type="button" data-action="remove-dynamic-entry" data-target="${fieldId}" class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 self-center">Remover</button>
         </div>
-      </div>
-      <div id="student-modal" class="fixed z-10 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-          <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-          <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <form id="student-form">
-              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Adicionar Aluno</h3>
-                <div class="mt-2">
-                  <div class="mb-4">
-                    <label for="student-name" class="block text-gray-700 text-sm font-bold mb-2">Nome Completo</label>
-                    <input type="text" id="student-name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                  </div>
-                  <div class="mb-4">
-                    <label for="student-email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
-                    <input type="email" id="student-email" name="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                  </div>
-                  <div class="mb-4">
-                    <label for="student-phone" class="block text-gray-700 text-sm font-bold mb-2">Telefone</label>
-                    <input type="tel" id="student-phone" name="phone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                  </div>
-                  <div class="mb-4">
-                    <label for="student-dob" class="block text-gray-700 text-sm font-bold mb-2">Data de Nascimento</label>
-                    <input type="date" id="student-dob" name="dob" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                  </div>
-                  <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">Aluno é menor de idade?</label>
-                    <input type="checkbox" id="student-is-minor" name="is_minor" class="mr-2 leading-tight">
-                    <span class="text-sm">Sim</span>
-                  </div>
-                  <div id="responsible-fields" class="hidden">
-                    <div class="mb-4">
-                      <label for="responsible-name" class="block text-gray-700 text-sm font-bold mb-2">Nome do Responsável</label>
-                      <input type="text" id="responsible-name" name="responsibleName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>
-                    <div class="mb-4">
-                      <label for="responsible-cpf" class="block text-gray-700 text-sm font-bold mb-2">CPF do Responsável</label>
-                      <input type="text" id="responsible-cpf" name="responsibleCpf" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>
-                     <div class="mb-4">
-                        <label for="responsible-kinship" class="block text-gray-700 text-sm font-bold mb-2">Parentesco</label>
-                        <input type="text" id="responsible-kinship" name="responsibleKinship" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    </div>
-                  </div>
-                  <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">
-                        Ativo
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" id="student-active" name="active" class="form-checkbox h-5 w-5 text-blue-600">
-                        <span class="ml-2 text-gray-700">Sim</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                  Salvar
-                </button>
-                <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
     `;
-  },
+}
 
-  async init() {
-    let allStudents = [];
-    let allClass = [];
-
-    const loadStudents = async () => {
-      showLoading();
-      try {
-        allStudents = await getStudents();
-        allClass = await getClasses();
-        renderTable(allStudents, allClass);
-      } catch (error) {
-        showToast('Erro ao carregar alunos.', 'error');
-      } finally {
-        hideLoading();
-      }
-    };
-
-    const renderTable = (students, classes) => {
-      const tbody = document.getElementById('students-tbody');
-      tbody.innerHTML = '';
-      if (!students) {
-        showToast('Nenhum aluno encontrado ou erro ao buscar dados.', 'error');
-        return;
-      }
-
-      const getTurmaNames = (turmaIds) => {
-        if (!turmaIds || turmaIds.length === 0) return 'Sem turma';
-
-        return turmaIds.map(turmaId => {
-          const turma = classes.find(t => t.id === turmaId);
-          return turma ? turma.name : 'Turma desconhecida';
-        }).join(', ');
-      };
-      
-      students.forEach(student => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
-            <div class="flex items-center">
-              <div class="ml-3">
-                <p class="text-gray-200 whitespace-no-wrap">${student.name}</p>
-              </div>
+async function openStudentForm(studentId = null) {
+    showLoading();
+    try {
+        const [studentRes, classesRes, enrollmentsRes] = await Promise.all([
+            studentId ? fetchWithAuth(`/api/admin/students/${studentId}`) : Promise.resolve(null),
+            fetchWithAuth('/api/admin/classes/'),
+            studentId ? fetchWithAuth(`/api/admin/students/${studentId}/enrollments`) : Promise.resolve(null)
+        ]);
+        const student = studentRes ? await studentRes.json() : null;
+        const allClasses = await classesRes.json();
+        const currentEnrollments = enrollmentsRes ? await enrollmentsRes.json() : [];
+        const title = studentId ? `Editando ${student.name}` : 'Adicionar Novo Aluno';
+        const classMap = Object.fromEntries(allClasses.map(c => [c.id, c]));
+        const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
+        const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
+        const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
+                <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
+            </div>`;
+        const passwordFieldHtml = studentId ? `
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
+                <input type="password" name="password" class="p-2 border rounded-md w-full">
+            </div>` : '';
+        const enrollmentsHtml = studentId ? `
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
+            <div id="current-enrollments-container" class="space-y-2">
+                ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
+                    <div class="p-2 border rounded flex justify-between items-center">
+                        <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0}, Venc: dia ${e.due_day || 'N/A'})</span>
+                        <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
+                    </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
             </div>
-          </td>
-          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
-            <p class="text-gray-200 whitespace-no-wrap">${student.email}</p>
-          </td>
-          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
-              <p class="text-gray-200 whitespace-no-wrap">${getTurmaNames(student.turmas)}</p>
-          </td>
-          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
-            <span class="relative inline-block px-3 py-1 font-semibold ${student.active ? 'text-green-900' : 'text-red-900'} leading-tight">
-              <span aria-hidden class="absolute inset-0 ${student.active ? 'bg-green-200' : 'bg-red-200'} opacity-50 rounded-full"></span>
-              <span class="relative">${student.active ? 'Ativo' : 'Inativo'}</span>
-            </span>
-          </td>
-          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
-            <button class="edit-btn text-indigo-600 hover:text-indigo-900" data-id="${student.id}">Editar</button>
-            <button class="delete-btn text-red-600 hover:text-red-900 ml-4" data-id="${student.id}">Excluir</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-      addEventListenersToButtons();
-    };
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
+                <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md">
+            </div>
+            <div class="text-right mt-2">
+                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar Matrícula</button>
+            </div>
+            ` : `
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
+            <div class="space-y-2">
+                ${allClasses.map(c => `
+                    <div class="p-2 border rounded">
+                        <label class="flex items-center"><input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
+                            <span>${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
+                        <div class="enrollment-details hidden mt-2 pl-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
+                            <input type="number" name="due_day" placeholder="Dia do Vencimento (padrão: ${c.default_due_day || 10})" min="1" max="31" class="p-2 border rounded-md w-full">
+                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full md:col-span-2">
+                        </div></div>`).join('')}</div>`;
+        const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
+        const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
+                ${nameAndEmailHtml}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
+                ${passwordFieldHtml}
+                <hr class="my-4"><div class="flex justify-between items-center mb-2">
+                    <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
+                <div id="guardians-container">${guardiansHtml}</div>
+                ${enrollmentsHtml}
+                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button></div></form>`;
+        showModal(title, formHtml);
+    } catch (error) { showModal('Erro', '<p>Não foi possível carregar os dados.</p>'); }
+    finally { hideLoading(); }
+}
 
-    const addEventListenersToButtons = () => {
-      document.querySelectorAll('.edit-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-          const studentId = e.target.getAttribute('data-id');
-          const student = allStudents.find(s => s.id === studentId);
-          openStudentModal(student);
-        });
-      });
+async function handleDeleteClick(studentId, studentName) {
+    showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
+             <div class="text-right mt-6">
+                    <button data-action="cancel-delete" class="bg-gray-300 px-4 py-2 rounded-md mr-2">Cancelar</button>
+                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
+}
 
-      document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-          const studentId = e.target.getAttribute('data-id');
-          if (confirm('Tem certeza que deseja excluir este aluno?')) {
-            showLoading();
-            try {
-              await deleteStudent(studentId);
-              showToast('Aluno excluído com sucesso!', 'success');
-              loadStudents();
-            } catch (error) {
-              showToast('Erro ao excluir aluno.', 'error');
-            } finally {
-              hideLoading();
+export async function renderStudentList(targetElement) {
+    targetElement.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-white">Gerenciamento de Alunos</h1>
+            <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
+        </div>
+        <div id="table-container"><p>Carregando...</p></div>`;
+
+    const tableContainer = targetElement.querySelector('#table-container');
+
+    const renderTable = async () => {
+        showLoading();
+        try {
+            const response = await fetchWithAuth('/api/admin/students/');
+            const students = await response.json();
+            if (students.length === 0) {
+                tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
+                return;
             }
-          }
-        });
-      });
+            tableContainer.innerHTML = `
+                <div class="bg-white rounded-md shadow overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turmas Matriculadas</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsáveis</th>
+                                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Ações</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${students.map(student => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
+                                        <div class="text-xs text-gray-500">Idade: ${student.age !== null ? student.age : 'N/A'}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div><strong>${g.name}</strong> (${g.kinship}): ${g.contact}</div>`).join('') : 'Nenhum'}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <button data-action="edit" data-student-id="${student.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Aluno">
+                                                <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                            <button data-action="delete" data-student-id="${student.id}" data-student-name="${student.name}" class="p-2 rounded-full hover:bg-gray-200" title="Deletar Aluno">
+                                                <svg class="w-5 h-5 text-red-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch (error) {
+            console.error("Erro ao buscar alunos:", error);
+            targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
+        } finally {
+            hideLoading();
+        }
+    }
+
+    const handlePageClick = (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+        const action = button.dataset.action;
+        const studentId = button.dataset.studentId;
+        const studentName = button.dataset.studentName;
+        if (action === 'add') openStudentForm();
+        if (action === 'edit') openStudentForm(studentId);
+        if (action === 'delete') handleDeleteClick(studentId, studentName);
     };
 
-    const openStudentModal = (student) => {
-      const modal = document.getElementById('student-modal');
-      const form = document.getElementById('student-form');
-      const modalTitle = document.getElementById('modal-title');
-      form.reset();
-      const responsibleFields = document.getElementById('responsible-fields');
+    const modalBody = document.getElementById('modal-body');
 
-      if (student) {
-        modalTitle.innerText = 'Editar Aluno';
-        form.dataset.studentId = student.id;
-        document.getElementById('student-name').value = student.name;
-        document.getElementById('student-email').value = student.email;
-        document.getElementById('student-phone').value = student.telefone || '';
-        document.getElementById('student-dob').value = student.dataNascimento ? format(new Date(student.dataNascimento), 'yyyy-MM-dd') : '';
-        document.getElementById('student-active').checked = student.active;
-        document.getElementById('student-is-minor').checked = student.isMinor;
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        if (form.id !== 'student-form') return;
 
-        if (student.isMinor) {
-          responsibleFields.classList.remove('hidden');
-          document.getElementById('responsible-name').value = student.responsibleForContact?.name || '';
-          document.getElementById('responsible-cpf').value = student.responsibleForContact?.cpf || '';
-          document.getElementById('responsible-kinship').value = student.responsibleForContact?.kinship || '';
-        } else {
-          responsibleFields.classList.add('hidden');
+        const studentId = form.dataset.studentId;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.textContent = 'Salvando...';
+        
+        try {
+            const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
+                name: entry.querySelector('[name="guardian_name"]').value,
+                kinship: entry.querySelector('[name="guardian_kinship"]').value,
+                contact: entry.querySelector('[name="guardian_contact"]').value,
+            }));
+            const userData = {
+                phone: form.elements.phone.value,
+                date_of_birth: form.elements.date_of_birth.value,
+                guardians: guardians,
+            };
+            let url = '/api/admin/students';
+            let method = 'POST';
+
+            if (studentId) {
+                url = `/api/admin/students/${studentId}`;
+                method = 'PUT';
+                const password = form.elements.password.value;
+                if (password) userData.password = password;
+                
+                // --- INÍCIO DA CORREÇÃO ---
+                // Para alinhar com a rota de criação, envolvemos os dados de atualização na chave "user_data".
+                const payload = { user_data: userData };
+                const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+                // --- FIM DA CORREÇÃO ---
+
+                if (!response.ok) throw await response.json();
+            } else {
+                userData.name = form.elements.name.value;
+                userData.email = form.elements.email.value;
+                const enrollmentsData = [];
+                form.querySelectorAll('input[name="class_enroll"]:checked').forEach(checkbox => {
+                    const detailsDiv = checkbox.closest('.p-2');
+                    enrollmentsData.push({
+                        class_id: checkbox.value,
+                        base_monthly_fee: checkbox.dataset.fee,
+                        discount_amount: parseFloat(detailsDiv.querySelector('[name="discount_amount"]').value) || 0,
+                        discount_reason: detailsDiv.querySelector('[name="discount_reason"]').value || "",
+                        due_day: parseInt(detailsDiv.querySelector('[name="due_day"]').value) || null,
+                    });
+                });
+                const payload = { user_data: userData, enrollments_data: enrollmentsData };
+                const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
+                if (!response.ok) throw await response.json();
+            }
+            hideModal();
+            await renderTable();
+        } catch (error) {
+            showModal('Erro ao Salvar', `<p>${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Salvar';
+        }
+    };
+
+    const handleModalClick = async (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+        const action = button.dataset.action;
+        
+        if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
+        if (action === 'remove-dynamic-entry') document.getElementById(button.dataset.target)?.remove();
+        if (action === 'cancel-delete') hideModal();
+
+        if (action === 'confirm-delete') {
+            const studentIdToDelete = button.dataset.studentId;
+            hideModal(); 
+            showLoading();
+            try { 
+                const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
+                    throw new Error(errorData.error);
+                }
+            } catch (error) { 
+                showModal('Erro', `<p>${error.message}</p>`);
+            } finally { 
+                await renderTable(); 
+                hideLoading(); 
+            }
         }
 
-      } else {
-        modalTitle.innerText = 'Adicionar Aluno';
-        delete form.dataset.studentId;
-        document.getElementById('student-active').checked = true;
-      }
-      modal.classList.remove('hidden');
-    };
-
-    const handleFormSubmit = async (event) => {
-      event.preventDefault();
-      const studentId = event.target.dataset.studentId;
-      const formData = new FormData(event.target);
-      const studentData = Object.fromEntries(formData.entries());
-
-      // --- INÍCIO DA CORREÇÃO ---
-      // O formulário usa 'phone' e 'dob', mas o Firestore espera 'telefone' e 'dataNascimento'.
-      // Aqui, nós ajustamos o objeto de dados antes de enviá-lo.
-      studentData.telefone = studentData.phone;
-      studentData.dataNascimento = studentData.dob;
-      delete studentData.phone; // Remove a chave antiga para não enviar dados desnecessários
-      delete studentData.dob;   // Remove a chave antiga
-      // --- FIM DA CORREÇÃO ---
-
-      studentData.active = document.getElementById('student-active').checked;
-      const isMinor = document.getElementById('student-is-minor').checked;
-      studentData.isMinor = isMinor;
-
-      if (isMinor) {
-        studentData.responsibleForContact = {
-          name: studentData.responsibleName,
-          cpf: studentData.responsibleCpf,
-          kinship: studentData.responsibleKinship,
-        };
-      }
-
-      delete studentData.responsibleName;
-      delete studentData.responsibleCpf;
-      delete studentData.responsibleKinship;
-
-      showLoading();
-      try {
-        if (studentId) {
-          await updateStudent(studentId, studentData);
-          showToast('Aluno atualizado com sucesso!', 'success');
-        } else {
-          await createStudent(studentData);
-          showToast('Aluno adicionado com sucesso!', 'success');
+        if (action === 'add-enrollment' || action === 'remove-enrollment') {
+            e.stopPropagation();
+            const studentId = document.querySelector('#student-form')?.dataset.studentId;
+            const isAdding = action === 'add-enrollment';
+            const url = isAdding ? '/api/admin/enrollments' : `/api/admin/enrollments/${button.dataset.enrollmentId}`;
+            const method = isAdding ? 'POST' : 'DELETE';
+            const body = isAdding ? {
+                student_id: studentId,
+                class_id: document.querySelector('[name="new_class_id"]').value,
+                discount_amount: parseFloat(document.querySelector('[name="new_discount"]').value) || 0,
+                due_day: parseInt(document.querySelector('[name="new_due_day"]').value) || null,
+            } : null;
+            if (isAdding && !body.class_id) {
+                showModal('Atenção', '<p>Selecione uma turma para matricular.</p>');
+                return;
+            };
+            showLoading();
+            try { 
+                const response = await fetchWithAuth(url, { method, body: body ? JSON.stringify(body) : null });
+                if (!response.ok) throw await response.json();
+            } catch (error) { 
+                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
+            } finally { 
+                await openStudentForm(studentId); 
+            }
         }
-        document.getElementById('student-modal').classList.add('hidden');
-        loadStudents();
-      } catch (error) {
-        console.error("Erro ao salvar aluno:", error);
-        const errorMessage = error.response?.data?.error || 'Erro ao salvar aluno.';
-        showToast(errorMessage, 'error');
-      } finally {
-        hideLoading();
-      }
     };
 
-    document.getElementById('add-student-btn').addEventListener('click', () => openStudentModal(null));
-    document.getElementById('cancel-btn').addEventListener('click', () => document.getElementById('student-modal').classList.add('hidden'));
-    document.getElementById('student-form').addEventListener('submit', handleFormSubmit);
-
-    document.getElementById('student-is-minor').addEventListener('change', (e) => {
-      const responsibleFields = document.getElementById('responsible-fields');
-      if (e.target.checked) {
-        responsibleFields.classList.remove('hidden');
-      } else {
-        responsibleFields.classList.add('hidden');
-      }
+    targetElement.addEventListener('click', handlePageClick);
+    modalBody.addEventListener('click', handleModalClick);
+    modalBody.addEventListener('submit', handleFormSubmit);
+    
+    // Toggle enrollment details visibility
+    modalBody.addEventListener('change', (e) => {
+        if (e.target.name === 'class_enroll') {
+            const detailsDiv = e.target.closest('.p-2').querySelector('.enrollment-details');
+            detailsDiv.classList.toggle('hidden', !e.target.checked);
+        }
     });
 
-    document.getElementById('search-input').addEventListener('input', (e) => {
-      const searchTerm = e.target.value.toLowerCase();
-      const filteredStudents = allStudents.filter(student =>
-        student.name.toLowerCase().includes(searchTerm) ||
-        student.email.toLowerCase().includes(searchTerm)
-      );
-      renderTable(filteredStudents, allClass);
-    });
+    await renderTable();
 
-    await loadStudents();
-  }
-};
-
-export default StudentList;
+    return () => {
+        targetElement.removeEventListener('click', handlePageClick);
+        modalBody.removeEventListener('click', handleModalClick);
+        modalBody.removeEventListener('submit', handleFormSubmit);
+    };
+}
