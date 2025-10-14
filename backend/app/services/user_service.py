@@ -43,17 +43,16 @@ class UserService:
                 'updated_at': firestore.SERVER_TIMESTAMP
             }
             
-            # --- INÍCIO DA CORREÇÃO ---
-            # Adiciona os campos phone e date_of_birth se existirem, usando as chaves corretas.
             if 'phone' in user_data and user_data['phone']:
                 db_user_data['phone'] = user_data['phone']
             
+            # --- Ajuste na criação para guardians e data de nascimento ---
             if 'date_of_birth' in user_data and user_data['date_of_birth']:
                 db_user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
             
-            if 'guardians' in user_data:
+            if 'guardians' in user_data: # Adicionado tratamento para 'guardians' na criação
                  db_user_data['guardians'] = user_data['guardians']
-            # --- FIM DA CORREÇÃO ---
+            # --- Fim do Ajuste ---
 
             self.collection.document(uid).set(db_user_data)
             
@@ -146,18 +145,18 @@ class UserService:
             if 'role' in data:
                 update_data['role'] = data['role']
             
-            # --- INÍCIO DA CORREÇÃO ---
-            # Adiciona os campos phone e date_of_birth se existirem, usando as chaves corretas.
             if 'phone' in data:
-                update_data['phone'] = data['phone']
+                update_data['phone'] = data['phone'] # Pode ser uma string vazia, que é um valor válido para o Firestore
 
-            if 'date_of_birth' in data and data['date_of_birth']:
-                update_data['date_of_birth'] = datetime.strptime(data['date_of_birth'], '%Y-%m-%d')
-            else: # Se a data for enviada como vazia, remove do banco
-                update_data['date_of_birth'] = firestore.DELETE_FIELD
+            # --- INÍCIO DA CORREÇÃO MAIS ROBUSTA PARA DATA DE NASCIMENTO E GUARDIANS ---
+            if 'date_of_birth' in data:
+                if data['date_of_birth']: # Se a data não for vazia, tenta converter
+                    update_data['date_of_birth'] = datetime.strptime(data['date_of_birth'], '%Y-%m-%d')
+                else: # Se for vazia ou null, remove do banco (Firestore.DELETE_FIELD)
+                    update_data['date_of_birth'] = firestore.DELETE_FIELD
             
             if 'guardians' in data:
-                 update_data['guardians'] = data['guardians']
+                 update_data['guardians'] = data['guardians'] # Pode ser uma lista vazia, que é um valor válido
             # --- FIM DA CORREÇÃO ---
 
 
@@ -169,9 +168,13 @@ class UserService:
                 auth.update_user(uid, **auth_update_data)
 
             return self.get_user_by_id(uid)
+        except ValueError as ve: # Captura erros de conversão de data
+            print(f"Erro de validação ao atualizar utilizador {uid}: {ve}")
+            raise ValueError(f"Formato de data inválido ou outro erro de validação: {ve}") # Relança um ValueError
         except Exception as e:
             print(f"Erro ao atualizar utilizador {uid}: {e}")
-            raise
+            raise # Relança a exceção original
+
 
     def delete_user(self, uid):
         """Deleta um utilizador do Firestore, Authentication e todas as suas matrículas."""
