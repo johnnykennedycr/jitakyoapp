@@ -1,685 +1,343 @@
-import { db } from '../firebaseConfig.js';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { createStudent, getStudents, updateStudent, deleteStudent } from '../services/studentService.js';
+import { getClasses } from '../services/classService.js';
 import { showToast } from '../utils/toast.js';
-import { showSpinner, hideSpinner } from '../utils/spinner.js';
-import { showModal, closeModal } from '../utils/modal.js';
+import { showLoading, hideLoading } from '../utils/loading.js';
+import { format } from 'date-fns';
 
-let students = [];
-let currentPage = 1;
-const rowsPerPage = 10;
-
-// Função principal que renderiza o componente de lista de alunos
-async function renderStudentList(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">Alunos</h2>
-                <button id="add-student-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
-                    <i class="fas fa-plus mr-2"></i>Adicionar Aluno
+const StudentList = {
+  async render() {
+    return `
+      <div class="container mx-auto px-4 sm:px-8">
+        <div class="py-8">
+          <div>
+            <h2 class="text-2xl font-semibold leading-tight text-gray-200">Alunos</h2>
+          </div>
+          <div class="my-2 flex sm:flex-row flex-col">
+            <div class="flex flex-row mb-1 sm:mb-0">
+              </div>
+              <div class="block relative">
+                <span class="h-full absolute inset-y-0 left-0 flex items-center pl-2">
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 fill-current text-gray-500">
+                    <path
+                      d="M10 4a6 6 0 100 12 6 6 0 000-12zm-8 6a8 8 0 1114.32 4.906l5.387 5.387a1 1 0 01-1.414 1.414l-5.387-5.387A8 8 0 012 10z">
+                    </path>
+                  </svg>
+                </span>
+                <input placeholder="Buscar alunos" id="search-input"
+                  class="appearance-none rounded-r rounded-l sm:rounded-l-none border border-gray-400 border-b block pl-8 pr-6 py-2 w-full bg-white text-sm placeholder-gray-400 text-gray-700 focus:bg-white focus:placeholder-gray-600 focus:text-gray-700 focus:outline-none" />
+              </div>
+              <button id="add-student-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-2">
+                Adicionar Aluno
+              </button>
+            </div>
+          </div>
+          <div class="-mx-4 sm:-mx-8 px-4 sm:px-8 py-4 overflow-x-auto">
+            <div class="inline-block min-w-full shadow rounded-lg overflow-hidden">
+              <table class="min-w-full leading-normal">
+                <thead>
+                  <tr>
+                    <th
+                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th
+                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th
+                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Turmas
+                    </th>
+                    <th
+                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th
+                      class="px-5 py-3 border-b-2 border-gray-200 bg-gray-800 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="students-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="student-modal" class="fixed z-10 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+          <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+          <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <form id="student-form">
+              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Adicionar Aluno</h3>
+                <div class="mt-2">
+                  <div class="mb-4">
+                    <label for="student-name" class="block text-gray-700 text-sm font-bold mb-2">Nome Completo</label>
+                    <input type="text" id="student-name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                  </div>
+                  <div class="mb-4">
+                    <label for="student-email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="student-email" name="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                  </div>
+                  <div class="mb-4">
+                    <label for="student-phone" class="block text-gray-700 text-sm font-bold mb-2">Telefone</label>
+                    <input type="tel" id="student-phone" name="phone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                  </div>
+                  <div class="mb-4">
+                    <label for="student-dob" class="block text-gray-700 text-sm font-bold mb-2">Data de Nascimento</label>
+                    <input type="date" id="student-dob" name="dob" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                  </div>
+                  <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Aluno é menor de idade?</label>
+                    <input type="checkbox" id="student-is-minor" name="is_minor" class="mr-2 leading-tight">
+                    <span class="text-sm">Sim</span>
+                  </div>
+                  <div id="responsible-fields" class="hidden">
+                    <div class="mb-4">
+                      <label for="responsible-name" class="block text-gray-700 text-sm font-bold mb-2">Nome do Responsável</label>
+                      <input type="text" id="responsible-name" name="responsibleName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="mb-4">
+                      <label for="responsible-cpf" class="block text-gray-700 text-sm font-bold mb-2">CPF do Responsável</label>
+                      <input type="text" id="responsible-cpf" name="responsibleCpf" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                     <div class="mb-4">
+                        <label for="responsible-kinship" class="block text-gray-700 text-sm font-bold mb-2">Parentesco</label>
+                        <input type="text" id="responsible-kinship" name="responsibleKinship" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                  </div>
+                  <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        Ativo
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="student-active" name="active" class="form-checkbox h-5 w-5 text-blue-600">
+                        <span class="ml-2 text-gray-700">Sim</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
+                  Salvar
                 </button>
-            </div>
-            <div class="mb-4">
-                <input type="text" id="student-search" placeholder="Buscar aluno por nome..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            </div>
-            <div id="students-table-container" class="overflow-x-auto">
-                <!-- A tabela de alunos será renderizada aqui -->
-            </div>
-            <div id="pagination-controls" class="mt-4 flex justify-end">
-                <!-- Os controles de paginação serão renderizados aqui -->
-            </div>
+                <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+      </div>
     `;
+  },
 
-    document.getElementById('add-student-btn').addEventListener('click', renderAddStudentForm);
-    document.getElementById('student-search').addEventListener('input', handleSearch);
+  async init() {
+    let allStudents = [];
+    let allClass = [];
 
-    await fetchStudents();
-}
+    const loadStudents = async () => {
+      showLoading();
+      try {
+        allStudents = await getStudents();
+        allClass = await getClasses();
+        renderTable(allStudents, allClass);
+      } catch (error) {
+        showToast('Erro ao carregar alunos.', 'error');
+      } finally {
+        hideLoading();
+      }
+    };
 
-// Busca os alunos do Firestore e armazena em cache
-async function fetchStudents() {
-    showSpinner();
-    try {
-        const querySnapshot = await getDocs(collection(db, 'students'));
-        students = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Ordena os alunos por nome
-        students.sort((a, b) => a.name.localeCompare(b.name));
-        currentPage = 1; // Reseta para a primeira página após buscar os dados
-        renderTable();
-    } catch (error) {
-        console.error("Erro ao buscar alunos: ", error);
-        showToast('Erro ao carregar os alunos. Tente novamente mais tarde.', 'error');
-    } finally {
-        hideSpinner();
-    }
-}
-
-// Renderiza a tabela de alunos com base nos dados em cache e na paginação
-function renderTable(filteredStudents = students) {
-    const tableContainer = document.getElementById('students-table-container');
-    if (!tableContainer) return;
-
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    const paginatedStudents = filteredStudents.slice(start, end);
-
-    if (paginatedStudents.length === 0 && currentPage > 1) {
-        currentPage--;
-        renderTable(filteredStudents);
+    const renderTable = (students, classes) => {
+      const tbody = document.getElementById('students-tbody');
+      tbody.innerHTML = '';
+      if (!students) {
+        showToast('Nenhum aluno encontrado ou erro ao buscar dados.', 'error');
         return;
-    }
+      }
 
-    tableContainer.innerHTML = `
-        <table class="min-w-full bg-white">
-            <thead class="bg-gray-100">
-                <tr>
-                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nome</th>
-                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Telefone</th>
-                    <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="students-tbody" class="text-gray-700">
-                ${paginatedStudents.map(student => `
-                    <tr class="border-b border-gray-200 hover:bg-gray-50">
-                        <td class="py-3 px-4">${student.name}</td>
-                        <td class="py-3 px-4">
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                ${student.status === 'active' ? 'Ativo' : 'Inativo'}
-                            </span>
-                        </td>
-                        <td class="py-3 px-4">${student.contact?.phone || 'N/A'}</td>
-                        <td class="py-3 px-4">
-                            <button class="view-student-btn text-indigo-600 hover:text-indigo-900 mr-2" data-id="${student.id}" title="Visualizar"><i class="fas fa-eye"></i></button>
-                            <button class="edit-student-btn text-yellow-600 hover:text-yellow-900 mr-2" data-id="${student.id}" title="Editar"><i class="fas fa-pencil-alt"></i></button>
-                            <button class="delete-student-btn text-red-600 hover:text-red-900" data-id="${student.id}" title="Excluir"><i class="fas fa-trash-alt"></i></button>
-                        </td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
-        ${paginatedStudents.length === 0 ? '<p class="text-center py-4">Nenhum aluno encontrado.</p>' : ''}
-    `;
-    renderPaginationControls(filteredStudents.length);
-    attachTableEventListeners();
-}
+      const getTurmaNames = (turmaIds) => {
+        if (!turmaIds || turmaIds.length === 0) return 'Sem turma';
 
-// Adiciona os event listeners aos botões da tabela
-function attachTableEventListeners() {
-    document.querySelectorAll('.view-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => handleViewStudent(e.currentTarget.dataset.id));
-    });
-    document.querySelectorAll('.edit-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => renderEditStudentForm(e.currentTarget.dataset.id));
-    });
-    document.querySelectorAll('.delete-student-btn').forEach(button => {
-        button.addEventListener('click', (e) => handleDeleteStudent(e.currentTarget.dataset.id));
-    });
-}
+        return turmaIds.map(turmaId => {
+          const turma = classes.find(t => t.id === turmaId);
+          return turma ? turma.name : 'Turma desconhecida';
+        }).join(', ');
+      };
+      
+      students.forEach(student => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
+            <div class="flex items-center">
+              <div class="ml-3">
+                <p class="text-gray-200 whitespace-no-wrap">${student.name}</p>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
+            <p class="text-gray-200 whitespace-no-wrap">${student.email}</p>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
+              <p class="text-gray-200 whitespace-no-wrap">${getTurmaNames(student.turmas)}</p>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
+            <span class="relative inline-block px-3 py-1 font-semibold ${student.active ? 'text-green-900' : 'text-red-900'} leading-tight">
+              <span aria-hidden class="absolute inset-0 ${student.active ? 'bg-green-200' : 'bg-red-200'} opacity-50 rounded-full"></span>
+              <span class="relative">${student.active ? 'Ativo' : 'Inativo'}</span>
+            </span>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-gray-800 text-sm">
+            <button class="edit-btn text-indigo-600 hover:text-indigo-900" data-id="${student.id}">Editar</button>
+            <button class="delete-btn text-red-600 hover:text-red-900 ml-4" data-id="${student.id}">Excluir</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      addEventListenersToButtons();
+    };
 
-// Renderiza os controles de paginação
-function renderPaginationControls(totalItems) {
-    const paginationContainer = document.getElementById('pagination-controls');
-    if (!paginationContainer) return;
-
-    const totalPages = Math.ceil(totalItems / rowsPerPage);
-    if (totalPages <= 1) {
-        paginationContainer.innerHTML = '';
-        return;
-    }
-
-    let buttons = '';
-    for (let i = 1; i <= totalPages; i++) {
-        buttons += `<button class="page-btn px-4 py-2 mx-1 rounded-lg ${currentPage === i ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}" data-page="${i}">${i}</button>`;
-    }
-
-    paginationContainer.innerHTML = `
-        <button id="prev-page-btn" class="px-4 py-2 mx-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
-        ${buttons}
-        <button id="next-page-btn" class="px-4 py-2 mx-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
-    `;
-
-    document.querySelectorAll('.page-btn').forEach(button => {
+    const addEventListenersToButtons = () => {
+      document.querySelectorAll('.edit-btn').forEach(button => {
         button.addEventListener('click', (e) => {
-            currentPage = parseInt(e.target.dataset.page);
-            handleSearch(); // Re-renderiza a tabela com o filtro atual
+          const studentId = e.target.getAttribute('data-id');
+          const student = allStudents.find(s => s.id === studentId);
+          openStudentModal(student);
         });
-    });
+      });
 
-    const prevBtn = document.getElementById('prev-page-btn');
-    if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                handleSearch();
+      document.querySelectorAll('.delete-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const studentId = e.target.getAttribute('data-id');
+          if (confirm('Tem certeza que deseja excluir este aluno?')) {
+            showLoading();
+            try {
+              await deleteStudent(studentId);
+              showToast('Aluno excluído com sucesso!', 'success');
+              loadStudents();
+            } catch (error) {
+              showToast('Erro ao excluir aluno.', 'error');
+            } finally {
+              hideLoading();
             }
+          }
         });
-    }
+      });
+    };
 
-    const nextBtn = document.getElementById('next-page-btn');
-    if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-            if (currentPage < totalPages) {
-                currentPage++;
-                handleSearch();
-            }
-        });
-    }
-}
+    const openStudentModal = (student) => {
+      const modal = document.getElementById('student-modal');
+      const form = document.getElementById('student-form');
+      const modalTitle = document.getElementById('modal-title');
+      form.reset();
+      const responsibleFields = document.getElementById('responsible-fields');
 
-// Lida com a busca de alunos
-function handleSearch() {
-    const searchTerm = document.getElementById('student-search').value.toLowerCase();
-    const filtered = students.filter(student => student.name.toLowerCase().includes(searchTerm));
-    if(document.getElementById('student-search').value !== "" && currentPage !==1){
-        //Não faz nada para não bugar a paginação
-    }else{
-        currentPage = 1;
-    }
-    renderTable(filtered);
-}
+      if (student) {
+        modalTitle.innerText = 'Editar Aluno';
+        form.dataset.studentId = student.id;
+        document.getElementById('student-name').value = student.name;
+        document.getElementById('student-email').value = student.email;
+        document.getElementById('student-phone').value = student.telefone || '';
+        document.getElementById('student-dob').value = student.dataNascimento ? format(new Date(student.dataNascimento), 'yyyy-MM-dd') : '';
+        document.getElementById('student-active').checked = student.active;
+        document.getElementById('student-is-minor').checked = student.isMinor;
 
-// Renderiza o formulário para adicionar um novo aluno em um modal
-function renderAddStudentForm() {
-    const formHtml = `
-        <form id="add-student-form" class="space-y-6">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4">Novo Aluno</h3>
-            
-            <!-- Informações Pessoais -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Informações Pessoais</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
-                        <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="birthDate" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                        <input type="date" id="birthDate" name="birthDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="gender" class="block text-sm font-medium text-gray-700">Gênero</label>
-                        <select id="gender" name="gender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="male">Masculino</option>
-                            <option value="female">Feminino</option>
-                            <option value="other">Outro</option>
-                        </select>
-                    </div>
-                     <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                        <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="active">Ativo</option>
-                            <option value="inactive">Inativo</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contato -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Contato</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                        <input type="tel" id="phone" name="phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" id="email" name="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Endereço -->
-             <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Endereço</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                    <div class="md:col-span-2">
-                        <label for="street" class="block text-sm font-medium text-gray-700">Rua</label>
-                        <input type="text" id="street" name="street" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="number" class="block text-sm font-medium text-gray-700">Número</label>
-                        <input type="text" id="number" name="number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div class="md:col-span-1">
-                         <label for="complement" class="block text-sm font-medium text-gray-700">Complemento</label>
-                        <input type="text" id="complement" name="complement" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div class="md:col-span-2">
-                         <label for="neighborhood" class="block text-sm font-medium text-gray-700">Bairro</label>
-                        <input type="text" id="neighborhood" name="neighborhood" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="city" class="block text-sm font-medium text-gray-700">Cidade</label>
-                        <input type="text" id="city" name="city" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="state" class="block text-sm font-medium text-gray-700">Estado</label>
-                        <input type="text" id="state" name="state" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="zip" class="block text-sm font-medium text-gray-700">CEP</label>
-                        <input type="text" id="zip" name="zip" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contato de Emergência -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Contato de Emergência</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="emergencyName" class="block text-sm font-medium text-gray-700">Nome</label>
-                        <input type="text" id="emergencyName" name="emergencyName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="emergencyPhone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                        <input type="tel" id="emergencyPhone" name="emergencyPhone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-             <!-- Documentos -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Documentos</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
-                        <input type="text" id="cpf" name="cpf" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="rg" class="block text-sm font-medium text-gray-700">RG</label>
-                        <input type="text" id="rg" name="rg" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-             <!-- Informações da Arte Marcial -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Informações da Arte Marcial</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                    <div>
-                        <label for="rank" class="block text-sm font-medium text-gray-700">Faixa</label>
-                        <input type="text" id="rank" name="rank" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="startDate" class="block text-sm font-medium text-gray-700">Data de Início</label>
-                        <input type="date" id="startDate" name="startDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="lastGraduation" class="block text-sm font-medium text-gray-700">Última Graduação</label>
-                        <input type="date" id="lastGraduation" name="lastGraduation" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Observações -->
-            <div>
-                <h4 class="text-lg font-medium text-gray-800">Observações</h4>
-                <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-            </div>
-
-
-            <div class="flex justify-end pt-4">
-                <button type="button" id="cancel-add-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
-                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Salvar</button>
-            </div>
-        </form>
-    `;
-    showModal(formHtml);
-    document.getElementById('add-student-form').addEventListener('submit', handleAddStudentSubmit);
-    document.getElementById('cancel-add-btn').addEventListener('click', closeModal);
-}
-
-// Lida com o envio do formulário de adição
-async function handleAddStudentSubmit(event) {
-    event.preventDefault();
-    const form = event.target;
-    showSpinner();
-
-    try {
-        const studentData = {
-            name: form.name.value,
-            status: form.status.value,
-            contact: {
-                phone: form.phone.value,
-                email: form.email.value,
-                emergencyName: form.emergencyName.value,
-                emergencyPhone: form.emergencyPhone.value,
-            },
-            address: {
-                street: form.street.value,
-                number: form.number.value,
-                complement: form.complement.value,
-                neighborhood: form.neighborhood.value,
-                city: form.city.value,
-                state: form.state.value,
-                zip: form.zip.value,
-            },
-            details: {
-                gender: form.gender.value,
-                cpf: form.cpf.value,
-                rg: form.rg.value,
-                notes: form.notes.value,
-            },
-            martialArtInfo: {
-                rank: form.rank.value,
-                startDate: form.startDate.value,
-                lastGraduation: form.lastGraduation.value,
-            },
-            birthDate: form.birthDate.value,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        // DEBUG: Log para verificar os dados antes de enviar
-        console.log('Dados do novo aluno para salvar:', studentData);
-        
-        await addDoc(collection(db, 'students'), studentData);
-        
-        hideSpinner();
-        showToast('Aluno adicionado com sucesso!');
-        closeModal();
-        await fetchStudents();
-    } catch (error) {
-        console.error("Erro ao adicionar aluno: ", error);
-        showToast('Erro ao adicionar aluno.', 'error');
-        hideSpinner();
-    }
-}
-
-
-// Renderiza o formulário de edição de um aluno em um modal
-function renderEditStudentForm(studentId) {
-    const student = students.find(s => s.id === studentId);
-    if (!student) {
-        showToast('Aluno não encontrado.', 'error');
-        return;
-    }
-
-    const formHtml = `
-        <form id="edit-student-form" class="space-y-6">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4">Editar Aluno</h3>
-            
-             <!-- Informações Pessoais -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Informações Pessoais</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
-                        <input type="text" id="name" name="name" value="${student.name || ''}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="birthDate" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                        <input type="date" id="birthDate" name="birthDate" value="${student.birthDate || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="gender" class="block text-sm font-medium text-gray-700">Gênero</label>
-                        <select id="gender" name="gender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="male" ${student.details?.gender === 'male' ? 'selected' : ''}>Masculino</option>
-                            <option value="female" ${student.details?.gender === 'female' ? 'selected' : ''}>Feminino</option>
-                            <option value="other" ${student.details?.gender === 'other' ? 'selected' : ''}>Outro</option>
-                        </select>
-                    </div>
-                     <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                        <select id="status" name="status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="active" ${student.status === 'active' ? 'selected' : ''}>Ativo</option>
-                            <option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inativo</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contato -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Contato</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="phone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                        <input type="tel" id="phone" name="phone" value="${student.contact?.phone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" id="email" name="email" value="${student.contact?.email || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Endereço -->
-             <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Endereço</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                    <div class="md:col-span-2">
-                        <label for="street" class="block text-sm font-medium text-gray-700">Rua</label>
-                        <input type="text" id="street" name="street" value="${student.address?.street || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="number" class="block text-sm font-medium text-gray-700">Número</label>
-                        <input type="text" id="number" name="number" value="${student.address?.number || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div class="md:col-span-1">
-                         <label for="complement" class="block text-sm font-medium text-gray-700">Complemento</label>
-                        <input type="text" id="complement" name="complement" value="${student.address?.complement || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div class="md:col-span-2">
-                         <label for="neighborhood" class="block text-sm font-medium text-gray-700">Bairro</label>
-                        <input type="text" id="neighborhood" name="neighborhood" value="${student.address?.neighborhood || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="city" class="block text-sm font-medium text-gray-700">Cidade</label>
-                        <input type="text" id="city" name="city" value="${student.address?.city || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="state" class="block text-sm font-medium text-gray-700">Estado</label>
-                        <input type="text" id="state" name="state" value="${student.address?.state || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                     <div>
-                         <label for="zip" class="block text-sm font-medium text-gray-700">CEP</label>
-                        <input type="text" id="zip" name="zip" value="${student.address?.zip || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contato de Emergência -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Contato de Emergência</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="emergencyName" class="block text-sm font-medium text-gray-700">Nome</label>
-                        <input type="text" id="emergencyName" name="emergencyName" value="${student.contact?.emergencyName || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="emergencyPhone" class="block text-sm font-medium text-gray-700">Telefone</label>
-                        <input type="tel" id="emergencyPhone" name="emergencyPhone" value="${student.contact?.emergencyPhone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-             <!-- Documentos -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Documentos</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label for="cpf" class="block text-sm font-medium text-gray-700">CPF</label>
-                        <input type="text" id="cpf" name="cpf" value="${student.details?.cpf || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="rg" class="block text-sm font-medium text-gray-700">RG</label>
-                        <input type="text" id="rg" name="rg" value="${student.details?.rg || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-
-             <!-- Informações da Arte Marcial -->
-            <div class="border-b border-gray-200 pb-4">
-                <h4 class="text-lg font-medium text-gray-800">Informações da Arte Marcial</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                    <div>
-                        <label for="rank" class="block text-sm font-medium text-gray-700">Faixa</label>
-                        <input type="text" id="rank" name="rank" value="${student.martialArtInfo?.rank || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="startDate" class="block text-sm font-medium text-gray-700">Data de Início</label>
-                        <input type="date" id="startDate" name="startDate" value="${student.martialArtInfo?.startDate || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="lastGraduation" class="block text-sm font-medium text-gray-700">Última Graduação</label>
-                        <input type="date" id="lastGraduation" name="lastGraduation" value="${student.martialArtInfo?.lastGraduation || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Observações -->
-            <div>
-                <h4 class="text-lg font-medium text-gray-800">Observações</h4>
-                <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">${student.details?.notes || ''}</textarea>
-            </div>
-
-            <div class="flex justify-end pt-4">
-                <button type="button" id="cancel-edit-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
-                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Salvar Alterações</button>
-            </div>
-        </form>
-    `;
-    showModal(formHtml);
-    const form = document.getElementById('edit-student-form');
-    form.addEventListener('submit', (e) => handleEditStudentSubmit(e, studentId));
-    document.getElementById('cancel-edit-btn').addEventListener('click', closeModal);
-}
-
-// Lida com o envio do formulário de edição
-async function handleEditStudentSubmit(event, studentId) {
-    event.preventDefault();
-    const form = event.target;
-    showSpinner();
-    try {
-        // Correção: Usar notação de ponto para atualizar campos aninhados de forma segura
-        const updatedData = {
-            name: form.name.value,
-            status: form.status.value,
-            birthDate: form.birthDate.value,
-            'contact.phone': form.phone.value,
-            'contact.email': form.email.value,
-            'contact.emergencyName': form.emergencyName.value,
-            'contact.emergencyPhone': form.emergencyPhone.value,
-            'address.street': form.street.value,
-            'address.number': form.number.value,
-            'address.complement': form.complement.value,
-            'address.neighborhood': form.neighborhood.value,
-            'address.city': form.city.value,
-            'address.state': form.state.value,
-            'address.zip': form.zip.value,
-            'details.gender': form.gender.value,
-            'details.cpf': form.cpf.value,
-            'details.rg': form.rg.value,
-            'details.notes': form.notes.value,
-            'martialArtInfo.rank': form.rank.value,
-            'martialArtInfo.startDate': form.startDate.value,
-            'martialArtInfo.lastGraduation': form.lastGraduation.value,
-            updatedAt: new Date()
-        };
-
-        // DEBUG: Log para verificar os dados antes de enviar
-        console.log('Dados formatados para atualização (dot notation):', updatedData);
-
-        const studentRef = doc(db, 'students', studentId);
-        await updateDoc(studentRef, updatedData);
-
-        hideSpinner();
-        showToast('Aluno atualizado com sucesso!');
-        closeModal();
-        await fetchStudents();
-    } catch (error) {
-        console.error("Erro ao atualizar aluno: ", error);
-        showToast('Erro ao atualizar aluno.', 'error');
-        hideSpinner();
-    }
-}
-
-// Lida com a exclusão de um aluno
-function handleDeleteStudent(studentId) {
-    const student = students.find(s => s.id === studentId);
-    const confirmationHtml = `
-        <div class="text-center">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4">Confirmar Exclusão</h3>
-            <p class="text-gray-600 mb-6">Você tem certeza que deseja excluir o aluno <strong>${student.name}</strong>? Esta ação não pode ser desfeita.</p>
-            <div class="flex justify-center">
-                <button id="cancel-delete-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 mr-2">Cancelar</button>
-                <button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Excluir</button>
-            </div>
-        </div>
-    `;
-    showModal(confirmationHtml);
-    document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-        showSpinner();
-        try {
-            await deleteDoc(doc(db, 'students', studentId));
-            showToast('Aluno excluído com sucesso!');
-            await fetchStudents();
-        } catch (error) {
-            console.error("Erro ao excluir aluno: ", error);
-            showToast('Erro ao excluir aluno.', 'error');
-        } finally {
-            hideSpinner();
-            closeModal();
+        if (student.isMinor) {
+          responsibleFields.classList.remove('hidden');
+          document.getElementById('responsible-name').value = student.responsibleForContact?.name || '';
+          document.getElementById('responsible-cpf').value = student.responsibleForContact?.cpf || '';
+          document.getElementById('responsible-kinship').value = student.responsibleForContact?.kinship || '';
+        } else {
+          responsibleFields.classList.add('hidden');
         }
+
+      } else {
+        modalTitle.innerText = 'Adicionar Aluno';
+        delete form.dataset.studentId;
+        document.getElementById('student-active').checked = true;
+      }
+      modal.classList.remove('hidden');
+    };
+
+    const handleFormSubmit = async (event) => {
+      event.preventDefault();
+      const studentId = event.target.dataset.studentId;
+      const formData = new FormData(event.target);
+      const studentData = Object.fromEntries(formData.entries());
+
+      // --- INÍCIO DA CORREÇÃO ---
+      // O formulário usa 'phone' e 'dob', mas o Firestore espera 'telefone' e 'dataNascimento'.
+      // Aqui, nós ajustamos o objeto de dados antes de enviá-lo.
+      studentData.telefone = studentData.phone;
+      studentData.dataNascimento = studentData.dob;
+      delete studentData.phone; // Remove a chave antiga para não enviar dados desnecessários
+      delete studentData.dob;   // Remove a chave antiga
+      // --- FIM DA CORREÇÃO ---
+
+      studentData.active = document.getElementById('student-active').checked;
+      const isMinor = document.getElementById('student-is-minor').checked;
+      studentData.isMinor = isMinor;
+
+      if (isMinor) {
+        studentData.responsibleForContact = {
+          name: studentData.responsibleName,
+          cpf: studentData.responsibleCpf,
+          kinship: studentData.responsibleKinship,
+        };
+      }
+
+      delete studentData.responsibleName;
+      delete studentData.responsibleCpf;
+      delete studentData.responsibleKinship;
+
+      showLoading();
+      try {
+        if (studentId) {
+          await updateStudent(studentId, studentData);
+          showToast('Aluno atualizado com sucesso!', 'success');
+        } else {
+          await createStudent(studentData);
+          showToast('Aluno adicionado com sucesso!', 'success');
+        }
+        document.getElementById('student-modal').classList.add('hidden');
+        loadStudents();
+      } catch (error) {
+        console.error("Erro ao salvar aluno:", error);
+        const errorMessage = error.response?.data?.error || 'Erro ao salvar aluno.';
+        showToast(errorMessage, 'error');
+      } finally {
+        hideLoading();
+      }
+    };
+
+    document.getElementById('add-student-btn').addEventListener('click', () => openStudentModal(null));
+    document.getElementById('cancel-btn').addEventListener('click', () => document.getElementById('student-modal').classList.add('hidden'));
+    document.getElementById('student-form').addEventListener('submit', handleFormSubmit);
+
+    document.getElementById('student-is-minor').addEventListener('change', (e) => {
+      const responsibleFields = document.getElementById('responsible-fields');
+      if (e.target.checked) {
+        responsibleFields.classList.remove('hidden');
+      } else {
+        responsibleFields.classList.add('hidden');
+      }
     });
-    document.getElementById('cancel-delete-btn').addEventListener('click', closeModal);
-}
 
-// Exibe os detalhes de um aluno em um modal
-function handleViewStudent(studentId) {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const filteredStudents = allStudents.filter(student =>
+        student.name.toLowerCase().includes(searchTerm) ||
+        student.email.toLowerCase().includes(searchTerm)
+      );
+      renderTable(filteredStudents, allClass);
+    });
 
-    const detailsHtml = `
-        <div class="space-y-4">
-            <h3 class="text-2xl font-bold text-gray-800 border-b pb-2">${student.name}</h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                <div><strong>Status:</strong> <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${student.status === 'active' ? 'Ativo' : 'Inativo'}</span></div>
-                <div><strong>Data de Nasc.:</strong> ${student.birthDate ? new Date(student.birthDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</div>
-                <div><strong>Gênero:</strong> ${student.details?.gender || 'N/A'}</div>
-                <div><strong>Telefone:</strong> ${student.contact?.phone || 'N/A'}</div>
-                <div><strong>Email:</strong> ${student.contact?.email || 'N/A'}</div>
-                <div><strong>CPF:</strong> ${student.details?.cpf || 'N/A'}</div>
-                <div><strong>RG:</strong> ${student.details?.rg || 'N/A'}</div>
-            </div>
+    await loadStudents();
+  }
+};
 
-            <div class="pt-2">
-                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Endereço</h4>
-                <p>${student.address?.street || ''}, ${student.address?.number || ''} - ${student.address?.neighborhood || ''}</p>
-                <p>${student.address?.city || ''} - ${student.address?.state || ''}, ${student.address?.zip || ''}</p>
-            </div>
-
-            <div class="pt-2">
-                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Contato de Emergência</h4>
-                <p><strong>Nome:</strong> ${student.contact?.emergencyName || 'N/A'}</p>
-                <p><strong>Telefone:</strong> ${student.contact?.emergencyPhone || 'N/A'}</p>
-            </div>
-
-             <div class="pt-2">
-                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Informações Marciais</h4>
-                <p><strong>Faixa:</strong> ${student.martialArtInfo?.rank || 'N/A'}</p>
-                <p><strong>Início:</strong> ${student.martialArtInfo?.startDate ? new Date(student.martialArtInfo.startDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</p>
-                <p><strong>Última Graduação:</strong> ${student.martialArtInfo?.lastGraduation ? new Date(student.martialArtInfo.lastGraduation).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</p>
-            </div>
-            
-            <div class="pt-2">
-                <h4 class="text-lg font-semibold text-gray-700 border-b pb-1 mb-2">Observações</h4>
-                <p class="whitespace-pre-wrap">${student.details?.notes || 'Nenhuma observação.'}</p>
-            </div>
-
-            <div class="flex justify-end pt-4">
-                 <button type="button" id="close-view-btn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300">Fechar</button>
-            </div>
-        </div>
-    `;
-    showModal(detailsHtml);
-    document.getElementById('close-view-btn').addEventListener('click', closeModal);
-}
-
-
-export { renderStudentList };
+export default StudentList;
