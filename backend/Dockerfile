@@ -11,6 +11,12 @@ ENV PYTHONUNBUFFERED 1
 # Copia apenas o arquivo de dependências primeiro para aproveitar o cache do Docker.
 COPY requirements.txt .
 
+# Instala dependências do sistema necessárias para compilar dlib (C++)
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 # Instala as dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
