@@ -9,6 +9,7 @@ import { renderTeacherList } from "../components/TeacherList.js";
 import { renderStudentList } from "../components/StudentList.js";
 import { renderClassList } from "../components/ClassList.js";
 import { renderFinancialDashboard } from "../components/FinancialDashboard.js";
+import { renderKioskMode } from "../components/KioskMode.js"; // Importe o componente do Quiosque
 
 // Variável para guardar a função de limpeza da página atual
 let currentPageCleanup = () => {};
@@ -22,66 +23,84 @@ export async function renderAuthenticatedApp(user, container) {
             throw new Error("Perfil do usuário ou 'role' não encontrado.");
         }
         
-        // --- NOVA LÓGICA DE VERIFICAÇÃO DE ROLE ---
+        // --- LÓGICA DE VERIFICAÇÃO DE ROLE ---
         const userRole = userProfile.role;
 
         if (userRole !== 'admin' && userRole !== 'super_admin') {
-            // Se o usuário NÃO É admin ou super_admin, ele não pertence a este painel.
             console.log(`Usuário com role '${userRole}' não tem acesso a este painel. Redirecionando...`);
             
-            // Você pode customizar os alertas e redirecionamentos
             if (userRole === 'student') {
-                // Removido o alert para uma melhor experiência do usuário
-                // IMPORTANTE: Use a URL correta do seu app de aluno aqui!
                 window.location.href = 'https://aluno-jitakyoapp.web.app'; 
             } else if (userRole === 'teacher') {
-                // IMPORTANTE: Use a URL correta do seu futuro app de professor
                 window.location.href = 'https://professor-jitakyoapp.web.app'; 
             } else {
-                // Se for uma role desconhecida, desloga por segurança.
                 alert('Você não tem permissão para acessar esta área.');
                 auth.signOut();
             }
-            return; // Interrompe a execução para que o painel de admin não seja renderizado.
+            return; 
         }
 
-        // --- O CÓDIGO ABAIXO SÓ EXECUTA SE FOR ADMIN OU SUPER_ADMIN ---
+        // --- INICIALIZA PERFIL ---
         setUserProfile(userProfile);
 
-        const layoutTemplate = document.getElementById('layout-template');
-        container.innerHTML = '';
-        container.appendChild(layoutTemplate.content.cloneNode(true));
-        
-        const sidebarHTML = createSidebar(); 
-        document.getElementById('sidebar-container').innerHTML = sidebarHTML;
-        const mainContent = document.getElementById('main-content');
-        mainContent.classList.add('overflow-y-auto', 'pb-20', 'md:pb-0');
-        
-        setupEventListeners();
+        // --- FUNÇÃO AUXILIAR PARA GARANTIR O LAYOUT DO ADMIN (COM SIDEBAR) ---
+        // Verificamos se a sidebar já existe. Se não existir, criamos.
+        // Isso permite alternar entre "Modo Quiosque" (tela cheia) e "Admin" sem recarregar a página.
+        const ensureAdminLayout = () => {
+            if (!document.getElementById('sidebar-container')) {
+                const layoutTemplate = document.getElementById('layout-template');
+                container.innerHTML = '';
+                container.appendChild(layoutTemplate.content.cloneNode(true));
+                
+                const sidebarHTML = createSidebar(); 
+                document.getElementById('sidebar-container').innerHTML = sidebarHTML;
+                
+                setupEventListeners(); // Reativa os cliques do menu
+            }
+            const mainContent = document.getElementById('main-content');
+            mainContent.classList.add('overflow-y-auto', 'pb-20', 'md:pb-0');
+            return mainContent;
+        };
 
-        // --- ROTEAMENTO COM LÓGICA DE LIMPEZA ---
-        router.off(router.routes); // Limpa rotas antigas
-
-        const navigateTo = async (renderFunction) => {
+        // --- FUNÇÃO DE NAVEGAÇÃO PADRÃO (DENTRO DO PAINEL) ---
+        const navigateToAdmin = async (renderFunction) => {
+            const mainContent = ensureAdminLayout();
+            
             if (typeof currentPageCleanup === 'function') {
                 currentPageCleanup();
             }
             currentPageCleanup = await renderFunction(mainContent);
         };
 
+        // --- FUNÇÃO DE NAVEGAÇÃO PARA O QUIOSQUE (TELA CHEIA) ---
+        const navigateToKiosk = async () => {
+            if (typeof currentPageCleanup === 'function') {
+                currentPageCleanup();
+            }
+            // Limpa todo o container para remover a Sidebar e Header
+            container.innerHTML = '';
+            container.className = 'h-screen w-screen overflow-hidden bg-gray-900'; // Garante fundo escuro
+
+            currentPageCleanup = await renderKioskMode(container);
+        };
+
+        // --- ROTEAMENTO ---
+        router.off(router.routes); // Limpa rotas antigas
+
         router.on({
-            '/admin/dashboard': () => navigateTo((el) => renderAdminDashboard(el, getUserProfile())),
-            '/admin/teachers': () => navigateTo(renderTeacherList),
-            '/admin/students': () => navigateTo(renderStudentList),
-            '/admin/classes': () => navigateTo(renderClassList),
-            '/admin/financial': () => navigateTo(renderFinancialDashboard),
+            '/admin/dashboard': () => navigateToAdmin((el) => renderAdminDashboard(el, getUserProfile())),
+            '/admin/teachers': () => navigateToAdmin(renderTeacherList),
+            '/admin/students': () => navigateToAdmin(renderStudentList),
+            '/admin/classes': () => navigateToAdmin(renderClassList),
+            '/admin/financial': () => navigateToAdmin(renderFinancialDashboard),
+            
+            // Nova Rota do Quiosque
+            '/kiosk': () => navigateToKiosk(),
         }).notFound(() => {
+            const mainContent = ensureAdminLayout();
             mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
         });
         
-        // Como já verificamos a role, podemos navegar diretamente para o dashboard,
-        // removendo a lógica antiga do 'homeRoute'.
-        router.navigate('/admin/dashboard');
         router.resolve();
 
     } catch (error) {
@@ -92,7 +111,6 @@ export async function renderAuthenticatedApp(user, container) {
 
 function setupEventListeners() {
     // Esta função contém os listeners para os elementos persistentes como a sidebar
-    // e o botão de logout. Como eles não mudam, não precisam de limpeza.
     const logoutDesktop = document.getElementById('logout-button');
     const logoutMobile = document.getElementById('logout-button-mobile');
     const toggleButton = document.getElementById('sidebar-toggle-btn');
@@ -108,7 +126,6 @@ function setupEventListeners() {
         e.preventDefault();
         setUserProfile(null);
         auth.signOut();
-        // Redireciona para a página de login após o logout
         router.navigate('/login');
     };
 

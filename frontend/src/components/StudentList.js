@@ -1,6 +1,7 @@
 import { fetchWithAuth } from '../lib/api.js';
 import { showModal, hideModal } from './Modal.js';
 import { showLoading, hideLoading } from './LoadingSpinner.js';
+import { loadFaceApiModels, getFaceDescriptor } from '../lib/faceService.js';
 
 // --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
@@ -94,6 +95,101 @@ async function handleDeleteClick(studentId, studentName) {
                     <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
+// --- FUNÇÃO PARA ABRIR CÂMERA E REGISTRAR FACE ---
+async function openFaceRegistration(studentId, studentName) {
+    showModal(`Cadastrar Face: ${studentName}`, `
+        <div class="flex flex-col items-center">
+            <p class="mb-4 text-sm text-gray-600">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
+            <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden aspect-[4/3]">
+                <video id="face-video" autoplay muted playsinline class="w-full h-full object-cover transform scale-x-[-1]"></video>
+                <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-50">Carregando IA...</div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button data-action="capture-face" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Capturar Rosto
+                </button>
+                <button data-action="close-camera" class="bg-gray-400 text-white px-4 py-2 rounded-full">Cancelar</button>
+            </div>
+            <p id="face-status" class="mt-2 text-sm font-medium text-orange-500"></p>
+        </div>
+    `);
+
+    const video = document.getElementById('face-video');
+    const overlay = document.getElementById('face-overlay');
+    const btnCapture = document.querySelector('button[data-action="capture-face"]');
+    const statusText = document.getElementById('face-status');
+    let stream = null;
+
+    try {
+        // Carrega modelos
+        await loadFaceApiModels();
+        overlay.classList.add('hidden'); // Remove overlay de "Carregando"
+        
+        // Inicia Webcam
+        stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        video.srcObject = stream;
+        
+        btnCapture.disabled = false;
+
+        btnCapture.onclick = async () => {
+            btnCapture.disabled = true;
+            btnCapture.textContent = "Processando...";
+            statusText.textContent = "Analisando rosto...";
+            statusText.className = "mt-2 text-sm font-medium text-blue-500";
+
+            try {
+                const descriptor = await getFaceDescriptor(video);
+                
+                if (!descriptor) {
+                    throw new Error("Nenhum rosto detectado. Tente melhorar a iluminação.");
+                }
+
+                // Converte Float32Array para Array normal para salvar no Firestore/JSON
+                const descriptorArray = Array.from(descriptor);
+
+                // Envia para o backend (API Existente de Update de Aluno)
+                // Precisamos garantir que o backend aceite o campo 'face_descriptor' dentro de user_data
+                const response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        user_data: { face_descriptor: descriptorArray }
+                    })
+                });
+
+                if (!response.ok) throw new Error("Erro ao salvar no servidor.");
+
+                statusText.textContent = "Rosto cadastrado com sucesso!";
+                statusText.className = "mt-2 text-sm font-medium text-green-600";
+                
+                // Fecha após 1.5s
+                setTimeout(() => {
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    hideModal();
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                statusText.textContent = err.message || "Erro na captura.";
+                statusText.className = "mt-2 text-sm font-medium text-red-500";
+                btnCapture.disabled = false;
+                btnCapture.textContent = "Tentar Novamente";
+            }
+        };
+
+        // Lidar com botão cancelar dentro do modal específico da câmera
+        document.querySelector('button[data-action="close-camera"]').onclick = () => {
+             if (stream) stream.getTracks().forEach(track => track.stop());
+             hideModal();
+        };
+
+    } catch (err) {
+        console.error(err);
+        overlay.textContent = "Erro ao acessar câmera";
+        overlay.classList.remove('hidden');
+    }
+}
+
+
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -130,6 +226,9 @@ export async function renderStudentList(targetElement) {
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
                                         <div class="text-xs text-gray-500">Idade: ${student.age !== null ? student.age : 'N/A'}</div>
+                                        ${student.face_descriptor && student.face_descriptor.length > 0 
+                                            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Face Cadastrada</span>' 
+                                            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Sem Face</span>'}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div>${e.class_name}</div>`).join('') : 'Nenhuma'}
@@ -139,6 +238,9 @@ export async function renderStudentList(targetElement) {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div class="flex items-center justify-end space-x-2">
+                                            <button data-action="face-register" data-student-id="${student.id}" data-student-name="${student.name}" class="p-2 rounded-full hover:bg-gray-200" title="Cadastrar Face">
+                                                 <svg class="w-5 h-5 text-blue-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                            </button>
                                             <button data-action="edit" data-student-id="${student.id}" class="p-2 rounded-full hover:bg-gray-200" title="Editar Aluno">
                                                 <svg class="w-5 h-5 text-indigo-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                             </button>
@@ -170,6 +272,7 @@ export async function renderStudentList(targetElement) {
         if (action === 'add') openStudentForm();
         if (action === 'edit') openStudentForm(studentId);
         if (action === 'delete') handleDeleteClick(studentId, studentName);
+        if (action === 'face-register') openFaceRegistration(studentId, studentName);
     };
 
     const modalBody = document.getElementById('modal-body');
@@ -204,11 +307,8 @@ export async function renderStudentList(targetElement) {
                 const password = form.elements.password.value;
                 if (password) userData.password = password;
                 
-                // --- INÍCIO DA CORREÇÃO ---
-                // Para alinhar com a rota de criação, envolvemos os dados de atualização na chave "user_data".
                 const payload = { user_data: userData };
                 const response = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
-                // --- FIM DA CORREÇÃO ---
 
                 if (!response.ok) throw await response.json();
             } else {

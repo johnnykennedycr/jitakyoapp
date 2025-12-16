@@ -1,0 +1,27 @@
+{
+  "hosting": {
+    "public": "frontend/public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|html)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=3600"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      { "source": "/kiosk/**", "destination": "/kiosk/index.html" },
+      { "source": "/admin/face-register.html", "destination": "/admin/face-register.html" },
+      { "source": "/api/**", "run": { "serviceId": "jitakyoapp-backend", "region": "us-central1" } },
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}
