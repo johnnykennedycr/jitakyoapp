@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro Facial - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">Cadastrar Face do Aluno</h2>
+        
+        <!-- Input do ID do Aluno -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">ID do Aluno</label>
+            <input type="text" id="student-id" class="mt-1 block w-full border border-gray-300 rounded-md p-2" placeholder="Ex: student_123">
+        </div>
+
+        <div class="relative bg-black rounded-lg overflow-hidden h-64 mb-4">
+            <video id="reg-video" autoplay muted class="w-full h-full object-cover"></video>
+            <canvas id="reg-canvas" class="hidden"></canvas>
+            <img id="preview-img" class="hidden w-full h-full object-cover absolute inset-0">
+        </div>
+
+        <div class="flex gap-2">
+            <button id="btn-capture" class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Capturar</button>
+            <button id="btn-retake" class="hidden flex-1 bg-gray-500 text-white py-2 rounded hover:bg-gray-600">Refazer</button>
+            <button id="btn-save" class="hidden flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700">Salvar</button>
+        </div>
+
+        <p id="msg-status" class="mt-4 text-center text-sm font-medium"></p>
+    </div>
+
+    <script>
+        const API_BASE = '/api/admin'; // Caminho relativo para produção
+        const video = document.getElementById('reg-video');
+        const canvas = document.getElementById('reg-canvas');
+        const preview = document.getElementById('preview-img');
+        const btnCapture = document.getElementById('btn-capture');
+        const btnRetake = document.getElementById('btn-retake');
+        const btnSave = document.getElementById('btn-save');
+        const msgStatus = document.getElementById('msg-status');
+        let currentBlob = null;
+
+        // Iniciar Câmera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => video.srcObject = stream)
+            .catch(err => console.error(err));
+
+        // Capturar
+        btnCapture.onclick = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            canvas.toBlob(blob => {
+                currentBlob = blob;
+                preview.src = URL.createObjectURL(blob);
+                preview.classList.remove('hidden');
+                btnCapture.classList.add('hidden');
+                btnRetake.classList.remove('hidden');
+                btnSave.classList.remove('hidden');
+            }, 'image/jpeg');
+        };
+
+        // Refazer
+        btnRetake.onclick = () => {
+            preview.classList.add('hidden');
+            btnCapture.classList.remove('hidden');
+            btnRetake.classList.add('hidden');
+            btnSave.classList.add('hidden');
+            currentBlob = null;
+            msgStatus.innerText = '';
+        };
+
+        // Salvar
+        btnSave.onclick = async () => {
+            const studentId = document.getElementById('student-id').value;
+            if (!studentId) {
+                alert('Por favor, insira o ID do aluno.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', currentBlob, 'face.jpg');
+
+            btnSave.innerText = 'Enviando...';
+            btnSave.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/students/${studentId}/face-registration`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    msgStatus.innerText = 'Sucesso! Face registrada.';
+                    msgStatus.className = 'mt-4 text-center text-sm font-medium text-green-600';
+                    setTimeout(() => btnRetake.click(), 2000);
+                } else {
+                    throw new Error(data.error || 'Erro desconhecido');
+                }
+            } catch (err) {
+                msgStatus.innerText = 'Erro: ' + err.message;
+                msgStatus.className = 'mt-4 text-center text-sm font-medium text-red-600';
+            } finally {
+                btnSave.innerText = 'Salvar';
+                btnSave.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

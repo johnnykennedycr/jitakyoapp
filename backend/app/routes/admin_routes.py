@@ -18,6 +18,7 @@ from app.services.enrollment_service import EnrollmentService
 from app.services.attendance_service import AttendanceService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService # <-- NOVO
+from app.services.facial_recognition_service import FacialRecognitionService # <-- NOVO
 
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
@@ -29,10 +30,11 @@ enrollment_service = None
 attendance_service = None
 payment_service = None
 notification_service = None # <-- NOVO
+facial_recognition_service = None # <-- NOVO
 db = None
 
-def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param, ns): # <-- ns ADICIONADO
-    global db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service
+def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param, ns, frs=None): # <-- frs ADICIONADO
+    global db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service, facial_recognition_service
     db = database
     user_service = us
     teacher_service = ts
@@ -41,6 +43,7 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param, ns): # <-
     attendance_service = as_param
     payment_service = ps_param
     notification_service = ns # <-- NOVO
+    facial_recognition_service = frs # <-- NOVO
 
 
 # --- NOVA ROTA PARA O DASHBOARD ---
@@ -563,6 +566,109 @@ def get_attendance_history(class_id):
         logging.error(f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}")
         return jsonify({"error": f"Erro ao buscar histórico de chamadas para a turma {class_id}: {e}"}), 500
 
+# --- ROTAS DE RECONHECIMENTO FACIAL (KIOSK) ---
+
+@admin_api_bp.route('/students/<string:student_id>/face-registration', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def register_student_face(student_id):
+    """Recebe uma foto de referência, gera o encoding e salva no perfil do aluno."""
+    if 'file' not in request.files:
+        return jsonify(error="Nenhum arquivo enviado."), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify(error="Nome de arquivo inválido."), 400
+
+    try:
+        # Gera o encoding (vetor numérico)
+        encoding = facial_recognition_service.get_face_encoding_from_stream(file)
+        
+        if encoding is None:
+            return jsonify(error="Nenhum rosto detectado na imagem. Tente uma foto mais clara."), 400
+        
+        # Atualiza o usuário com o novo campo 'face_encoding'
+        # Nota: O user_service precisa suportar atualização de campos arbitrários ou você deve adicionar isso ao modelo
+        success = user_service.update_user(student_id, {'face_encoding': encoding, 'has_face_registered': True})
+        
+        if success:
+            return jsonify(success=True, message="Face registrada com sucesso!"), 200
+        else:
+            return jsonify(error="Erro ao salvar dados faciais no banco."), 500
+            
+    except Exception as e:
+        logging.error(f"Erro no registro facial: {e}", exc_info=True)
+        return jsonify(error=f"Erro interno: {e}"), 500
+
+@admin_api_bp.route('/attendance/kiosk/recognize', methods=['POST'])
+# @login_required -> Kiosk pode usar um token especial ou estar na rede interna, mas vamos manter login por enquanto
+def kiosk_recognize_attendance():
+    """
+    Recebe uma foto do tablet na entrada.
+    1. Identifica o aluno.
+    2. Verifica se há aula agora.
+    3. Registra presença.
+    """
+    if 'file' not in request.files:
+        return jsonify(error="Imagem não fornecida."), 400
+        
+    try:
+        # 1. Buscar todos os alunos que têm face cadastrada
+        # Otimização: Em produção, cachear isso ou buscar apenas ativos
+        all_students = user_service.get_users_by_role('student')
+        students_with_face = [s.to_dict() for s in all_students if s.to_dict().get('face_encoding')]
+        
+        # 2. Identificar Aluno
+        file = request.files['file']
+        identified_student = facial_recognition_service.identify_student(file, students_with_face)
+        
+        if not identified_student:
+            return jsonify(success=False, message="Aluno não identificado."), 404
+            
+        # 3. Verificar Turma no Horário Atual
+        now = datetime.now()
+        current_weekday = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][now.weekday()]
+        current_time_minutes = now.hour * 60 + now.minute
+        
+        all_classes = training_class_service.get_all_classes()
+        matching_class = None
+        
+        for cls in all_classes:
+            for slot in cls.get('schedule', []):
+                if slot['day_of_week'] == current_weekday:
+                    start_h, start_m = map(int, slot['start_time'].split(':'))
+                    start_minutes = start_h * 60 + start_m
+                    # Aceita presença se estiver dentro de uma janela (ex: 30 min antes até 30 min depois do início)
+                    if abs(current_time_minutes - start_minutes) <= 45: 
+                        matching_class = cls
+                        break
+            if matching_class: break
+        
+        if matching_class:
+            # 4. Registrar Presença
+            attendance_data = {
+                'class_id': matching_class['id'],
+                'date': now.strftime('%Y-%m-%d'),
+                'students': [{'student_id': identified_student['id'], 'status': 'present', 'method': 'facial_recognition'}]
+            }
+            attendance_service.create_or_update_attendance(attendance_data)
+            
+            return jsonify({
+                "success": True, 
+                "student_name": identified_student['name'],
+                "class_name": matching_class['name'],
+                "message": f"Bem-vindo, {identified_student['name']}! Presença confirmada."
+            }), 200
+        else:
+            return jsonify({
+                "success": False, 
+                "student_name": identified_student['name'],
+                "message": f"Olá {identified_student['name']}, nenhuma aula encontrada para agora."
+            }), 200
+
+    except Exception as e:
+        logging.error(f"Erro no Kiosk: {e}", exc_info=True)
+        return jsonify(error=f"Erro de processamento: {e}"), 500
 
 
 @admin_api_bp.route('/classes/<string:class_id>/unenroll/<string:student_id>', methods=['POST'])

@@ -17,6 +17,7 @@ backend/__pycache__/
 # Arquivos de configuração de IDEs
 .vscode/
 .idea/
+serviceAccountKey.json
 
 # Outros
 .DS_Store

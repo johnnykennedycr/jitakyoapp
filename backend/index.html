@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JitaKyo Dojo - Check-in</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Animação de scan */
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: #eab308;
+            animation: scan 2s infinite linear;
+            box-shadow: 0 0 10px #eab308;
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white h-screen flex flex-col items-center justify-center overflow-hidden">
+
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-yellow-500 tracking-wider">JITAKYO DOJO</h1>
+        <p class="text-slate-400 mt-2">Aproxime-se para confirmar presença</p>
+    </div>
+
+    <!-- Container da Câmera -->
+    <div class="relative rounded-2xl overflow-hidden border-4 border-yellow-600 shadow-2xl w-[640px] h-[480px] bg-black">
+        <video id="video" autoplay muted playsinline class="w-full h-full object-cover"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        
+        <!-- Overlay de Scan -->
+        <div class="absolute inset-0 pointer-events-none">
+            <div class="scan-line"></div>
+            <div class="absolute inset-0 border-2 border-yellow-500/30 m-8 rounded-lg"></div>
+        </div>
+
+        <!-- Feedback Visual -->
+        <div id="status-overlay" class="absolute inset-0 flex items-center justify-center bg-black/80 hidden transition-opacity duration-300">
+            <div class="text-center">
+                <div id="status-icon" class="text-6xl mb-4"></div>
+                <h2 id="status-title" class="text-2xl font-bold"></h2>
+                <p id="status-message" class="text-lg mt-2 text-gray-300"></p>
+            </div>
+        </div>
+    </div>
+
+    <button id="btn-checkin" class="mt-10 px-10 py-4 bg-yellow-600 hover:bg-yellow-700 text-black font-bold text-xl rounded-full shadow-lg transform transition hover:scale-105 active:scale-95">
+        CONFIRMAR PRESENÇA
+    </button>
+
+    <script src="kiosk.js"></script>
+</body>
+</html>

@@ -50,6 +50,7 @@ def create_app():
     from app.services.attendance_service import AttendanceService
     from app.services.payment_service import PaymentService
     from app.services.notification_service import NotificationService
+    from app.services.facial_recognition_service import FacialRecognitionService
     
     # Nível 0
     user_service = UserService(db, mail=mail)
@@ -66,6 +67,7 @@ def create_app():
     # --- CORREÇÃO APLICADA AQUI ---
     # O NotificationService precisa do enrollment_service para buscar alunos por turma.
     notification_service = NotificationService(db, enrollment_service=enrollment_service)
+    facial_recognition_service = FacialRecognitionService()
 
     # Resolução de dependência circular
     user_service.set_enrollment_service(enrollment_service)
@@ -80,7 +82,7 @@ def create_app():
 
     init_decorators(user_service)
     init_user_bp(user_service)
-    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service)
+    init_admin_bp(db, user_service, teacher_service, training_class_service, enrollment_service, attendance_service, payment_service, notification_service, facial_recognition_service)
     init_teacher_bp(user_service, teacher_service, training_class_service, attendance_service)
     init_student_bp(user_service, enrollment_service, training_class_service, attendance_service, payment_service, notification_service)
     init_webhook_bp(payment_service)
@@ -102,4 +104,3 @@ app = create_app()
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
-
