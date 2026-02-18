@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "jitakyoapp"
+  },
   "targets": {
     "jitakyoapp": {
       "hosting": {
@@ -11,6 +13,5 @@
         ]
       }
     }
-  },
-  "etags": {}
+  }
 }
