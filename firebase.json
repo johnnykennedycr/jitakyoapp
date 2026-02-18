@@ -53,7 +53,7 @@
       ],
       "rewrites": [
         { "source": "/api/**", "run": { "serviceId": "jitakyoapp", "region": "southamerica-east1" } },
-        { "source": "**", "destination": "/index.html" }
+        { "source": "**", "destination": "/aluno/index.html" }
       ]
     }
   ]
