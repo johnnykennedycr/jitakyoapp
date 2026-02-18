@@ -1,38 +1,60 @@
 {
-  "hosting": {
-    "public": "frontend/dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "headers": [
-      {
-        "source": "**/*.@(eot|otf|ttf|ttc|woff|font.css)",
-        "headers": [ { "key": "Cache-Control", "value": "max-age=2592000" } ]
-      },
-      {
-        "source": "**/*.@(jpg|jpeg|gif|png|svg|ico)",
-        "headers": [ { "key": "Cache-Control", "value": "max-age=2592000" } ]
-      },
-      {
-        "source": "**/*.@(js|css|html)",
-        "headers": [ { "key": "Cache-Control", "value": "max-age=3600" } ]
-      },
-      {
-        "source": "**/*manifest.json", 
-        "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
-      },
-      {
-        "source": "**/service-worker.js", 
-        "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
-      }
-    ],
-    "rewrites": [
-      { "source": "/kiosk/**", "destination": "/kiosk/index.html" },
-      { "source": "/admin/face-register.html", "destination": "/admin/face-register.html" },
-      { "source": "/api/**", "run": { "serviceId": "jitakyoapp", "region": "southamerica-east1" } },
-      { "source": "**", "destination": "/index.html" }
-    ]
-  }
+  "hosting": [
+    {
+      "target": "admin",
+      "public": "frontend/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.@(eot|otf|ttf|ttc|woff|font.css)",
+          "headers": [ { "key": "Cache-Control", "value": "max-age=2592000" } ]
+        },
+        {
+          "source": "**/*.@(jpg|jpeg|gif|png|svg|ico)",
+          "headers": [ { "key": "Cache-Control", "value": "max-age=2592000" } ]
+        },
+        {
+          "source": "**/*.@(js|css|html)",
+          "headers": [ { "key": "Cache-Control", "value": "max-age=3600" } ]
+        },
+        {
+          "source": "**/*manifest.json",
+          "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
+        },
+        {
+          "source": "**/service-worker.js",
+          "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
+        }
+      ],
+      "rewrites": [
+        { "source": "/kiosk/**", "destination": "/kiosk/index.html" },
+        { "source": "/admin/face-register.html", "destination": "/admin/face-register.html" },
+        { "source": "/api/**", "run": { "serviceId": "jitakyoapp", "region": "southamerica-east1" } },
+        { "source": "**", "destination": "/index.html" }
+      ]
+    },
+    {
+      "target": "aluno",
+      "public": "frontend/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*manifest.json",
+          "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
+        }
+      ],
+      "rewrites": [
+        { "source": "/api/**", "run": { "serviceId": "jitakyoapp", "region": "southamerica-east1" } },
+        { "source": "**", "destination": "/index.html" }
+      ]
+    }
+  ]
 }
