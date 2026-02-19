@@ -102,7 +102,7 @@ async function openFaceRegistration(studentId, studentName) {
             <p class="mb-4 text-sm text-gray-600">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
             <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden aspect-[4/3]">
                 <video id="face-video" autoplay muted playsinline class="w-full h-full object-cover transform scale-x-[-1]"></video>
-                <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-50">Carregando IA...</div>
+                <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-50 text-center px-4">Carregando IA...</div>
             </div>
             <div class="mt-4 flex gap-2">
                 <button data-action="capture-face" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -121,15 +121,15 @@ async function openFaceRegistration(studentId, studentName) {
     let stream = null;
 
     try {
-        // Carrega modelos
         await loadFaceApiModels();
-        overlay.classList.add('hidden'); // Remove overlay de "Carregando"
+        overlay.classList.add('hidden');
         
-        // Inicia Webcam
-        stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
         
-        btnCapture.disabled = false;
+        video.onloadedmetadata = () => {
+            btnCapture.disabled = false;
+        };
 
         btnCapture.onclick = async () => {
             btnCapture.disabled = true;
@@ -144,11 +144,8 @@ async function openFaceRegistration(studentId, studentName) {
                     throw new Error("Nenhum rosto detectado. Tente melhorar a iluminação.");
                 }
 
-                // Converte Float32Array para Array normal para salvar no Firestore/JSON
                 const descriptorArray = Array.from(descriptor);
 
-                // Envia para o backend (API Existente de Update de Aluno)
-                // Precisamos garantir que o backend aceite o campo 'face_descriptor' dentro de user_data
                 const response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
                     method: 'PUT',
                     body: JSON.stringify({
@@ -161,10 +158,12 @@ async function openFaceRegistration(studentId, studentName) {
                 statusText.textContent = "Rosto cadastrado com sucesso!";
                 statusText.className = "mt-2 text-sm font-medium text-green-600";
                 
-                // Fecha após 1.5s
                 setTimeout(() => {
                     if (stream) stream.getTracks().forEach(track => track.stop());
                     hideModal();
+                    // O renderTable() será chamado pelo evento de fechamento se necessário, 
+                    // ou podemos forçar aqui se quisermos atualizar o badge "Face Cadastrada"
+                    location.reload(); 
                 }, 1500);
 
             } catch (err) {
@@ -176,7 +175,6 @@ async function openFaceRegistration(studentId, studentName) {
             }
         };
 
-        // Lidar com botão cancelar dentro do modal específico da câmera
         document.querySelector('button[data-action="close-camera"]').onclick = () => {
              if (stream) stream.getTracks().forEach(track => track.stop());
              hideModal();
@@ -184,7 +182,7 @@ async function openFaceRegistration(studentId, studentName) {
 
     } catch (err) {
         console.error(err);
-        overlay.textContent = "Erro ao acessar câmera";
+        overlay.textContent = "Erro ao acessar câmera: " + err.message;
         overlay.classList.remove('hidden');
     }
 }
@@ -196,7 +194,7 @@ export async function renderStudentList(targetElement) {
             <h1 class="text-3xl font-bold text-white">Gerenciamento de Alunos</h1>
             <button data-action="add" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Adicionar Aluno</button>
         </div>
-        <div id="table-container"><p>Carregando...</p></div>`;
+        <div id="table-container"><p class="text-white">Carregando...</p></div>`;
 
     const tableContainer = targetElement.querySelector('#table-container');
 
@@ -206,7 +204,7 @@ export async function renderStudentList(targetElement) {
             const response = await fetchWithAuth('/api/admin/students/');
             const students = await response.json();
             if (students.length === 0) {
-                tableContainer.innerHTML = '<p>Nenhum aluno encontrado.</p>';
+                tableContainer.innerHTML = '<p class="text-white">Nenhum aluno encontrado.</p>';
                 return;
             }
             tableContainer.innerHTML = `
@@ -257,7 +255,7 @@ export async function renderStudentList(targetElement) {
             `;
         } catch (error) {
             console.error("Erro ao buscar alunos:", error);
-            targetElement.querySelector('#table-container').innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
+            tableContainer.innerHTML = `<p class="text-red-500">Falha ao carregar os alunos.</p>`;
         } finally {
             hideLoading();
         }
@@ -332,7 +330,7 @@ export async function renderStudentList(targetElement) {
             hideModal();
             await renderTable();
         } catch (error) {
-            showModal('Erro ao Salvar', `<p>${error.error || 'Ocorreu uma falha. Verifique os dados e tente novamente.'}</p>`);
+            showModal('Erro ao Salvar', `<p>${error.error || 'Ocorreu uma falha.'}</p>`);
         } finally {
             submitButton.disabled = false;
             submitButton.textContent = 'Salvar';
@@ -354,10 +352,7 @@ export async function renderStudentList(targetElement) {
             showLoading();
             try { 
                 const response = await fetchWithAuth(`/api/admin/students/${studentIdToDelete}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: 'Falha ao deletar' }));
-                    throw new Error(errorData.error);
-                }
+                if (!response.ok) throw new Error('Falha ao deletar');
             } catch (error) { 
                 showModal('Erro', `<p>${error.message}</p>`);
             } finally { 
@@ -398,7 +393,6 @@ export async function renderStudentList(targetElement) {
     modalBody.addEventListener('click', handleModalClick);
     modalBody.addEventListener('submit', handleFormSubmit);
     
-    // Toggle enrollment details visibility
     modalBody.addEventListener('change', (e) => {
         if (e.target.name === 'class_enroll') {
             const detailsDiv = e.target.closest('.p-2').querySelector('.enrollment-details');
