@@ -18,8 +18,12 @@
           "headers": [ { "key": "Cache-Control", "value": "max-age=2592000" } ]
         },
         {
-          "source": "**/*.@(js|css|html)",
+          "source": "**/*.@(js|css)", 
           "headers": [ { "key": "Cache-Control", "value": "max-age=3600" } ]
+        },
+        {
+          "source": "**/*.html",
+          "headers": [ { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" } ]
         },
         {
           "source": "**/*manifest.json",
@@ -34,6 +38,7 @@
         { "source": "/kiosk/**", "destination": "/kiosk/index.html" },
         { "source": "/admin/face-register.html", "destination": "/admin/face-register.html" },
         { "source": "/api/**", "run": { "serviceId": "jitakyoapp", "region": "southamerica-east1" } },
+        { "source": "/admin/**", "destination": "/index.html" },
         { "source": "**", "destination": "/index.html" }
       ]
     },
@@ -44,7 +49,7 @@
         "firebase.json",
         "**/.*",
         "**/node_modules/**",
-        "index.html" 
+        "index.html"
       ],
       "headers": [
         {

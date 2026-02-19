@@ -1,12 +1,13 @@
 {
-    "name": "JitaKyoApp - Área do Aluno",
-    "short_name": "JitaKyo Aluno",
-    "start_url": ".",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#1e293b",
-    "description": "Portal do Aluno do sistema JitaKyoApp.",
-    "icons": [
+  "name": "JitaKyoApp - Área do Aluno",
+  "short_name": "JitaKyo Aluno",
+  "start_url": "./index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e293b",
+  "description": "Portal do Aluno do sistema JitaKyoApp.",
+  "icons": [
     {
       "src": "icons/SmallTile.scale-100.png",
       "sizes": "71x71"
@@ -458,14 +459,14 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshots/dashboard.png",
+      "src": "screenshots/dashboard.png",
       "sizes": "468x798",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Dashboard"
     },
     {
-      "src": "/screenshots/login.png",
+      "src": "screenshots/login.png",
       "sizes": "474x795",
       "type": "image/png",
       "form_factor": "wide",
@@ -473,4 +474,3 @@
     }
   ]
 }
-
