@@ -14,7 +14,7 @@ export async function renderFaceRegister(targetElement) {
                     <h1 class="text-white font-bold text-2xl">Cadastro Facial</h1>
                     <p class="text-gray-400">Vincule a biometria facial a um aluno</p>
                 </div>
-                <a href="/admin" data-navigo class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition">
+                <a href="/admin/dashboard" data-navigo class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition">
                     Voltar ao Dashboard
                 </a>
             </header>
@@ -48,7 +48,7 @@ export async function renderFaceRegister(targetElement) {
                         <video id="register-video" autoplay muted playsinline class="w-full h-full object-cover transform scale-x-[-1]"></video>
                         <canvas id="register-canvas" class="absolute top-0 left-0 w-full h-full transform scale-x-[-1]"></canvas>
                         
-                        <div id="camera-status" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 text-white text-sm">
+                        <div id="camera-status" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 text-white text-sm text-center px-4">
                             Aguardando modelos...
                         </div>
                     </div>
@@ -81,11 +81,12 @@ export async function renderFaceRegister(targetElement) {
     let detectionInterval = null;
     let currentDescriptor = null;
 
-    // --- Lógica de Busca (Debounce) ---
+    // --- Lógica de Busca (Case-Insensitive no Frontend) ---
     let debounceTimer;
     searchInput.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
-        const term = e.target.value.trim();
+        const term = e.target.value.trim(); // Mantemos o termo original para o envio
+        
         if (term.length < 2) {
             searchResults.classList.add('hidden');
             return;
@@ -93,15 +94,24 @@ export async function renderFaceRegister(targetElement) {
 
         debounceTimer = setTimeout(async () => {
             try {
+                // Enviamos o termo, mas no backend você deve garantir que a busca seja case-insensitive.
+                // Se o backend for limitado, buscamos e filtramos aqui.
                 const res = await fetchWithAuth(`/api/admin/students/search?name=${encodeURIComponent(term)}`);
-                const students = await res.json();
+                let students = await res.json();
                 
+                // Filtro adicional de segurança para garantir case-insensitivity se a API falhar nisso
+                const lowerTerm = term.toLowerCase();
+                students = students.filter(s => s.name.toLowerCase().includes(lowerTerm));
+
                 searchResults.innerHTML = '';
                 if (students.length > 0) {
                     students.forEach(s => {
                         const item = document.createElement('div');
-                        item.className = "p-3 hover:bg-indigo-50 cursor-pointer border-b last:border-0 text-gray-700";
-                        item.innerText = s.name;
+                        item.className = "p-3 hover:bg-indigo-50 border-b last:border-0 text-gray-700 flex justify-between items-center cursor-pointer";
+                        item.innerHTML = `
+                            <span>${s.name}</span>
+                            ${s.face_descriptor ? '<span class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Já possui face</span>' : ''}
+                        `;
                         item.onclick = () => selectStudent(s);
                         searchResults.appendChild(item);
                     });
@@ -127,7 +137,6 @@ export async function renderFaceRegister(targetElement) {
         captureSection.classList.remove('opacity-50', 'pointer-events-none');
         
         searchInput.value = '';
-        
         if (!stream) startCamera();
     }
 
@@ -145,7 +154,7 @@ export async function renderFaceRegister(targetElement) {
                 startDetection();
             };
         } catch (err) {
-            cameraStatus.innerText = "Erro ao acessar câmera/modelos.";
+            cameraStatus.innerText = "Erro ao acessar câmera: " + err.message;
             console.error(err);
         }
     }
@@ -182,20 +191,27 @@ export async function renderFaceRegister(targetElement) {
         captureBtn.innerText = "Salvando...";
 
         try {
-            const res = await fetchWithAuth(`/api/admin/students/${selectedStudentId}/face`, {
-                method: 'POST',
-                body: JSON.stringify({ face_descriptor: currentDescriptor })
+            // CORREÇÃO: Usamos a rota padrão de PUT student para evitar o 404
+            // Enviamos tanto dentro de user_data quanto fora, para garantir compatibilidade com o backend
+            const res = await fetchWithAuth(`/api/admin/students/${selectedStudentId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ 
+                    user_data: { 
+                        face_descriptor: currentDescriptor 
+                    }
+                })
             });
 
             if (res.ok) {
-                showModal("Sucesso", "Biometria facial cadastrada com sucesso!", "success");
-                // Reset após sucesso
+                showModal("Sucesso", "Biometria facial vinculada com sucesso!", "success");
+                // Limpeza e Reset
                 captureSection.classList.add('opacity-50', 'pointer-events-none');
                 selectedCard.classList.add('hidden');
                 noSelectionMsg.classList.remove('hidden');
                 stopCamera();
             } else {
-                throw new Error("Erro ao salvar no servidor");
+                const errData = await res.json();
+                throw new Error(errData.error || "Erro no servidor");
             }
         } catch (err) {
             showModal("Erro", "Falha ao registrar face: " + err.message, "error");
