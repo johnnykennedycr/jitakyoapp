@@ -132,6 +132,62 @@ def dashboard_data():
         print(f"Erro em dashboard_data: {e}")
         return jsonify(error=str(e)), 500
 
+# --- NOVO ENDPOINT: SALVAR DESCRITOR FACIAL (CLIENT-SIDE) ---
+@admin_api_bp.route('/students/<string:student_id>/face', methods=['POST'])
+@login_required
+@role_required('admin', 'super_admin')
+def save_student_face(student_id):
+    """
+    Recebe o array do descritor facial gerado pelo face-api.js no frontend
+    e salva diretamente no perfil do aluno.
+    """
+    try:
+        data = request.get_json()
+        descriptor = data.get('face_descriptor')
+
+        if not descriptor or not isinstance(descriptor, list):
+            return jsonify(error="Descritor facial inválido ou ausente."), 400
+
+        # Atualiza o campo no Firestore através do UserService
+        # O campo 'face_descriptor' é o que o Quiosque e a Lista de Alunos esperam
+        success = user_service.update_user(student_id, {
+            'face_descriptor': descriptor,
+            'has_face_registered': True,
+            'face_updated_at': datetime.utcnow().isoformat()
+        })
+
+        if success:
+            return jsonify(success=True, message="Biometria facial salva com sucesso."), 200
+        else:
+            return jsonify(error="Aluno não encontrado ou falha ao salvar."), 404
+
+    except Exception as e:
+        logging.error(f"Erro ao salvar descritor facial: {e}")
+        return jsonify(error=f"Erro interno: {e}"), 500
+
+
+# --- BUSCA DE ALUNOS (CASE-INSENSITIVE) ---
+@admin_api_bp.route('/students/search', methods=['GET'])
+@login_required
+@role_required('admin', 'super_admin')
+def search_students():
+    """Busca alunos por um termo no nome de forma insensível a maiúsculas."""
+    try:
+        search_term = request.args.get('name', '').strip()
+        # Busca no serviço (que provavelmente faz busca prefixada no Firestore)
+        students = user_service.search_students_by_name(search_term)
+        
+        # Filtro refinado no Python para garantir case-insensitivity total
+        search_term_lower = search_term.toLowerCase() if hasattr(search_term, 'toLowerCase') else search_term.lower()
+        filtered_data = [
+            s.to_dict() for s in students 
+            if search_term_lower in s.name.lower()
+        ]
+        
+        return jsonify(filtered_data), 200
+    except Exception as e:
+        logging.error(f"Erro em search_students: {e}")
+        return jsonify(error=str(e)), 500
 
 
 # --- Rota para buscar usuários que podem ser professores ---
