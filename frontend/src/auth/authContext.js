@@ -9,7 +9,8 @@ import { renderTeacherList } from "../components/TeacherList.js";
 import { renderStudentList } from "../components/StudentList.js";
 import { renderClassList } from "../components/ClassList.js";
 import { renderFinancialDashboard } from "../components/FinancialDashboard.js";
-import { renderKioskMode } from "../components/KioskMode.js"; // Importe o componente do Quiosque
+import { renderKioskMode } from "../components/KioskMode.js";
+import { renderFaceRegister } from "../components/FaceRegister.js"; // Importe do novo componente
 
 // Variável para guardar a função de limpeza da página atual
 let currentPageCleanup = () => {};
@@ -44,8 +45,6 @@ export async function renderAuthenticatedApp(user, container) {
         setUserProfile(userProfile);
 
         // --- FUNÇÃO AUXILIAR PARA GARANTIR O LAYOUT DO ADMIN (COM SIDEBAR) ---
-        // Verificamos se a sidebar já existe. Se não existir, criamos.
-        // Isso permite alternar entre "Modo Quiosque" (tela cheia) e "Admin" sem recarregar a página.
         const ensureAdminLayout = () => {
             if (!document.getElementById('sidebar-container')) {
                 const layoutTemplate = document.getElementById('layout-template');
@@ -94,11 +93,14 @@ export async function renderAuthenticatedApp(user, container) {
             '/admin/classes': () => navigateToAdmin(renderClassList),
             '/admin/financial': () => navigateToAdmin(renderFinancialDashboard),
             
-            // Nova Rota do Quiosque
+            // Nova Rota do Registro Facial (Dentro do Layout Admin)
+            '/admin/face-register': () => navigateToAdmin(renderFaceRegister),
+            
+            // Rota do Quiosque (Fora do Layout Admin)
             '/kiosk': () => navigateToKiosk(),
         }).notFound(() => {
             const mainContent = ensureAdminLayout();
-            mainContent.innerHTML = '<h1>404 - Página Não Encontrada</h1>';
+            mainContent.innerHTML = '<div class="p-8 text-white"><h1>404 - Página Não Encontrada</h1></div>';
         });
         
         router.resolve();
