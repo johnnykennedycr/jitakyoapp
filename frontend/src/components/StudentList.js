@@ -6,6 +6,10 @@ import { loadFaceApiModels, getFaceDescriptor } from '../lib/faceService.js';
 let allStudentsCache = []; // Cache para filtro local case-insensitive
 
 // --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
+
+/**
+ * Cria o HTML para campos dinâmicos de responsáveis.
+ */
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -18,6 +22,9 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
     `;
 }
 
+/**
+ * Abre o formulário de edição ou criação de aluno.
+ */
 async function openStudentForm(studentId = null) {
     showLoading();
     try {
@@ -35,7 +42,7 @@ async function openStudentForm(studentId = null) {
         const enrolledClassIds = new Set(currentEnrollments.map(e => e.class_id));
         const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
 
-        const nameAndEmailHtml = studentId ? `<p class="mb-2">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
+        const nameAndEmailHtml = studentId ? `<p class="mb-2 text-gray-600">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
                 <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
@@ -51,19 +58,19 @@ async function openStudentForm(studentId = null) {
             <hr class="my-4"><h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
             <div id="current-enrollments-container" class="space-y-2">
                 ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
-                    <div class="p-2 border rounded flex justify-between items-center">
+                    <div class="p-2 border rounded flex justify-between items-center bg-gray-50">
                         <span>${classMap[e.class_id]?.name || 'N/A'} (Desconto: R$ ${e.discount_amount || 0}, Venc: dia ${e.due_day || 'N/A'})</span>
                         <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded">Remover</button>
                     </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
             </div>
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Nova Turma</h4>
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2 text-indigo-600">Matricular em Nova Turma</h4>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
                 <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
                 <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
                 <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md">
             </div>
             <div class="text-right mt-2">
-                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md">Adicionar Matrícula</button>
+                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600">Adicionar Matrícula</button>
             </div>
             ` : `
             <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
@@ -90,7 +97,7 @@ async function openStudentForm(studentId = null) {
                     <h4 class="text-lg font-medium">Responsáveis</h4><button type="button" data-action="add-guardian" class="bg-green-500 text-white px-3 py-1 rounded-md text-sm">Adicionar</button></div>
                 <div id="guardians-container">${guardiansHtml}</div>
                 ${enrollmentsHtml}
-                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">Salvar</button></div></form>`;
+                <div class="text-right mt-6"><button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 shadow-md">Salvar Aluno</button></div></form>`;
         
         showModal(title, formHtml);
     } catch (error) { 
@@ -100,6 +107,9 @@ async function openStudentForm(studentId = null) {
     }
 }
 
+/**
+ * Modal de confirmação de exclusão.
+ */
 async function handleDeleteClick(studentId, studentName) {
     showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
              <div class="text-right mt-6">
@@ -107,13 +117,16 @@ async function handleDeleteClick(studentId, studentName) {
                     <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button></div>`);
 }
 
+/**
+ * Lógica de Captura Facial via Modal.
+ */
 async function openFaceRegistration(studentId, studentName) {
     showModal(`Cadastrar Face: ${studentName}`, `
         <div class="flex flex-col items-center">
-            <p class="mb-4 text-sm text-gray-600">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
-            <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden aspect-[4/3]">
+            <p class="mb-4 text-sm text-gray-600 text-center">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
+            <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden aspect-[4/3] border-4 border-gray-100 shadow-inner">
                 <video id="face-video" autoplay muted playsinline class="w-full h-full object-cover transform scale-x-[-1]"></video>
-                <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-50 text-center px-4">Carregando IA...</div>
+                <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-70 text-center px-4 italic">Iniciando IA...</div>
             </div>
             <div class="mt-4 flex gap-2">
                 <button data-action="capture-face" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -121,7 +134,7 @@ async function openFaceRegistration(studentId, studentName) {
                 </button>
                 <button data-action="close-camera" class="bg-gray-400 text-white px-4 py-2 rounded-full">Cancelar</button>
             </div>
-            <p id="face-status" class="mt-2 text-sm font-medium text-orange-500"></p>
+            <p id="face-status" class="mt-2 text-sm font-medium text-blue-600"></p>
         </div>
     `);
 
@@ -142,26 +155,24 @@ async function openFaceRegistration(studentId, studentName) {
             btnCapture.disabled = true;
             btnCapture.textContent = "Processando...";
             statusText.textContent = "Analisando rosto...";
-            statusText.className = "mt-2 text-sm font-medium text-blue-500";
 
             try {
                 const descriptor = await getFaceDescriptor(video);
-                if (!descriptor) throw new Error("Nenhum rosto detectado. Tente melhorar a iluminação.");
+                if (!descriptor) throw new Error("Rosto não detectado. Tente melhorar a iluminação.");
 
-                const descriptorArray = Array.from(descriptor);
-                const response = await fetchWithAuth(`/api/admin/students/${studentId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ user_data: { face_descriptor: descriptorArray } })
+                const response = await fetchWithAuth(`/api/admin/students/${studentId}/face`, {
+                    method: 'POST',
+                    body: JSON.stringify({ face_descriptor: Array.from(descriptor) })
                 });
 
                 if (!response.ok) throw new Error("Erro ao salvar no servidor.");
-                statusText.textContent = "Rosto cadastrado com sucesso!";
+                statusText.textContent = "Sucesso! Rosto cadastrado.";
                 statusText.className = "mt-2 text-sm font-medium text-green-600";
                 
                 setTimeout(() => {
                     if (stream) stream.getTracks().forEach(track => track.stop());
                     hideModal();
-                    location.reload(); 
+                    location.reload(); // Recarrega para ver o badge verde
                 }, 1500);
 
             } catch (err) {
@@ -182,6 +193,9 @@ async function openFaceRegistration(studentId, studentName) {
     }
 }
 
+/**
+ * Função principal de renderização da lista de alunos.
+ */
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -203,11 +217,11 @@ export async function renderStudentList(targetElement) {
 
     const updateTableDisplay = (students) => {
         if (students.length === 0) {
-            tableContainer.innerHTML = '<p class="text-white p-4">Nenhum aluno encontrado.</p>';
+            tableContainer.innerHTML = '<p class="text-white p-4 italic opacity-60 text-center">Nenhum aluno encontrado para os critérios de busca.</p>';
             return;
         }
         tableContainer.innerHTML = `
-            <div class="bg-white rounded-xl shadow overflow-x-auto">
+            <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-100">
                         <tr>
@@ -219,7 +233,7 @@ export async function renderStudentList(targetElement) {
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         ${students.map(student => `
-                            <tr>
+                            <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
                                     <div class="text-xs text-gray-500">${student.email}</div>
@@ -228,10 +242,10 @@ export async function renderStudentList(targetElement) {
                                         : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800 uppercase mt-1">Sem Face</span>'}
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-500">
-                                    ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div class="truncate max-w-[150px]">• ${e.class_name}</div>`).join('') : 'Nenhuma'}
+                                    ${(student.enrollments && student.enrollments.length > 0) ? student.enrollments.map(e => `<div class="truncate max-w-[150px]">• ${e.class_name}</div>`).join('') : '<span class="italic text-gray-300">Nenhuma</span>'}
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-500">
-                                    ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div class="truncate max-w-[200px]"><strong>${g.name}</strong> (${g.kinship})</div>`).join('') : 'Nenhum'}
+                                    ${(student.guardians && student.guardians.length > 0) ? student.guardians.map(g => `<div class="truncate max-w-[200px]"><strong>${g.name}</strong> (${g.kinship})</div>`).join('') : '<span class="italic text-gray-300">Nenhum</span>'}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
@@ -254,6 +268,9 @@ export async function renderStudentList(targetElement) {
         `;
     };
 
+    /**
+     * Busca os alunos da API.
+     */
     const fetchStudents = async () => {
         showLoading();
         try {
@@ -261,12 +278,15 @@ export async function renderStudentList(targetElement) {
             allStudentsCache = await response.json();
             updateTableDisplay(allStudentsCache);
         } catch (error) {
-            tableContainer.innerHTML = `<p class="text-red-500 p-4">Falha ao carregar alunos.</p>`;
+            tableContainer.innerHTML = `<p class="text-red-500 p-4">Falha ao carregar alunos do servidor.</p>`;
         } finally {
             hideLoading();
         }
     };
 
+    /**
+     * Gerenciador de cliques de ação na página.
+     */
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -279,6 +299,9 @@ export async function renderStudentList(targetElement) {
 
     const modalBody = document.getElementById('modal-body');
 
+    /**
+     * Gerenciador de submissão do formulário.
+     */
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -330,13 +353,16 @@ export async function renderStudentList(targetElement) {
             hideModal();
             await fetchStudents();
         } catch (error) {
-            showModal('Erro ao Salvar', `<p>${error.error || 'Falha ao salvar.'}</p>`);
+            showModal('Erro ao Salvar', `<p>${error.error || 'Falha ao salvar informações do aluno.'}</p>`);
         } finally {
             submitButton.disabled = false;
             submitButton.textContent = 'Salvar';
         }
     };
 
+    /**
+     * Gerenciador de cliques dentro do modal (responsáveis e matrículas).
+     */
     const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -373,7 +399,7 @@ export async function renderStudentList(targetElement) {
             } : null;
 
             if (isAdding && !body.class_id) {
-                alert('Selecione uma turma.');
+                showModal('Aviso', 'Por favor, selecione uma turma.');
                 return;
             }
             showLoading();
@@ -382,7 +408,7 @@ export async function renderStudentList(targetElement) {
                 if (!response.ok) throw await response.json();
                 await openStudentForm(sId); 
             } catch (error) { 
-                showModal('Erro', `<p>${error.error || 'Falha na operação.'}</p>`);
+                showModal('Erro', `<p>${error.error || 'Falha na operação de matrícula.'}</p>`);
             } finally {
                 hideLoading();
             }
@@ -391,7 +417,7 @@ export async function renderStudentList(targetElement) {
 
     // Filtro Case-Insensitive local
     targetElement.querySelector('#list-search').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
+        const term = e.target.value.toLowerCase().trim();
         const filtered = allStudentsCache.filter(s => 
             s.name.toLowerCase().includes(term) || 
             (s.email && s.email.toLowerCase().includes(term))
@@ -404,7 +430,8 @@ export async function renderStudentList(targetElement) {
     modalBody.addEventListener('submit', handleFormSubmit);
     modalBody.addEventListener('change', (e) => {
         if (e.target.name === 'class_enroll') {
-            e.target.closest('.p-2').querySelector('.enrollment-details').classList.toggle('hidden', !e.target.checked);
+            const entry = e.target.closest('.p-2').querySelector('.enrollment-details');
+            if (entry) entry.classList.toggle('hidden', !e.target.checked);
         }
     });
 
