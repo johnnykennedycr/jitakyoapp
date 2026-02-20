@@ -160,12 +160,22 @@ async function openFaceRegistration(studentId, studentName) {
                 const descriptor = await getFaceDescriptor(video);
                 if (!descriptor) throw new Error("Rosto não detectado. Tente melhorar a iluminação.");
 
+                const descriptorArray = Array.from(descriptor);
+                
+                // CORREÇÃO CRUCIAL: Envolver o descritor em 'user_data' 
+                // para que o UserService do backend o reconheça e salve no banco.
                 const response = await fetchWithAuth(`/api/admin/students/${studentId}/face`, {
                     method: 'POST',
-                    body: JSON.stringify({ face_descriptor: Array.from(descriptor) })
+                    body: JSON.stringify({ 
+                        user_data: { 
+                            face_descriptor: descriptorArray,
+                            has_face_registered: true 
+                        } 
+                    })
                 });
 
                 if (!response.ok) throw new Error("Erro ao salvar no servidor.");
+                
                 statusText.textContent = "Sucesso! Rosto cadastrado.";
                 statusText.className = "mt-2 text-sm font-medium text-green-600";
                 
@@ -237,7 +247,7 @@ export async function renderStudentList(targetElement) {
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900">${student.name || 'N/A'}</div>
                                     <div class="text-xs text-gray-500">${student.email}</div>
-                                    ${student.face_descriptor && student.face_descriptor.length > 0 
+                                    ${(student.face_descriptor && student.face_descriptor.length > 0) || student.has_face_registered 
                                         ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 uppercase mt-1">Face OK</span>' 
                                         : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800 uppercase mt-1">Sem Face</span>'}
                                 </td>
