@@ -1,7 +1,6 @@
-# backend/app/services/user_service.py
-
 import string
 import secrets
+import logging
 from datetime import datetime, timedelta
 from firebase_admin import auth, firestore
 from flask_mail import Message
@@ -9,6 +8,11 @@ from app.models.user import User
 
 class UserService:
     def __init__(self, db, mail=None):
+        """
+        Inicializa o serviço de usuários.
+        :param db: Instância do Firestore Client.
+        :param mail: Instância do Flask-Mail (opcional).
+        """
         self.db = db
         self.collection = self.db.collection('users')
         self.mail = mail
@@ -19,106 +23,127 @@ class UserService:
         self.enrollment_service = enrollment_service
 
     def _generate_random_password(self, length=12):
-        """Gera uma senha aleatória segura."""
+        """Gera uma senha aleatória segura para novos usuários."""
         alphabet = string.ascii_letters + string.digits + string.punctuation
         return ''.join(secrets.choice(alphabet) for i in range(length))
 
+    def create_user(self, user_id, name, email, role):
+        """
+        Cria um registro de usuário básico no Firestore (usado para admins/professores).
+        Chamado pelas rotas quando um usuário já foi criado no Firebase Auth.
+        """
+        try:
+            user_data = {
+                'name': name,
+                'email': email,
+                'role': role,
+                'created_at': firestore.SERVER_TIMESTAMP,
+                'updated_at': firestore.SERVER_TIMESTAMP
+            }
+            self.collection.document(user_id).set(user_data)
+            return self.get_user_by_id(user_id)
+        except Exception as e:
+            logging.error(f"Erro ao criar registro de usuário no Firestore: {e}")
+            return None
+
     def create_user_with_enrollments(self, user_data, enrollments_data):
-        """Cria um novo utilizador e o matricula opcionalmente em turmas."""
+        """
+        Cria um novo aluno no Firebase Auth e Firestore, vinculando matrículas.
+        """
         email = user_data.get('email')
         name = user_data.get('name')
         password = user_data.get('password') or self._generate_random_password()
         
         try:
-            # 1. Criar utilizador no Firebase Authentication
+            # 1. Criar usuário no Firebase Authentication
             firebase_user = auth.create_user(email=email, password=password, display_name=name)
             uid = firebase_user.uid
             
-            # 2. Salvar dados do utilizador no Firestore
+            # 2. Preparar dados para o Firestore
             db_user_data = {
                 'name': name,
                 'email': email,
                 'role': 'student',
                 'created_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': firestore.SERVER_TIMESTAMP
+                'updated_at': firestore.SERVER_TIMESTAMP,
+                'has_face_registered': False # Inicializa controle de face
             }
             
             if 'phone' in user_data and user_data['phone']:
                 db_user_data['phone'] = user_data['phone']
             
-            # --- Ajuste na criação para guardians e data de nascimento ---
             if 'date_of_birth' in user_data and user_data['date_of_birth']:
                 db_user_data['date_of_birth'] = datetime.strptime(user_data['date_of_birth'], '%Y-%m-%d')
             
-            if 'guardians' in user_data: # Adicionado tratamento para 'guardians' na criação
+            if 'guardians' in user_data:
                  db_user_data['guardians'] = user_data['guardians']
-            # --- Fim do Ajuste ---
 
+            # Salva no banco
             self.collection.document(uid).set(db_user_data)
             
-            # 3. Criar matrículas, se houver
+            # 3. Criar matrículas vinculadas, se houver
             if self.enrollment_service and enrollments_data:
                 for enrollment_info in enrollments_data:
                     enrollment_info['student_id'] = uid
                     self.enrollment_service.create_enrollment(enrollment_info)
 
-            # 4. Enviar email de boas-vindas (opcional, mas recomendado)
+            # 4. Envio de e-mail de credenciais
             if self.mail:
-                msg = Message(
-                    'Bem-vindo à JitaKyoApp!',
-                    recipients=[email]
-                )
-                msg.body = f"Olá {name},\n\nSua conta foi criada com sucesso. Use este email e a senha '{password}' para aceder.\n\nAtenciosamente,\nEquipa JitaKyo"
-                self.mail.send(msg)
+                try:
+                    msg = Message('Bem-vindo à JitaKyoApp!', recipients=[email])
+                    msg.body = f"Olá {name},\n\nSua conta foi criada. Use o e-mail {email} e a senha '{password}' para acessar.\n\nAtenciosamente,\nEquipe JitaKyo"
+                    self.mail.send(msg)
+                except Exception as mail_err:
+                    logging.warning(f"Usuário criado mas falha ao enviar e-mail: {mail_err}")
 
             return self.get_user_by_id(uid)
             
         except auth.EmailAlreadyExistsError:
             raise ValueError(f"O email '{email}' já está em uso.")
         except Exception as e:
-            # Se a criação no Firestore ou matrículas falhar, deleta o utilizador do Auth para evitar inconsistências
             if 'uid' in locals():
                 auth.delete_user(uid)
-            print(f"Erro ao criar utilizador com matrículas: {e}")
+            logging.error(f"Erro ao criar utilizador com matrículas: {e}")
             raise
 
     def get_user_by_id(self, uid):
+        """Busca um usuário pelo UID e retorna um objeto User model."""
         try:
             doc = self.collection.document(uid).get()
             if doc.exists:
                 return User.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            print(f"Erro ao buscar utilizador por ID {uid}: {e}")
+            logging.error(f"Erro ao buscar utilizador por ID {uid}: {e}")
             return None
 
     def get_users_by_role(self, role):
+        """Lista usuários filtrando pela função (admin, student, etc)."""
         users = []
         try:
             docs = self.collection.where(filter=firestore.FieldFilter('role', '==', role)).stream()
             for doc in docs:
                 users.append(User.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
-            print(f"Erro ao buscar utilizadores pela role '{role}': {e}")
+            logging.error(f"Erro ao buscar utilizadores pela role '{role}': {e}")
         return users
         
     def get_all_users(self):
-        """Retorna uma lista de todos os objetos User."""
+        """Retorna uma lista de todos os usuários cadastrados."""
         users = []
         try:
             docs = self.collection.stream()
             for doc in docs:
                 users.append(User.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
-            print(f"Erro ao buscar todos os utilizadores: {e}")
+            logging.error(f"Erro ao buscar todos os utilizadores: {e}")
         return users
 
     def search_students_by_name(self, search_term):
-        """Busca alunos cujo nome começa com o termo de busca (case-insensitive)."""
+        """Busca alunos por prefixo de nome (Case-sensitive no Firestore)."""
         students = []
+        if not search_term: return []
         try:
-            # Firestore não suporta busca case-insensitive ou 'contains' de forma nativa.
-            # Esta abordagem busca por prefixo.
             end_term = search_term + '\uf8ff'
             query = self.collection.where(filter=firestore.FieldFilter('role', '==', 'student')) \
                                     .where(filter=firestore.FieldFilter('name', '>=', search_term)) \
@@ -127,15 +152,19 @@ class UserService:
             for doc in docs:
                 students.append(User.from_dict(doc.to_dict(), doc.id))
         except Exception as e:
-            print(f"Erro ao pesquisar alunos: {e}")
+            logging.error(f"Erro ao pesquisar alunos: {e}")
         return students
 
     def update_user(self, uid, data):
-        """Atualiza os dados de um utilizador no Firestore e no Firebase Auth."""
+        """
+        Atualiza dados do usuário. Suporta campos de perfil, 
+        responsáveis e Biometria Facial.
+        """
         try:
             update_data = {}
             auth_update_data = {}
 
+            # Filtro de campos permitidos
             if 'name' in data:
                 update_data['name'] = data['name']
                 auth_update_data['display_name'] = data['name']
@@ -144,21 +173,26 @@ class UserService:
                 auth_update_data['email'] = data['email']
             if 'role' in data:
                 update_data['role'] = data['role']
-            
             if 'phone' in data:
-                update_data['phone'] = data['phone'] # Pode ser uma string vazia, que é um valor válido para o Firestore
+                update_data['phone'] = data['phone']
 
-            # --- INÍCIO DA CORREÇÃO MAIS ROBUSTA PARA DATA DE NASCIMENTO E GUARDIANS ---
             if 'date_of_birth' in data:
-                if data['date_of_birth']: # Se a data não for vazia, tenta converter
+                if data['date_of_birth']:
                     update_data['date_of_birth'] = datetime.strptime(data['date_of_birth'], '%Y-%m-%d')
-                else: # Se for vazia ou null, remove do banco (Firestore.DELETE_FIELD)
+                else:
                     update_data['date_of_birth'] = firestore.DELETE_FIELD
             
             if 'guardians' in data:
-                 update_data['guardians'] = data['guardians'] # Pode ser uma lista vazia, que é um valor válido
-            # --- FIM DA CORREÇÃO ---
+                 update_data['guardians'] = data['guardians']
 
+            # --- SUPORTE PARA BIOMETRIA FACIAL ---
+            if 'face_descriptor' in data:
+                update_data['face_descriptor'] = data['face_descriptor']
+                update_data['has_face_registered'] = True
+            
+            if 'has_face_registered' in data:
+                update_data['has_face_registered'] = bool(data['has_face_registered'])
+            # ------------------------------------
 
             if update_data:
                 update_data['updated_at'] = firestore.SERVER_TIMESTAMP
@@ -168,138 +202,97 @@ class UserService:
                 auth.update_user(uid, **auth_update_data)
 
             return self.get_user_by_id(uid)
-        except ValueError as ve: # Captura erros de conversão de data
-            print(f"Erro de validação ao atualizar utilizador {uid}: {ve}")
-            raise ValueError(f"Formato de data inválido ou outro erro de validação: {ve}") # Relança um ValueError
+        except ValueError as ve:
+            logging.error(f"Erro de validação ao atualizar {uid}: {ve}")
+            raise ValueError(f"Dados inválidos: {ve}")
         except Exception as e:
-            print(f"Erro ao atualizar utilizador {uid}: {e}")
-            raise # Relança a exceção original
-
+            logging.error(f"Erro crítico ao atualizar utilizador {uid}: {e}")
+            raise
 
     def delete_user(self, uid):
-        """Deleta um utilizador do Firestore, Authentication e todas as suas matrículas."""
+        """Remove o usuário do Firestore, do Auth e apaga matrículas vinculadas."""
         try:
-            # Inicia um batch para garantir atomicidade
             batch = self.db.batch()
-
-            # 1. Deleta as matrículas do utilizador
             if self.enrollment_service:
                 enrollments = self.enrollment_service.get_enrollments_by_student_id(uid)
                 for enrollment in enrollments:
-                    # Assumindo que o serviço retorna objetos com um atributo 'id'
                     if hasattr(enrollment, 'id'):
-                        enrollment_ref = self.enrollment_service.collection.document(enrollment.id)
-                        batch.delete(enrollment_ref)
+                        batch.delete(self.enrollment_service.collection.document(enrollment.id))
+                    elif isinstance(enrollment, dict) and 'id' in enrollment:
+                        batch.delete(self.enrollment_service.collection.document(enrollment['id']))
 
-            # 2. Deleta o documento do utilizador no Firestore
-            user_ref = self.collection.document(uid)
-            batch.delete(user_ref)
-            
-            # Submete as operações de delete no Firestore
+            batch.delete(self.collection.document(uid))
             batch.commit()
-
-            # 3. Deleta o utilizador do Firebase Authentication
             auth.delete_user(uid)
-            
             return True
         except Exception as e:
-            print(f"Erro ao deletar utilizador {uid}: {e}")
+            logging.error(f"Erro ao deletar utilizador {uid}: {e}")
             return False
 
-    # --- NOVOS MÉTODOS PARA O DASHBOARD ---
-
     def count_active_students(self):
-        """Conta o número de alunos únicos com pelo menos uma matrícula ativa."""
+        """Calcula o total de alunos com matrículas vigentes."""
         if not self.enrollment_service:
-            print("AVISO: EnrollmentService não está disponível para contar alunos ativos.")
             return 0
         try:
             active_enrollments = self.enrollment_service.get_all_active_enrollments_with_details()
-            # Usa um set para contar apenas os IDs de estudantes únicos
-            active_student_ids = {e['student_id'] for e in active_enrollments}
-            return len(active_student_ids)
+            return len({e['student_id'] for e in active_enrollments})
         except Exception as e:
-            print(f"Erro ao contar alunos ativos: {e}")
+            logging.error(f"Erro ao contar alunos ativos: {e}")
             return 0
 
     def get_upcoming_birthdays(self, days_ahead=7):
-        """Busca alunos que fazem aniversário nos próximos X dias."""
+        """Lista aniversariantes na janela de dias informada."""
         upcoming = []
         try:
             today = datetime.now()
-            # Busca todos os usuários. Em uma aplicação maior, otimizar essa busca seria ideal.
             all_users = self.get_all_users() 
             students = [u for u in all_users if u.role == 'student' and hasattr(u, 'date_of_birth') and u.date_of_birth]
 
             for student in students:
-                # Assegura que date_of_birth é um objeto datetime
                 if isinstance(student.date_of_birth, datetime):
-                    # Ignora o ano para comparar apenas o mês e o dia
-                    birthday_this_year = student.date_of_birth.replace(year=today.year)
+                    b_day = student.date_of_birth.replace(year=today.year)
+                    if b_day < today:
+                        b_day = b_day.replace(year=today.year + 1)
                     
-                    # Se o aniversário já passou este ano, verifica no próximo ano
-                    if birthday_this_year < today:
-                        birthday_next_year = birthday_this_year.replace(year=today.year + 1)
-                        time_to_birthday = birthday_next_year - today
-                    else:
-                        time_to_birthday = birthday_this_year - today
-                    
-                    if 0 <= time_to_birthday.days < days_ahead:
-                        student_dict = student.to_dict()
-                        student_dict['days_until_birthday'] = time_to_birthday.days
-                        # Formata a data de aniversário para exibição
-                        student_dict['birth_date_formatted'] = student.date_of_birth.strftime('%d/%m')
-                        upcoming.append(student_dict)
+                    diff = (b_day - today).days
+                    if 0 <= diff < days_ahead:
+                        s_dict = student.to_dict()
+                        s_dict['days_until_birthday'] = diff
+                        s_dict['birth_date_formatted'] = student.date_of_birth.strftime('%d/%m')
+                        upcoming.append(s_dict)
             
-            # Ordena pelos aniversariantes mais próximos primeiro
             upcoming.sort(key=lambda x: x['days_until_birthday'])
             return upcoming
         except Exception as e:
-            print(f"Erro ao buscar próximos aniversariantes: {e}")
+            logging.error(f"Erro ao buscar aniversariantes: {e}")
             return []
 
     def get_new_students_per_month(self, num_months=6):
-        """Conta novos alunos (role='student') por mês nos últimos 'num_months'."""
+        """Gera dados estatísticos de novos alunos para gráficos."""
         try:
-            # Dicionário para armazenar contagem: { 'YYYY-MM': count }
             counts = {}
             today = datetime.now()
-            
-            # Prepara os labels e a contagem inicial para os últimos 'num_months'
             for i in range(num_months):
-                # Volta no tempo mês a mês
-                dt = today - timedelta(days=i * 30.5) # Aproximação mais precisa
-                month_key = dt.strftime('%Y-%m')
-                counts[month_key] = 0
+                dt = today - timedelta(days=i * 30.5)
+                counts[dt.strftime('%Y-%m')] = 0
             
-            # Define o limite de tempo para a busca no banco de dados
-            start_date_limit = today - timedelta(days=num_months * 30.5)
-            
-            # Busca otimizada no Firestore
+            limit = today - timedelta(days=num_months * 30.5)
             query = self.collection.where(filter=firestore.And([
                 firestore.FieldFilter('role', '==', 'student'),
-                firestore.FieldFilter('created_at', '>=', start_date_limit)
+                firestore.FieldFilter('created_at', '>=', limit)
             ])).stream()
 
             for doc in query:
-                student_data = doc.to_dict()
-                created_at = student_data.get('created_at')
-                
-                # 'created_at' pode ser um SERVER_TIMESTAMP que vira datetime no Python
-                if isinstance(created_at, datetime):
-                    month_key = created_at.strftime('%Y-%m')
-                    if month_key in counts:
-                        counts[month_key] += 1
+                c_at = doc.to_dict().get('created_at')
+                if isinstance(c_at, datetime):
+                    key = c_at.strftime('%Y-%m')
+                    if key in counts: counts[key] += 1
             
-            # Ordena os meses cronologicamente para o gráfico
-            sorted_months = sorted(counts.keys())
-            
-            # Formata a saída para ser facilmente consumida por uma biblioteca de gráficos
-            chart_data = {
-                'labels': [datetime.strptime(m, '%Y-%m').strftime('%b/%y') for m in sorted_months],
-                'data': [counts[m] for m in sorted_months]
+            sorted_keys = sorted(counts.keys())
+            return {
+                'labels': [datetime.strptime(k, '%Y-%m').strftime('%b/%y') for k in sorted_keys],
+                'data': [counts[k] for k in sorted_keys]
             }
-            return chart_data
         except Exception as e:
-            print(f"Erro ao contar novos alunos por mês: {e}")
+            logging.error(f"Erro estatístico: {e}")
             return {'labels': [], 'data': []}
