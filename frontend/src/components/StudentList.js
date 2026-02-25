@@ -284,7 +284,7 @@ export async function renderStudentList(targetElement) {
                                 <td class="px-6 py-5 text-sm text-gray-600">
                                     ${(s.guardians && s.guardians.length > 0) 
                                         ? s.guardians.map(g => `<div class="truncate max-w-[200px]" title="${g.name}: ${g.contact}"><strong>${g.name}</strong>: ${g.contact}</div>`).join('') 
-                                        : `<div class="text-indigo-600 font-medium italic">Estudante: ${s.phone || 'Sem telefone'}</div>`
+                                        : `<div class="text-indigo-600 font-medium italic">${s.name}: ${s.phone || 'Sem telefone'}</div>`
                                     }
                                 </td>
                                 <td class="px-6 py-5 text-right">

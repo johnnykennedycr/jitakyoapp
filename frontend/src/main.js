@@ -18,14 +18,29 @@ if (!appContainer) {
     });
 }
 
-// --- REGISTRO DO SERVICE WORKER (PWA) ---
+// --- LÓGICA DE ATUALIZAÇÃO FORÇADA (ANTI-CACHE) ---
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('ServiceWorker registration successful with scope: ', registration.scope);
-    }, err => {
-      console.log('ServiceWorker registration failed: ', err);
-    });
-  });
-}
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+            .then(registration => {
+                // Verifica atualizações no servidor toda vez que o app abre
+                registration.update();
 
+                registration.onupdatefound = () => {
+                    const installingWorker = registration.installing;
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Se uma nova versão foi instalada, recarrega a página automaticamente
+                            console.log('Nova versão detectada. Atualizando sistema...');
+                            window.location.reload();
+                        }
+                    };
+                };
+            });
+    });
+
+    // Escuta mudanças de controle para garantir que a página nova seja carregada
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+    });
+}
