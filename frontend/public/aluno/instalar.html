@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instalação JitaKyoApp</title>
+    <title>Instalação JitaKyoApp Aluno</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -18,21 +18,25 @@
         <!-- Cabeçalho -->
         <div class="p-8 text-center bg-gradient-to-br from-indigo-600 to-indigo-800">
             <div class="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg animate-float">
-                <span class="text-indigo-600 font-black text-3xl">JK</span>
+                <!-- SVG Ícone Simples -->
+                <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                </svg>
             </div>
             <h1 class="text-2xl font-black tracking-tight">JitaKyoApp</h1>
-            <p class="text-indigo-100 text-sm mt-1">Portal do Aluno</p>
+            <p class="text-indigo-100 text-sm mt-1">Área Exclusiva do Aluno</p>
         </div>
 
         <!-- Conteúdo Principal -->
         <div class="p-8">
             <div class="text-center mb-8">
-                <p class="text-slate-300 mb-6 text-sm">Aceda ao sistema sem precisar de descarregar ficheiros pesados ou enfrentar avisos de segurança.</p>
+                <p class="text-slate-300 mb-6 text-sm">Acesse seu painel de treinos e presenças diretamente da sua tela inicial.</p>
                 
-                <!-- QR Code Dinâmico -->
+                <!-- QR Code Dinâmico apontando para o domínio correto -->
                 <div class="relative inline-block p-4 bg-white rounded-2xl shadow-inner mb-6">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://jitakyoapp.web.app/aluno/&color=1e293b" 
-                         alt="QR Code JitaKyo"
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://aluno-jitakyoapp.web.app/&color=1e293b" 
+                         alt="QR Code JitaKyo Aluno"
                          class="w-40 h-40">
                 </div>
                 
@@ -40,12 +44,12 @@
                     <!-- Botão de Instalação (Apenas Android/Chrome) -->
                     <button id="btn-install" class="hidden w-full bg-green-500 hover:bg-green-400 text-slate-900 font-black py-4 rounded-xl transition shadow-lg flex items-center justify-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        INSTALAR APLICAÇÃO
+                        INSTALAR NO CELULAR
                     </button>
 
-                    <a href="https://jitakyoapp.web.app/aluno/" 
-                       class="inline-block w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition border border-slate-600">
-                        Abrir no Navegador
+                    <a href="https://aluno-jitakyoapp.web.app/" 
+                       class="inline-block w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition border border-slate-600 shadow-lg">
+                        Acessar Portal Agora
                     </a>
                 </div>
             </div>
@@ -64,7 +68,7 @@
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.523 15.341l1.102 1.91c.1.172.04.391-.132.492-.172.1-.391.04-.492-.132l-1.11-1.923c-1.31.595-2.775.928-4.321.928s-3.011-.333-4.321-.928l-1.11 1.923c-.1.172-.32.232-.492.132-.172-.1-.232-.32-.132-.492l1.102-1.91C5.074 13.566 3.017 11.237 3 8.525h18c-.017 2.712-2.074 5.041-4.477 6.816zM7.001 10.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5zm10 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5zM12 4.5c-2.3 0-4.35 1.15-5.61 2.9h11.22c-1.26-1.75-3.31-2.9-5.61-2.9z"/></svg>
                             Android (Chrome)
                         </p>
-                        <p class="text-slate-400">Toque nos <span class="text-white font-bold">três pontinhos (⋮)</span> e escolha <span class="text-white font-bold">"Instalar aplicativo"</span> ou <span class="text-white font-bold">"Adicionar ao ecrã principal"</span>.</p>
+                        <p class="text-slate-400">Ao abrir o portal, toque nos <span class="text-white font-bold">três pontinhos (⋮)</span> no topo e selecione <span class="text-white font-bold">"Instalar aplicativo"</span>.</p>
                     </div>
 
                     <!-- iOS -->
@@ -73,14 +77,14 @@
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.1 2.48-1.34.03-1.77-.79-3.31-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.17 17 2.85 12.39 4.6 9.37c.87-1.5 2.41-2.45 4.1-2.48 1.28-.02 2.5.86 3.28.86.79 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.25 2.73zM13 5.07c.66-.83 1.11-1.98.98-3.13-1.01.04-2.23.67-2.95 1.51-.64.73-1.2 1.92-1.05 3.05 1.12.09 2.27-.51 3.02-1.43z"/></svg>
                             iPhone (Safari)
                         </p>
-                        <p class="text-slate-400">Toque no ícone de <span class="text-white font-bold">Partilhar (⇪)</span> e selecione <span class="text-white font-bold">"Ecrã principal"</span>.</p>
+                        <p class="text-slate-400">Toque no ícone de <span class="text-white font-bold">Compartilhar (⇪)</span> e escolha <span class="text-white font-bold">"Adicionar à Tela de Início"</span>.</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="p-6 bg-slate-900 text-center text-[10px] text-slate-500 border-t border-slate-700">
-            JitaKyoApp &copy; 2026 - Tecnologia ao serviço do desporto.
+        <div class="p-6 bg-slate-900 text-center text-[10px] text-slate-500 border-t border-slate-700 uppercase tracking-widest font-bold">
+            JitaKyoApp &copy; 2026 - Gestão Esportiva Inteligente
         </div>
     </div>
 
@@ -88,11 +92,9 @@
         let deferredPrompt;
         const btnInstall = document.getElementById('btn-install');
 
-        // Escuta o evento que o browser dispara quando detecta que o site pode ser instalado
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // Mostra o botão de instalação apenas se o browser permitir
             btnInstall.classList.remove('hidden');
         });
 
@@ -107,7 +109,6 @@
             }
         });
 
-        // Se o app já estiver instalado, oculta o botão
         window.addEventListener('appinstalled', () => {
             btnInstall.classList.add('hidden');
             deferredPrompt = null;
