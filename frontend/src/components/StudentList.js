@@ -8,6 +8,21 @@ let allStudentsCache = []; // Cache para filtro local case-insensitive
 // --- FUNÇÕES AUXILIARES E DE FORMULÁRIO ---
 
 /**
+ * Calcula a idade com base na data de nascimento.
+ */
+function calculateAge(dobString) {
+    if (!dobString) return 'N/A';
+    const birthday = new Date(dobString);
+    const today = new Date();
+    let age = today.getFullYear() - birthday.getFullYear();
+    const m = today.getMonth() - birthday.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthday.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+/**
  * Cria o HTML para campos dinâmicos de responsáveis.
  */
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
@@ -173,7 +188,6 @@ async function openFaceRegistration(studentId, studentName) {
 
                 const descriptorArray = Array.from(descriptor);
                 
-                // Envolve o descritor em 'user_data' para consistência com o UserService
                 const response = await fetchWithAuth(`/api/admin/students/${studentId}/face`, {
                     method: 'POST',
                     body: JSON.stringify({ 
@@ -224,7 +238,7 @@ export async function renderStudentList(targetElement) {
                 <div class="relative flex-grow md:w-72">
                     <input type="text" id="list-search" placeholder="Pesquisar por nome ou email..." 
                         class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
-                    <svg class="absolute left-4 top-3.5 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="absolute left-4 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                 </div>
@@ -247,6 +261,7 @@ export async function renderStudentList(targetElement) {
                         <tr>
                             <th class="px-6 py-4 text-left">Aluno</th>
                             <th class="px-6 py-4 text-left">Matrículas</th>
+                            <th class="px-6 py-4 text-left">Contato / Responsáveis</th>
                             <th class="px-6 py-4 text-right">Ações</th>
                         </tr>
                     </thead>
@@ -256,6 +271,7 @@ export async function renderStudentList(targetElement) {
                                 <td class="px-6 py-5">
                                     <div class="font-bold text-gray-900">${s.name}</div>
                                     <div class="text-xs text-gray-400 font-mono">${s.email}</div>
+                                    <div class="text-[10px] text-gray-500 mt-0.5 font-medium">Idade: ${calculateAge(s.date_of_birth)} anos</div>
                                     <div class="mt-2">
                                         ${(s.face_descriptor && s.face_descriptor.length > 0) || s.has_face_registered 
                                             ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700 uppercase tracking-tighter">FACE OK</span>' 
@@ -264,6 +280,12 @@ export async function renderStudentList(targetElement) {
                                 </td>
                                 <td class="px-6 py-5 text-sm text-gray-600">
                                     ${(s.enrollments || []).map(e => `<div class="truncate max-w-[200px]">• ${e.class_name}</div>`).join('') || '<span class="text-gray-300 italic">Nenhuma matrícula</span>'}
+                                </td>
+                                <td class="px-6 py-5 text-sm text-gray-600">
+                                    ${(s.guardians && s.guardians.length > 0) 
+                                        ? s.guardians.map(g => `<div class="truncate max-w-[200px]" title="${g.name}: ${g.contact}"><strong>${g.name}</strong>: ${g.contact}</div>`).join('') 
+                                        : `<div class="text-indigo-600 font-medium italic">Estudante: ${s.phone || 'Sem telefone'}</div>`
+                                    }
                                 </td>
                                 <td class="px-6 py-5 text-right">
                                     <div class="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
