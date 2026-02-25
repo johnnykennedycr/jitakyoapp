@@ -1,5 +1,5 @@
 {
-  "name": "JitaKyoApp - Área do Aluno",
+  "name": "JitaKyoApp Aluno",
   "short_name": "JitaKyo Aluno",
   "description": "Portal do Aluno do sistema JitaKyoApp.",
   "start_url": "/aluno/",
