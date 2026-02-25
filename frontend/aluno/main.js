@@ -126,21 +126,7 @@ function renderParQModal() {
                         </table>
                     </div>
 
-                    <div class="space-y-4 pt-4 border-t">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo do Atleta</label>
-                            <input type="text" name="athlete_name" value="${userProfile.name}" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Assinatura Atleta/Responsável</label>
-                                <input type="text" name="signature" placeholder="Digite seu nome completo" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data do Preenchimento</label>
-                                <input type="date" name="parq_date" value="${new Date().toISOString().split('T')[0]}" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
-                            </div>
-                        </div>
+                    
                     </div>
                 </form>
             </div>
