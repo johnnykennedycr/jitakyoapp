@@ -67,17 +67,153 @@ async function sendTokenToServer(token) {
     }
 }
 
+// --- LÓGICA DO PAR-Q ---
+
+const parQQuestions = [
+    { id: 'q1', text: 'Algum médico já disse que você possui algum problema de coração e que só deveria realizar atividade física supervisionada por profissionais de saúde?' },
+    { id: 'q2', text: 'Você Sente dores do peito quanto pratica atividade física?' },
+    { id: 'q3', text: 'No último mês, você sentiu dores no peito quando praticou atividade física?' },
+    { id: 'q4', text: 'Você apresenta desequilíbrio devido à tontura e/ou perda de consciência?' },
+    { id: 'q5', text: 'Você possui algum problema ósseo/ou articular que poderia ser piorado pela atividade física?' },
+    { id: 'q6', text: 'Você toma atualmente algum medicamento para pressão arterial e/ou problema de coração?' },
+    { id: 'q7', text: 'Sabe de alguma outra razão pela qual você não deve praticar atividade física?' },
+    { id: 'q8', text: 'Você já apresentou/protocolou no seu clube algum Atestado Médico com restrições à prática de atividade esportiva?' }
+];
+
+function renderParQModal() {
+    const modal = document.createElement('div');
+    modal.id = 'parq-modal';
+    modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[100] p-4';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="p-6 border-b bg-gray-50 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-900">Anexo I - Questionário PAR-Q</h3>
+                    <p class="text-xs text-gray-500 uppercase font-semibold mt-1">Prontidão para Atividade Física</p>
+                </div>
+                <img src="${LOGO_PATH}" class="h-10 w-10">
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-grow bg-white">
+                <p class="text-sm text-gray-600 mb-6 leading-relaxed italic">
+                    Este questionário tem o objetivo de identificar a necessidade de avaliação por um médico antes do início da atividade física. Se responder "SIM" a qualquer pergunta, consulte seu médico antes de treinar.
+                </p>
+                
+                <form id="parq-form" class="space-y-6">
+                    <div class="border rounded-xl overflow-hidden shadow-sm">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Pergunta</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase w-16">Sim</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase w-16">Não</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${parQQuestions.map(q => `
+                                    <tr>
+                                        <td class="px-4 py-4 text-sm text-gray-700">${q.text}</td>
+                                        <td class="px-2 text-center">
+                                            <input type="radio" name="${q.id}" value="sim" required class="h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+                                        </td>
+                                        <td class="px-2 text-center">
+                                            <input type="radio" name="${q.id}" value="nao" required class="h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="space-y-4 pt-4 border-t">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo do Atleta</label>
+                            <input type="text" name="athlete_name" value="${userProfile.name}" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Assinatura Atleta/Responsável</label>
+                                <input type="text" name="signature" placeholder="Digite seu nome completo" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data do Preenchimento</label>
+                                <input type="date" name="parq_date" value="${new Date().toISOString().split('T')[0]}" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                <button type="button" id="cancel-parq" class="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">Depois</button>
+                <button type="submit" form="parq-form" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                    SALVAR E DECLARAR
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+
+    document.getElementById('cancel-parq').onclick = () => modal.remove();
+    
+    document.getElementById('parq-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.innerText = "Salvando...";
+
+        const formData = new FormData(e.target);
+        const answers = {};
+        parQQuestions.forEach(q => {
+            answers[q.id] = formData.get(q.id);
+        });
+
+        const data = {
+            par_q_data: {
+                answers: answers,
+                athlete_name: formData.get('athlete_name'),
+                signature: formData.get('signature'),
+                filled_at: formData.get('parq_date'),
+                status: "completed"
+            },
+            par_q_filled: true
+        };
+
+        try {
+            await fetchWithAuth('/api/student/par-q', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            modal.remove();
+            userProfile.par_q_filled = true;
+            renderAppScreen(); 
+            showSuccessModal("Questionário PAR-Q salvo com sucesso!");
+        } catch (error) {
+            console.error("Erro ao salvar PAR-Q:", error);
+            btn.disabled = false;
+            btn.innerText = "SALVAR E DECLARAR";
+        }
+    };
+}
+
+function showSuccessModal(message) {
+    const modal = document.getElementById('success-modal');
+    const msgEl = modal.querySelector('p');
+    if (msgEl) msgEl.textContent = message;
+    modal.classList.remove('hidden');
+}
+
 // --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
 function renderLoginScreen() {
     if (!authContainer) return;
     authContainer.innerHTML = `
         <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md flex flex-col items-center">
-            <!-- LOGO ADICIONADO NO LOGIN -->
             <img src="${LOGO_PATH}" alt="Logo JitaKyoApp" class="w-24 h-24 mb-4 object-contain">
-            
             <h2 class="text-3xl font-bold text-center text-gray-800 mb-1">JitaKyoApp</h2>
             <p class="text-center text-gray-500 mb-8 font-medium">Área do Aluno</p>
-            
             <form id="login-form" class="w-full">
                 <div class="mb-4">
                     <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
@@ -114,11 +250,28 @@ function renderLoginScreen() {
 
 function renderAppScreen() {
     if (!appContainer) return;
+
+    const parQAlertHtml = (!userProfile.par_q_filled) ? `
+        <div class="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-xl shadow-sm flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3 text-left">
+                    <p class="text-sm text-amber-700 font-bold">Saúde: PAR-Q Pendente</p>
+                    <p class="text-xs text-amber-600">Preencha o questionário de prontidão física para sua segurança.</p>
+                </div>
+            </div>
+            <button id="open-parq-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">PREENCHER</button>
+        </div>
+    ` : '';
+
     appContainer.innerHTML = `
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="flex justify-between items-center py-6">
                 <div class="flex items-center space-x-4">
-                    <!-- LOGO ADICIONADO NO CABEÇALHO -->
                     <img src="${LOGO_PATH}" alt="Logo" class="h-12 w-12 rounded-lg object-contain shadow-sm border border-gray-100">
                     <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Olá, <span id="user-name" class="text-blue-600"></span>!</h1>
                 </div>
@@ -132,6 +285,9 @@ function renderAppScreen() {
                     <button id="logout-button" class="bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 font-bold py-2 px-4 rounded-lg transition-all text-sm border border-gray-200">Sair</button>
                 </div>
             </header>
+
+            ${parQAlertHtml}
+
             <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6 pb-12">
                 <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md border border-gray-50">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Minhas Turmas</h2>
@@ -168,8 +324,8 @@ function renderAppScreen() {
                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
                     <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                 </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Pagamento Aprovado!</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500">Seu pagamento foi processado com sucesso. Obrigado!</p></div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Sucesso!</h3>
+                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500">Operação processada com sucesso. Obrigado!</p></div>
                 <div class="mt-4"><button id="close-success-modal-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button></div>
             </div>
         </div>
@@ -179,6 +335,10 @@ function renderAppScreen() {
 
     document.getElementById('user-name').textContent = userProfile.name;
     document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
+
+    if (document.getElementById('open-parq-btn')) {
+        document.getElementById('open-parq-btn').addEventListener('click', renderParQModal);
+    }
 
     setupTabListeners();
     setupModalListeners();
@@ -205,7 +365,7 @@ function renderAppScreen() {
         banner.id = 'notification-banner';
         banner.className = 'fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-4 flex justify-between items-center shadow-lg z-50';
         banner.innerHTML = `
-            <p class="text-sm mr-4">Deseja receber notificações sobre novidades e avisos?</p>
+            <p class="text-sm mr-4 text-left">Deseja receber notificações sobre novidades e avisos?</p>
             <div class="flex-shrink-0">
                 <button id="allow-notifications" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg mr-2 text-sm transition-colors">Sim</button>
                 <button id="deny-notifications" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">Agora não</button>
@@ -239,8 +399,8 @@ async function loadNotifications() {
                 const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 return `
                     <div class="p-4 ${notif.read ? 'bg-gray-50' : 'bg-blue-50'} rounded-xl border-l-4 ${notif.read ? 'border-gray-200' : 'border-blue-500'} shadow-sm">
-                        <p class="font-bold text-gray-800">${notif.title}</p>
-                        <p class="text-sm text-gray-600 mt-1">${notif.body}</p>
+                        <p class="font-bold text-gray-800 text-left">${notif.title}</p>
+                        <p class="text-sm text-gray-600 mt-1 text-left">${notif.body}</p>
                         <p class="text-[10px] text-gray-400 text-right mt-2">${formattedDate}</p>
                     </div>
                 `;
@@ -320,7 +480,7 @@ async function loadClasses() {
                     : '<p class="text-sm text-gray-400 mt-2">Horários não definidos.</p>';
 
                 return `
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 text-left">
                     <h3 class="font-bold text-lg text-gray-800">${c.class_name || 'Turma sem nome'}</h3>
                     <p class="text-sm text-gray-600 font-medium">Prof. ${c.teacher_name || 'Não informado'}</p>
                     ${scheduleHtml}
@@ -371,13 +531,13 @@ function formatDate(dateSource) {
 
 function renderPaymentsTable(container, payments, isPaidTable) {
      if (!payments || payments.length === 0) {
-        container.innerHTML = `<p class="text-gray-400 mt-8 text-center italic text-sm">${isPaidTable ? 'Nenhum pagamento finalizado encontrado.' : 'Nenhuma fatura pendente encontrada.'}</p>`;
+        container.innerHTML = `<p class="text-gray-400 mt-8 text-center italic text-sm text-balance">${isPaidTable ? 'Nenhum pagamento finalizado encontrado.' : 'Nenhuma fatura pendente encontrada.'}</p>`;
         return;
     }
 
     container.innerHTML = `
         <div class="overflow-x-auto mt-4">
-            <table class="min-w-full divide-y divide-gray-100">
+            <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Descrição</th>
@@ -387,11 +547,11 @@ function renderPaymentsTable(container, payments, isPaidTable) {
                         ${isPaidTable ? '<th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Data Pag.</th>' : '<th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Ações</th>'}
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-100">
+                <tbody class="bg-white divide-y divide-gray-200">
                     ${payments.map(p => {
                         const description = p.description || `${p.type || 'Fatura'} - ${p.reference_month}/${p.reference_year}`;
                         return `
-                            <tr class="hover:bg-gray-50 transition-colors">
+                            <tr class="hover:bg-gray-50 transition-colors text-left">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">${description}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${formatDate(p.due_date)}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">R$ ${p.amount.toFixed(2)}</td>
@@ -448,11 +608,11 @@ function handlePayment(paymentId, paymentAmount) {
             <button id="close-modal-button" class="text-gray-400 hover:text-gray-800 text-3xl font-light">&times;</button>
         </div>
         <div id="payment-step-1">
-            <p class="text-gray-600 mb-6 text-sm">Para processar seu pagamento com segurança via Mercado Pago, informe seu CPF.</p>
-            <form id="cpf-form">
+            <p class="text-gray-600 mb-6 text-sm text-left">Para processar seu pagamento com segurança via Mercado Pago, informe seu CPF.</p>
+            <form id="cpf-form" class="text-left">
                 <div class="mb-6">
                     <label for="cpf" class="block text-gray-700 text-sm font-bold mb-2">CPF do Titular</label>
-                    <input type="text" id="cpf" placeholder="000.000.000-00" required class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <input type="text" id="cpf" placeholder="000.000.000-00" required class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all p-2">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl focus:outline-none focus:shadow-outline transition-all duration-300 shadow-lg">
                     Continuar para Pagamento
@@ -560,6 +720,11 @@ async function initializeAuthenticatedState(user) {
         const profile = await fetchWithAuth('/api/student/profile');
         userProfile = profile;
         renderAppScreen();
+        
+        // Dispara o modal automaticamente se não estiver preenchido
+        if (!userProfile.par_q_filled) {
+            setTimeout(renderParQModal, 1500);
+        }
     } catch (error) {
         console.error('Erro ao buscar dados:', error);
         signOut(auth); 

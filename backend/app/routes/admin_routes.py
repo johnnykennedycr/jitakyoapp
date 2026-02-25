@@ -51,41 +51,38 @@ def init_admin_bp(database, us, ts, tcs, es_param, as_param, ps_param, ns, frs=N
 @login_required
 @role_required('admin', 'super_admin', 'receptionist')
 def get_dashboard_summary():
-    """Coleta e retorna todos os dados necessários para a Visão Geral do Dashboard."""
+    """Coleta KPIs, incluindo agora o status de saúde dos alunos."""
     try:
-        # KPIs dos cards
         active_students = user_service.count_active_students()
         financial_summary = payment_service.get_financial_summary_for_dashboard()
         upcoming_birthdays = user_service.get_upcoming_birthdays(days_ahead=7)
 
-        # Dados para gráficos
-        new_students_chart = user_service.get_new_students_per_month(num_months=6)
-        students_by_discipline_chart = payment_service.get_students_by_discipline()
+        # Nova métrica: Alunos sem PAR-Q
+        # Nota: Idealmente você adicionaria um método count_pending_parq no user_service
+        # Por enquanto, podemos filtrar na lista de alunos ativos se o volume for baixo
+        all_students = user_service.get_users_by_role('student')
+        pending_parq = len([s for s in all_students if not getattr(s, 'par_q_filled', False)])
 
-        # Dados para listas
-        recent_payments = payment_service.get_recent_payments(limit=5)
-
-        # Monta o objeto de resposta
         summary_data = {
             "kpis": {
                 "active_students": active_students,
                 "monthly_revenue": financial_summary.get("total_paid_this_month", 0),
                 "total_overdue": financial_summary.get("total_overdue", 0),
-                "upcoming_birthdays": upcoming_birthdays
+                "upcoming_birthdays": upcoming_birthdays,
+                "pending_parq_count": pending_parq  # <-- Novo Indicador
             },
             "charts": {
-                "new_students": new_students_chart,
-                "students_by_discipline": students_by_discipline_chart
+                "new_students": user_service.get_new_students_per_month(num_months=6),
+                "students_by_discipline": payment_service.get_students_by_discipline()
             },
             "lists": {
-                "recent_payments": recent_payments
+                "recent_payments": payment_service.get_recent_payments(limit=5)
             }
         }
         return jsonify(summary_data), 200
     except Exception as e:
-        logging.error(f"Erro ao gerar resumo do dashboard: {e}", exc_info=True)
-        return jsonify(error=f"Falha ao carregar dados do dashboard: {e}"), 500
-
+        logging.error(f"Erro ao gerar resumo do dashboard: {e}")
+        return jsonify(error="Falha ao carregar dados."), 500
 
 @admin_api_bp.route('/dashboard-data')
 @login_required 

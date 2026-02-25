@@ -127,3 +127,29 @@ def process_student_payment():
     except Exception as e:
         return jsonify(error=f"Erro no processamento do pagamento: {e}"), 500
 
+# --- NOVA ROTA PARA O QUESTIONÁRIO PAR-Q ---
+
+@student_api_bp.route('/par-q', methods=['POST'])
+@role_required('student')
+def save_student_par_q():
+    """
+    Recebe os dados do questionário de prontidão física (PAR-Q) e
+    atualiza o perfil do aluno no Firestore.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify(error="Nenhum dado recebido."), 400
+        
+        # O payload do frontend contém par_q_data e par_q_filled.
+        # Usamos o user_service para persistir essas informações no documento do aluno.
+        updated_user = user_service.update_user(g.user.id, data)
+        
+        if updated_user:
+            return jsonify(success=True, message="Dados de saúde registrados com sucesso."), 200
+        else:
+            return jsonify(error="Não foi possível atualizar seu perfil de saúde."), 500
+
+    except Exception as e:
+        print(f"Erro ao processar salvamento do PAR-Q: {e}")
+        return jsonify(error="Erro interno ao salvar dados."), 500
