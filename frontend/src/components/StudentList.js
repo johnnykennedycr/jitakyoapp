@@ -80,6 +80,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
 
 /**
  * Visualiza as respostas do PAR-Q no Admin.
+ * Atualizado para remover campos redundantes de assinatura e nome.
  */
 async function viewParQAnswers(studentId, studentName) {
     showLoading();
@@ -104,16 +105,10 @@ async function viewParQAnswers(studentId, studentName) {
         ];
 
         const modalHtml = `
-            <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex justify-between items-center">
-                    <div>
-                        <p class="text-[10px] uppercase font-black text-indigo-400">Declarado em</p>
-                        <p class="font-bold text-indigo-900">${parQ.filled_at || 'N/A'}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] uppercase font-black text-indigo-400">Assinado por</p>
-                        <p class="font-bold text-indigo-900">${parQ.signature || 'N/A'}</p>
-                    </div>
+            <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2 text-left">
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                    <p class="text-[10px] uppercase font-black text-indigo-400 tracking-widest">Data do Preenchimento</p>
+                    <p class="font-bold text-indigo-900">${parQ.filled_at || 'N/A'}</p>
                 </div>
 
                 <div class="border rounded-xl overflow-hidden shadow-sm">
@@ -121,7 +116,7 @@ async function viewParQAnswers(studentId, studentName) {
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Pergunta</th>
-                                <th class="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Respostas</th>
+                                <th class="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">Resposta</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
@@ -144,7 +139,7 @@ async function viewParQAnswers(studentId, studentName) {
                 </div>
 
                 <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 italic text-xs text-gray-500">
-                    O aluno declarou-se ciente de que deve consultar um médico caso tenha respondido "SIM" a qualquer pergunta.
+                    O aluno declarou através do seu acesso autenticado a veracidade das informações acima, assumindo plena responsabilidade por qualquer atividade praticada.
                 </div>
             </div>
         `;
@@ -178,53 +173,53 @@ async function openStudentForm(studentId = null) {
         const availableClasses = allClasses.filter(c => !enrolledClassIds.has(c.id));
 
         const nameAndEmailHtml = studentId ? `<p class="mb-2 text-gray-600">Editando <strong>${student.name}</strong> (${student.email}).</p>` : `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
                 <div><label class="block text-sm font-medium text-gray-700">Nome Completo</label><input type="text" name="name" class="p-2 border rounded-md w-full" required></div>
                 <div><label class="block text-sm font-medium text-gray-700">Email</label><input type="email" name="email" class="p-2 border rounded-md w-full" required></div>
             </div>`;
 
         const passwordFieldHtml = studentId ? `
-            <div class="mb-4">
+            <div class="mb-4 text-left">
                 <label class="block text-sm font-medium text-gray-700">Nova Senha (deixe em branco para não alterar)</label>
                 <input type="password" name="password" class="p-2 border rounded-md w-full">
             </div>` : '';
 
         const enrollmentsHtml = studentId ? `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Turmas Matriculadas</h4>
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2 text-left">Turmas Matriculadas</h4>
             <div id="current-enrollments-container" class="space-y-2">
                 ${currentEnrollments.length > 0 ? currentEnrollments.map(e => `
                     <div class="p-2 border rounded flex justify-between items-center bg-gray-50">
                         <span>${classMap[e.class_id]?.name || 'N/A'} (R$ ${e.discount_amount || 0}, dia ${e.due_day || 'N/A'})</span>
                         <button type="button" data-action="remove-enrollment" data-enrollment-id="${e.id}" class="bg-red-500 text-white px-2 py-1 text-xs rounded transition hover:bg-red-600">Remover</button>
-                    </div>`).join('') : '<p class="text-sm text-gray-500">Nenhuma matrícula ativa.</p>'}
+                    </div>`).join('') : '<p class="text-sm text-gray-500 text-left">Nenhuma matrícula ativa.</p>'}
             </div>
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2 text-indigo-600">Matricular em Nova Turma</h4>
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2 text-indigo-600 text-left">Matricular em Nova Turma</h4>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-                <select name="new_class_id" class="p-2 border rounded-md flex-grow"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
-                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md">
-                <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md">
+                <select name="new_class_id" class="p-2 border rounded-md flex-grow text-sm"><option value="">Selecione uma turma</option>${availableClasses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                <input type="number" step="0.01" name="new_discount" placeholder="Desconto (R$)" class="p-2 border rounded-md text-sm">
+                <input type="number" name="new_due_day" placeholder="Venc. (dia)" min="1" max="31" class="p-2 border rounded-md text-sm">
             </div>
             <div class="text-right mt-2">
-                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 transition">Adicionar Matrícula</button>
+                <button type="button" data-action="add-enrollment" data-student-id="${studentId}" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 transition text-sm">Adicionar Matrícula</button>
             </div>
             ` : `
-            <hr class="my-4"><h4 class="text-lg font-medium mb-2">Matricular em Turmas (Opcional)</h4>
+            <hr class="my-4"><h4 class="text-lg font-medium mb-2 text-left">Matricular em Turmas (Opcional)</h4>
             <div class="space-y-2">
                 ${allClasses.map(c => `
-                    <div class="p-2 border rounded">
+                    <div class="p-2 border rounded text-left">
                         <label class="flex items-center"><input type="checkbox" name="class_enroll" value="${c.id}" data-fee="${c.default_monthly_fee}" class="mr-2">
-                            <span>${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
+                            <span class="text-sm">${c.name} - Base: R$ ${c.default_monthly_fee}</span></label>
                         <div class="enrollment-details hidden mt-2 pl-6 grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full">
-                            <input type="number" name="due_day" placeholder="Dia do Vencimento" min="1" max="31" class="p-2 border rounded-md w-full">
-                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full md:col-span-2">
+                            <input type="number" step="0.01" name="discount_amount" placeholder="Desconto (R$)" class="p-2 border rounded-md w-full text-sm">
+                            <input type="number" name="due_day" placeholder="Dia do Vencimento" min="1" max="31" class="p-2 border rounded-md w-full text-sm">
+                            <input type="text" name="discount_reason" placeholder="Motivo do Desconto" class="p-2 border rounded-md w-full md:col-span-2 text-sm">
                         </div></div>`).join('')}</div>`;
 
         const guardiansHtml = (student?.guardians || []).map(createGuardianFieldHtml).join('');
 
         const formHtml = `<form id="student-form" data-student-id="${studentId || ''}">
                 ${nameAndEmailHtml}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-left">
                     <div><label class="block text-sm font-medium text-gray-700">Data de Nascimento</label><input type="date" name="date_of_birth" value="${student?.date_of_birth?.split('T')[0] || ''}" class="p-2 border rounded-md w-full"></div>
                     <div><label class="block text-sm font-medium text-gray-700">Telefone</label><input type="text" name="phone" value="${student?.phone || ''}" class="mt-1 block w-full p-2 border rounded-md"></div></div>
                 ${passwordFieldHtml}
@@ -269,7 +264,7 @@ function openShareGuideModal(studentId, studentName, studentEmail, studentPhone)
 async function openFaceRegistration(studentId, studentName) {
     showModal(`Cadastrar Face: ${studentName}`, `
         <div class="flex flex-col items-center">
-            <p class="mb-4 text-sm text-gray-600 text-center">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
+            <p class="mb-4 text-sm text-gray-600 text-center text-balance">Posicione o rosto do aluno no centro da câmera. Aguarde o modelo carregar.</p>
             <div class="relative w-full max-w-sm bg-black rounded-lg overflow-hidden aspect-[4/3] border-4 border-gray-100 shadow-inner">
                 <video id="face-video" autoplay muted playsinline class="w-full h-full object-cover transform scale-x-[-1]"></video>
                 <div id="face-overlay" class="absolute inset-0 flex items-center justify-center text-white font-bold bg-black bg-opacity-70 text-center px-4 italic">Iniciando IA...</div>
@@ -404,10 +399,10 @@ export async function renderStudentList(targetElement) {
                                             : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-gray-100 text-gray-400 uppercase tracking-tighter">SEM BIOMETRIA</span>'}
                                     </div>
                                 </td>
-                                <td class="px-6 py-5 text-sm text-gray-600">
+                                <td class="px-6 py-5 text-sm text-gray-600 text-left">
                                     ${(s.enrollments || []).map(e => `<div class="truncate max-w-[200px]">• ${e.class_name}</div>`).join('') || '<span class="text-gray-300 italic">Nenhuma matrícula</span>'}
                                 </td>
-                                <td class="px-6 py-5 text-sm text-gray-600">
+                                <td class="px-6 py-5 text-sm text-gray-600 text-left">
                                     ${(s.guardians && s.guardians.length > 0) 
                                         ? s.guardians.map(g => `<div class="truncate max-w-[200px]" title="${g.name}: ${g.contact}"><strong>${g.name}</strong>: ${g.contact}</div>`).join('') 
                                         : `<div class="text-indigo-600 font-medium italic">${s.phone || 'Sem telefone'}</div>`
@@ -416,7 +411,7 @@ export async function renderStudentList(targetElement) {
                                 <td class="px-6 py-5 text-center">
                                     ${s.par_q_filled 
                                         ? `<button data-action="view-parq" data-student-id="${s.id}" data-student-name="${s.name}" class="inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black bg-indigo-100 text-indigo-700 uppercase hover:bg-indigo-200 transition">PAR-Q OK</button>` 
-                                        : `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black bg-amber-100 text-amber-700 uppercase">Pendente</span>`}
+                                        : `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black bg-amber-100 text-amber-700 uppercase tracking-tighter">Pendente</span>`}
                                 </td>
                                 <td class="px-6 py-5 text-right">
                                     <div class="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
@@ -443,7 +438,7 @@ export async function renderStudentList(targetElement) {
     };
 
     /**
-     * Busca os alunos da API.
+     * Busca os alunos da API com cache busting.
      */
     const fetchStudents = async () => {
         showLoading();
@@ -469,9 +464,9 @@ export async function renderStudentList(targetElement) {
         if (action === 'add') openStudentForm();
         if (action === 'edit') openStudentForm(studentId);
         if (action === 'delete') {
-            showModal(`Confirmar Exclusão`, `<p>Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-                <div class="text-right mt-6">
-                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md">Confirmar</button>
+            showModal(`Confirmar Exclusão`, `<p class="p-4 text-center">Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
+                <div class="text-right p-4 border-t">
+                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md font-bold">Confirmar</button>
                 </div>`);
         }
         if (action === 'face-register') openFaceRegistration(studentId, studentName);
@@ -502,7 +497,7 @@ export async function renderStudentList(targetElement) {
                 if (!response.ok) throw new Error('Falha ao deletar');
                 await fetchStudents();
             } catch (error) { 
-                showModal('Erro', `<p>${error.message}</p>`);
+                alert('Erro: ' + error.message);
             } finally { 
                 hideLoading(); 
             }
@@ -582,8 +577,10 @@ export async function renderStudentList(targetElement) {
 
         const studentId = form.dataset.studentId;
         const submitButton = form.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-        submitButton.textContent = 'Salvando...';
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = 'Salvando...';
+        }
         
         try {
             const guardians = Array.from(form.querySelectorAll('.dynamic-entry')).map(entry => ({
@@ -628,8 +625,10 @@ export async function renderStudentList(targetElement) {
         } catch (error) {
             alert(error.error || 'Falha ao salvar informações do aluno.');
         } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Salvar';
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Salvar';
+            }
         }
     };
 
