@@ -42,9 +42,9 @@
     },
     {
       "src": "screenshots/dashboard.png",
-      "sizes": "468x798",
+      "sizes": "798x468",
       "type": "image/png",
-      "form_factor": "narrow",
+      "form_factor": "wide",
       "label": "Painel do Aluno"
     }
   ]
