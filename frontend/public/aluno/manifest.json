@@ -4,6 +4,7 @@
   "description": "Portal do Aluno do sistema JitaKyoApp.",
   "start_url": "/aluno/",
   "scope": "/aluno/",
+  "id": "1:217073545024:web:80e4d80f30b55ecfaed4a5",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e293b",
