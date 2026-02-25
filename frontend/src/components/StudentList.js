@@ -1,9 +1,8 @@
-import React from 'react';
-
 /**
- * Nota: Para resolver os erros de compilação no ambiente de visualização (Canvas),
- * as funções que antes eram importadas foram definidas internamente ou mockadas.
- * Em seu ambiente local, você pode manter os imports se os arquivos existirem.
+ * StudentList.js
+ * Componente para gerenciamento de alunos, incluindo biometria facial
+ * e compartilhamento do guia de instalação PWA.
+ * * Removido import de React para corrigir erro de build (Vite/Rollup).
  */
 
 // --- HELPERS INTERNOS (Substituindo imports para garantir funcionamento no Canvas) ---
@@ -24,7 +23,7 @@ const fetchWithAuth = async (url, options = {}) => {
     return response;
 };
 
-// Funções de UI (Mocks para compilação, utilizam os seletores do DOM do seu App)
+// Funções de UI (Utilizam os seletores do DOM do seu App)
 const showModal = (title, content) => {
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
@@ -293,7 +292,7 @@ async function openFaceRegistration(studentId, studentName) {
 
     try {
         await loadFaceApiModels();
-        overlay.classList.add('hidden');
+        if (overlay) overlay.classList.add('hidden');
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
         video.onloadedmetadata = () => { btnCapture.disabled = false; };
@@ -364,7 +363,7 @@ export async function renderStudentList(targetElement) {
                 <div class="relative flex-grow md:w-72">
                     <input type="text" id="list-search" placeholder="Pesquisar por nome ou email..." 
                         class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
-                    <svg class="absolute left-4 top-3.5 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="absolute left-4 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                 </div>
@@ -444,7 +443,7 @@ export async function renderStudentList(targetElement) {
     };
 
     /**
-     * Busca os alunos da API com cache busting.
+     * Busca os alunos da API.
      */
     const fetchStudents = async () => {
         showLoading();
