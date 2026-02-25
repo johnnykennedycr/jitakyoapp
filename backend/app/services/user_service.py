@@ -35,7 +35,7 @@ class UserService:
         return f"""
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border-radius: 16px; overflow: hidden; background-color: #0f172a; color: #ffffff; border: 1px solid #334155;">
             <div style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); padding: 40px 20px; text-align: center;">
-                <img src="https://aluno-jitakyoapp.web.app/icons/android-launchericon-192-192.png" alt="Logo" style="width: 80px; height: 80px; margin-bottom: 15px; border-radius: 20px;">
+                <img src="https://jitakyoapp.web.app/aluno/icons/android-launchericon-192-192.png" alt="Logo" style="width: 80px; height: 80px; margin-bottom: 15px; border-radius: 20px;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -0.025em;">JitaKyoApp</h1>
                 <p style="margin-top: 8px; opacity: 0.9; font-size: 16px;">Seu portal de treinos está pronto!</p>
             </div>
@@ -52,7 +52,7 @@ class UserService:
                 </div>
 
                 <div style="text-align: center; margin: 32px 0;">
-                    <a href="https://aluno-jitakyoapp.web.app/instalar.html" style="background-color: #4f46e5; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);">
+                    <a href="https://jitakyoapp.web.app/instalar.html" style="background-color: #4f46e5; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);">
                         VER GUIA DE INSTALAÇÃO
                     </a>
                 </div>
