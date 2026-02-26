@@ -14,6 +14,7 @@ const fetchWithAuth = async (url, options = {}) => {
     const user = auth.currentUser;
     if (!user) throw new Error("Usuário não autenticado no Firebase.");
     
+    // Obtém o token real e atualizado do Firebase (Força o refresh para evitar 401)
     const idToken = await user.getIdToken(true);
     
     const timestamp = Date.now();
@@ -28,7 +29,7 @@ const fetchWithAuth = async (url, options = {}) => {
     
     const response = await fetch(finalUrl, { ...options, headers });
     if (response.status === 401) {
-        console.error("Erro 401: Token inválido ou expirado.");
+        console.error("Erro 401: Token inválido ou expirado. A sessão pode ter caído.");
     }
     if (!response.ok) throw new Error('Erro na requisição');
     return response;
@@ -42,9 +43,15 @@ function calculateAge(dobString) {
     if (!dobString) return 'N/A';
     
     let birthday;
-    if (typeof dobString === 'string') {
+    if (typeof dobString === 'object' && dobString._seconds) {
+        birthday = new Date(dobString._seconds * 1000);
+    } else if (typeof dobString === 'string') {
         const parts = dobString.split('T')[0].split('-');
-        birthday = new Date(parts[0], parts[1] - 1, parts[2]); 
+        if(parts.length === 3) {
+            birthday = new Date(parts[0], parts[1] - 1, parts[2]); 
+        } else {
+            birthday = new Date(dobString);
+        }
     } else {
         birthday = new Date(dobString);
     }
@@ -80,18 +87,18 @@ async function viewParQAnswers(studentId, studentName) {
         const parQ = student.par_q_data;
 
         if (!parQ) {
-            return showModal(`PAR-Q: ${studentName}`, `<p class="p-8 text-center text-gray-500 italic">Este aluno ainda não preencheu o questionário de saúde.</p>`);
+            return showModal(`Saúde: ${studentName}`, `<p class="p-8 text-center text-gray-500 italic">Este aluno ainda não preencheu o questionário de saúde.</p>`);
         }
 
         const questions = [
-            { id: 'q1', text: 'Algum médico já disse que possui problema de coração?' },
-            { id: 'q2', text: 'Sente dores do peito quanto pratica atividade física?' },
+            { id: 'q1', text: 'Algum médico já disse que possui problema de coração e recomendou supervisão?' },
+            { id: 'q2', text: 'Sente dores no peito quando pratica atividade física?' },
             { id: 'q3', text: 'No último mês, sentiu dores no peito em atividade?' },
-            { id: 'q4', text: 'Apresenta desequilíbrio ou perda de consciência?' },
-            { id: 'q5', text: 'Possui problema ósseo/articular que pode piorar?' },
-            { id: 'q6', text: 'Toma medicamento para pressão/coração?' },
-            { id: 'q7', text: 'Outra razão para não praticar atividade física?' },
-            { id: 'q8', text: 'Apresentou atestado com restrições?' }
+            { id: 'q4', text: 'Apresenta desequilíbrio devido a tontura ou perda de consciência?' },
+            { id: 'q5', text: 'Possui problema ósseo/articular que pode ser piorado?' },
+            { id: 'q6', text: 'Toma atualmente medicamento para pressão/coração?' },
+            { id: 'q7', text: 'Sabe de alguma outra razão para não praticar atividade física?' },
+            { id: 'q8', text: 'Apresentou atestado com restrições desportivas?' }
         ];
 
         const modalHtml = `
@@ -133,7 +140,7 @@ async function viewParQAnswers(studentId, studentName) {
                     </table>
                 </div>
 
-                <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 italic text-xs text-gray-500 leading-relaxed">
+                <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 italic text-xs text-gray-500 leading-relaxed text-justify">
                     O aluno declarou através do seu acesso autenticado a veracidade das informações acima, assumindo plena responsabilidade por qualquer atividade praticada sob orientações adversas.
                 </div>
             </div>
@@ -313,7 +320,6 @@ async function openFaceRegistration(studentId, studentName) {
                 setTimeout(() => {
                     if (stream) stream.getTracks().forEach(track => track.stop());
                     hideModal();
-                    // Atualiza a tabela suavemente via trigger na view principal
                     document.getElementById('refresh-list-btn')?.click();
                 }, 1500);
 
@@ -352,7 +358,7 @@ export async function renderStudentList(targetElement) {
             </div>
         </div>
 
-        <!-- Seção de Filtros e Ordenação -->
+        <!-- BARRA DE FILTROS E ORDENAÇÃO -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
             <div class="flex items-center gap-2 mb-4">
                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
@@ -360,6 +366,7 @@ export async function renderStudentList(targetElement) {
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                <!-- Pesquisa -->
                 <div class="lg:col-span-2 relative">
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Pesquisar</label>
                     <input type="text" id="list-search" placeholder="Nome ou email..." 
@@ -369,6 +376,7 @@ export async function renderStudentList(targetElement) {
                     </svg>
                 </div>
                 
+                <!-- Ordenação -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Ordenar por</label>
                     <select id="sort-by" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 outline-none p-2.5 font-medium cursor-pointer">
@@ -379,13 +387,15 @@ export async function renderStudentList(targetElement) {
                     </select>
                 </div>
 
+                <!-- Turma -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Turma</label>
                     <select id="filter-class" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 outline-none p-2.5 font-medium cursor-pointer">
-                        <option value="all">Todas</option>
+                        <option value="all">Todas as Turmas</option>
                     </select>
                 </div>
 
+                <!-- Saúde (PAR-Q) -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Status Saúde</label>
                     <select id="filter-parq" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 outline-none p-2.5 font-medium cursor-pointer">
@@ -395,15 +405,17 @@ export async function renderStudentList(targetElement) {
                     </select>
                 </div>
 
+                <!-- Biometria -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Biometria</label>
                     <select id="filter-biometry" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 outline-none p-2.5 font-medium cursor-pointer">
                         <option value="all">Todas</option>
                         <option value="ok">Cadastrada</option>
-                        <option value="missing">Pendente</option>
+                        <option value="missing">Sem Face</option>
                     </select>
                 </div>
 
+                <!-- Idade -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Faixa Etária</label>
                     <select id="filter-age" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl focus:ring-indigo-500 outline-none p-2.5 font-medium cursor-pointer">
@@ -464,7 +476,7 @@ export async function renderStudentList(targetElement) {
                                     }
                                 </td>
                                 <td class="px-6 py-5 text-center">
-                                    ${s.par_q_filled 
+                                    ${(s.par_q_filled || s.par_q_data) 
                                         ? `<button data-action="view-parq" data-student-id="${s.id}" data-student-name="${s.name}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100 hover:border-transparent">PAR-Q OK</button>` 
                                         : `<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 uppercase tracking-widest border border-amber-100">Pendente</span>`}
                                 </td>
@@ -512,7 +524,7 @@ export async function renderStudentList(targetElement) {
         Array.from(classesSet).sort().forEach(c => {
             classSelect.innerHTML += `<option value="${c}">${c}</option>`;
         });
-        classSelect.value = currentVal; // Maintain selection if possible
+        classSelect.value = currentVal; 
     };
 
     const applyFiltersAndSort = () => {
@@ -527,10 +539,10 @@ export async function renderStudentList(targetElement) {
             );
         }
 
-        // 2. PAR-Q Status
+        // 2. PAR-Q Status (Usando o fallback par_q_data)
         const parq = targetElement.querySelector('#filter-parq').value;
-        if (parq === 'ok') result = result.filter(s => s.par_q_filled);
-        if (parq === 'pending') result = result.filter(s => !s.par_q_filled);
+        if (parq === 'ok') result = result.filter(s => s.par_q_filled || s.par_q_data);
+        if (parq === 'pending') result = result.filter(s => !(s.par_q_filled || s.par_q_data));
 
         // 3. Biometry Status
         const bio = targetElement.querySelector('#filter-biometry').value;
@@ -594,7 +606,7 @@ export async function renderStudentList(targetElement) {
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
-        
+
         if (button.id === 'refresh-list-btn') {
             fetchStudents();
             return;
@@ -607,7 +619,7 @@ export async function renderStudentList(targetElement) {
         if (action === 'delete') {
             showModal(`Confirmar Exclusão`, `<p class="p-4 text-center">Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
                 <div class="text-right p-4 border-t mt-4">
-                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-red-700 transition">Confirmar Exclusão</button>
+                    <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-6 py-2.5 rounded-lg font-bold">Confirmar Exclusão</button>
                 </div>`);
         }
         if (action === 'face-register') openFaceRegistration(studentId, studentName);
@@ -615,17 +627,6 @@ export async function renderStudentList(targetElement) {
         if (action === 'view-parq') viewParQAnswers(studentId, studentName);
     };
 
-    // Anexar Listeners dos Filtros
-    const filterIds = ['list-search', 'sort-by', 'filter-parq', 'filter-biometry', 'filter-age', 'filter-class'];
-    filterIds.forEach(id => {
-        const el = targetElement.querySelector(`#${id}`);
-        if (el) {
-            el.addEventListener(id === 'list-search' ? 'input' : 'change', applyFiltersAndSort);
-        }
-    });
-
-    targetElement.addEventListener('click', handlePageClick);
-    
     const modalBody = document.getElementById('modal-body');
 
     const handleModalClick = async (e) => {
@@ -762,7 +763,7 @@ export async function renderStudentList(targetElement) {
                 if (!response.ok) throw await response.json();
             }
             hideModal();
-            await fetchStudents(); // Refresh data to update filters
+            await fetchStudents();
         } catch (error) {
             alert(error.error || 'Falha ao salvar informações do aluno.');
         } finally {
@@ -773,6 +774,15 @@ export async function renderStudentList(targetElement) {
         }
     };
 
+    // Vincular Eventos
+    const filterIds = ['list-search', 'sort-by', 'filter-parq', 'filter-biometry', 'filter-age', 'filter-class'];
+    filterIds.forEach(id => {
+        const el = targetElement.querySelector(`#${id}`);
+        if (el) el.addEventListener(id === 'list-search' ? 'input' : 'change', applyFiltersAndSort);
+    });
+
+    targetElement.addEventListener('click', handlePageClick);
+    
     if (modalBody) {
         modalBody.addEventListener('click', handleModalClick);
         modalBody.addEventListener('submit', handleFormSubmit);
