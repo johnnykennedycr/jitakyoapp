@@ -127,7 +127,6 @@ function renderParQModal() {
                     </div>
 
                     
-                    </div>
                 </form>
             </div>
 
