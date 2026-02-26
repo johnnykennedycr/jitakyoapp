@@ -63,7 +63,7 @@ self.addEventListener('fetch', event => {
  * Objetivo: Evitar que o usuário fique preso em versões antigas do sistema.
  */
 
-const CACHE_NAME = 'jitakyo-live-cache-v2'; // Mude o 'v2' sempre que fizer um grande deploy
+const CACHE_NAME = 'jitakyo-live-cache-v3'; // Mude o 'v2' sempre que fizer um grande deploy
 
 // Cacheamos apenas recursos que demoram a carregar e raramente mudam (imagens/ícones)
 const IMAGE_ASSETS = [
