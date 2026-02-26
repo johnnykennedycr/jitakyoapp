@@ -2,55 +2,44 @@
  * StudentList.js
  * Componente para gerenciamento de alunos, incluindo biometria facial
  * e compartilhamento do guia de instalação PWA.
- * * Removido import de React para corrigir erro de build (Vite/Rollup).
  */
 
-// --- HELPERS INTERNOS (Substituindo imports para garantir funcionamento no Canvas) ---
+// Importamos os módulos reais para evitar o erro 401 e problemas de UI no seu projeto
+import { auth } from "../config/firebaseConfig.js";
+import { showModal, hideModal } from "./Modal.js";
+import { showLoading, hideLoading } from "./LoadingSpinner.js";
+import { loadFaceApiModels, getFaceDescriptor } from '../lib/faceService.js';
 
+// --- HELPER DE API CORRIGIDO (Firebase Token) ---
 const fetchWithAuth = async (url, options = {}) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Usuário não autenticado no Firebase.");
+    
+    // Obtém o token real e atualizado do Firebase
+    const idToken = await user.getIdToken(true);
+    
     const timestamp = Date.now();
     const separator = url.includes('?') ? '&' : '?';
     const finalUrl = `${url}${separator}t=${timestamp}`;
     
     const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        'Authorization': `Bearer ${idToken}`,
         ...options.headers
     };
     
     const response = await fetch(finalUrl, { ...options, headers });
+    if (response.status === 401) {
+        console.error("Erro 401: Token inválido ou expirado.");
+    }
     if (!response.ok) throw new Error('Erro na requisição');
     return response;
 };
-
-// Funções de UI (Utilizam os seletores do DOM do seu App)
-const showModal = (title, content) => {
-    const modalTitle = document.getElementById('modal-title');
-    const modalBody = document.getElementById('modal-body');
-    const modal = document.getElementById('modal-container');
-    if (modalTitle) modalTitle.innerText = title;
-    if (modalBody) modalBody.innerHTML = content;
-    if (modal) modal.classList.remove('hidden');
-};
-
-const hideModal = () => {
-    const modal = document.getElementById('modal-container');
-    if (modal) modal.classList.add('hidden');
-};
-
-const showLoading = () => { document.body.style.cursor = 'wait'; };
-const hideLoading = () => { document.body.style.cursor = 'default'; };
-
-const loadFaceApiModels = async () => { console.log("Modelos de Face carregados"); };
-const getFaceDescriptor = async (video) => { return new Float32Array(128).fill(0); };
 
 let allStudentsCache = []; // Cache para filtro local case-insensitive
 
 // --- FUNÇÕES AUXILIARES ---
 
-/**
- * Calcula a idade com base na data de nascimento.
- */
 function calculateAge(dobString) {
     if (!dobString) return 'N/A';
     const birthday = new Date(dobString);
@@ -63,9 +52,6 @@ function calculateAge(dobString) {
     return age < 0 ? 0 : age;
 }
 
-/**
- * Cria o HTML para campos dinâmicos de responsáveis.
- */
 function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: '' }) {
     const fieldId = `guardian-${Date.now()}-${Math.random()}`;
     return `
@@ -80,7 +66,7 @@ function createGuardianFieldHtml(guardian = { name: '', kinship: '', contact: ''
 
 /**
  * Visualiza as respostas do PAR-Q no Admin.
- * Atualizado para remover campos redundantes de assinatura e nome.
+ * Simplificado para remover assinatura, exibindo a validação de login.
  */
 async function viewParQAnswers(studentId, studentName) {
     showLoading();
@@ -106,9 +92,14 @@ async function viewParQAnswers(studentId, studentName) {
 
         const modalHtml = `
             <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2 text-left">
-                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                    <p class="text-[10px] uppercase font-black text-indigo-400 tracking-widest">Data do Preenchimento</p>
-                    <p class="font-bold text-indigo-900">${parQ.filled_at || 'N/A'}</p>
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] uppercase font-black text-indigo-400 tracking-widest">Data do Preenchimento</p>
+                        <p class="font-bold text-indigo-900">${parQ.filled_at || 'N/A'}</p>
+                    </div>
+                    <div class="text-[10px] bg-indigo-600 text-white px-3 py-1.5 rounded font-bold shadow-sm tracking-widest uppercase">
+                        Validado via Login
+                    </div>
                 </div>
 
                 <div class="border rounded-xl overflow-hidden shadow-sm">
@@ -152,9 +143,6 @@ async function viewParQAnswers(studentId, studentName) {
     }
 }
 
-/**
- * Abre o formulário de edição ou criação de aluno.
- */
 async function openStudentForm(studentId = null) {
     showLoading();
     try {
@@ -237,9 +225,6 @@ async function openStudentForm(studentId = null) {
     }
 }
 
-/**
- * Abre modal de compartilhamento do guia de instalação.
- */
 function openShareGuideModal(studentId, studentName, studentEmail, studentPhone) {
     showModal(`Compartilhar Guia: ${studentName}`, `
         <div class="p-4 text-center">
@@ -258,9 +243,6 @@ function openShareGuideModal(studentId, studentName, studentEmail, studentPhone)
     `);
 }
 
-/**
- * Lógica de Captura Facial via Modal.
- */
 async function openFaceRegistration(studentId, studentName) {
     showModal(`Cadastrar Face: ${studentName}`, `
         <div class="flex flex-col items-center">
@@ -347,9 +329,6 @@ async function openFaceRegistration(studentId, studentName) {
     }
 }
 
-/**
- * Função principal de renderização da lista de alunos.
- */
 export async function renderStudentList(targetElement) {
     targetElement.innerHTML = `
         <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -437,9 +416,6 @@ export async function renderStudentList(targetElement) {
         `;
     };
 
-    /**
-     * Busca os alunos da API com cache busting.
-     */
     const fetchStudents = async () => {
         showLoading();
         try {
@@ -453,9 +429,6 @@ export async function renderStudentList(targetElement) {
         }
     };
 
-    /**
-     * Gerenciador de cliques de ação na página principal.
-     */
     const handlePageClick = (e) => {
         const button = e.target.closest('button');
         if (!button) return;
@@ -465,7 +438,7 @@ export async function renderStudentList(targetElement) {
         if (action === 'edit') openStudentForm(studentId);
         if (action === 'delete') {
             showModal(`Confirmar Exclusão`, `<p class="p-4 text-center">Tem certeza que deseja deletar <strong>${studentName}</strong>?</p>
-                <div class="text-right p-4 border-t">
+                <div class="text-right p-4 border-t mt-4">
                     <button data-action="confirm-delete" data-student-id="${studentId}" class="bg-red-600 text-white px-4 py-2 rounded-md font-bold">Confirmar</button>
                 </div>`);
         }
@@ -476,19 +449,14 @@ export async function renderStudentList(targetElement) {
 
     const modalBody = document.getElementById('modal-body');
 
-    /**
-     * Gerenciador de cliques dentro do modal compartilhado.
-     */
     const handleModalClick = async (e) => {
         const button = e.target.closest('button');
         if (!button) return;
         const { action, target, studentId, enrollmentId, studentName, studentPhone } = button.dataset;
         
-        // Funções dinâmicas de form
         if (action === 'add-guardian') document.getElementById('guardians-container').insertAdjacentHTML('beforeend', createGuardianFieldHtml());
         if (action === 'remove-dynamic-entry') document.getElementById(target)?.remove();
 
-        // Lógica de Deletar
         if (action === 'confirm-delete') {
             hideModal(); 
             showLoading();
@@ -503,7 +471,6 @@ export async function renderStudentList(targetElement) {
             }
         }
 
-        // Lógica de Matrículas
         if (action === 'add-enrollment' || action === 'remove-enrollment') {
             const sId = document.querySelector('#student-form')?.dataset.studentId;
             const isAdding = action === 'add-enrollment';
@@ -537,7 +504,6 @@ export async function renderStudentList(targetElement) {
             }
         }
 
-        // Lógica de Compartilhamento (E-mail)
         if (action === 'share-email') {
             button.disabled = true;
             button.innerText = "Enviando...";
@@ -556,7 +522,6 @@ export async function renderStudentList(targetElement) {
             }
         }
 
-        // Lógica de Compartilhamento (WhatsApp)
         if (action === 'share-whatsapp') {
             const phone = studentPhone.replace(/\D/g, '');
             if (!phone) return alert("O aluno não possui um número de telefone cadastrado.");
@@ -567,9 +532,6 @@ export async function renderStudentList(targetElement) {
         }
     };
 
-    /**
-     * Gerenciador de submissão do formulário de aluno.
-     */
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -632,9 +594,6 @@ export async function renderStudentList(targetElement) {
         }
     };
 
-    // --- EVENT LISTENERS ---
-
-    // Busca Case-Insensitive local (filtra cache)
     targetElement.querySelector('#list-search').addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase().trim();
         const filtered = allStudentsCache.filter(s => 
@@ -650,7 +609,6 @@ export async function renderStudentList(targetElement) {
         modalBody.addEventListener('submit', handleFormSubmit);
     }
 
-    // Toggle de visualização dos detalhes de matrícula (Adicionar Aluno)
     if (modalBody) {
         modalBody.addEventListener('change', (e) => {
             if (e.target.name === 'class_enroll') {

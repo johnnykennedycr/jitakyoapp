@@ -96,7 +96,7 @@ function renderParQModal() {
             </div>
             
             <div class="p-6 overflow-y-auto flex-grow bg-white">
-                <p class="text-sm text-gray-600 mb-6 leading-relaxed italic">
+                <p class="text-sm text-gray-600 mb-6 leading-relaxed italic text-left">
                     Este questionário tem o objetivo de identificar a necessidade de avaliação por um médico antes do início da atividade física. Se responder "SIM" a qualquer pergunta, consulte seu médico antes de treinar.
                 </p>
                 
@@ -113,12 +113,12 @@ function renderParQModal() {
                             <tbody class="divide-y divide-gray-200">
                                 ${parQQuestions.map(q => `
                                     <tr>
-                                        <td class="px-4 py-4 text-sm text-gray-700">${q.text}</td>
+                                        <td class="px-4 py-4 text-sm text-gray-700 text-left font-medium">${q.text}</td>
                                         <td class="px-2 text-center">
-                                            <input type="radio" name="${q.id}" value="sim" required class="h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+                                            <input type="radio" name="${q.id}" value="sim" required class="h-5 w-5 text-indigo-600 focus:ring-indigo-500">
                                         </td>
                                         <td class="px-2 text-center">
-                                            <input type="radio" name="${q.id}" value="nao" required class="h-4 w-4 text-indigo-600 focus:ring-indigo-500">
+                                            <input type="radio" name="${q.id}" value="nao" required class="h-5 w-5 text-indigo-600 focus:ring-indigo-500">
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -126,13 +126,20 @@ function renderParQModal() {
                         </table>
                     </div>
 
-                    
+                    <div class="space-y-4 pt-4 border-t text-left">
+                        <p class="text-xs text-gray-500">Ao salvar, você declara a veracidade das respostas e assume responsabilidade pelas atividades físicas praticadas sob seu acesso autenticado.</p>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Data da Declaração (Hoje)</label>
+                            <input type="text" name="parq_date" value="${new Date().toLocaleDateString('pt-BR')}" disabled class="w-full border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-500 font-bold p-2.5 cursor-not-allowed">
+                        </div>
+                    </div>
                 </form>
             </div>
 
             <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
                 <button type="button" id="cancel-parq" class="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">Depois</button>
-                <button type="submit" form="parq-form" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                <!-- Botão com ID explícito e FOR referenciando o form -->
+                <button type="submit" form="parq-form" id="submit-parq-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
                     SALVAR E DECLARAR
                 </button>
             </div>
@@ -143,13 +150,19 @@ function renderParQModal() {
 
     document.getElementById('cancel-parq').onclick = () => modal.remove();
     
-    document.getElementById('parq-form').onsubmit = async (e) => {
+    const form = document.getElementById('parq-form');
+    
+    form.onsubmit = async (e) => {
         e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.innerText = "Salvando...";
+        
+        // Evita o TypeError buscando pelo ID diretamente
+        const btn = document.getElementById('submit-parq-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Salvando...";
+        }
 
-        const formData = new FormData(e.target);
+        const formData = new FormData(form);
         const answers = {};
         parQQuestions.forEach(q => {
             answers[q.id] = formData.get(q.id);
@@ -158,9 +171,7 @@ function renderParQModal() {
         const data = {
             par_q_data: {
                 answers: answers,
-                athlete_name: formData.get('athlete_name'),
-                signature: formData.get('signature'),
-                filled_at: formData.get('parq_date'),
+                filled_at: new Date().toLocaleDateString('pt-BR'),
                 status: "completed"
             },
             par_q_filled: true
@@ -178,8 +189,11 @@ function renderParQModal() {
             showSuccessModal("Questionário PAR-Q salvo com sucesso!");
         } catch (error) {
             console.error("Erro ao salvar PAR-Q:", error);
-            btn.disabled = false;
-            btn.innerText = "SALVAR E DECLARAR";
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "SALVAR E DECLARAR";
+            }
+            alert("Falha ao salvar o questionário. Verifique sua conexão e tente novamente.");
         }
     };
 }
@@ -257,7 +271,7 @@ function renderAppScreen() {
         <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="flex justify-between items-center py-6">
                 <div class="flex items-center space-x-4">
-                    <img src="${LOGO_PATH}" alt="Logo" class="h-12 w-12 rounded-lg object-contain shadow-sm border border-gray-100">
+                    <img src="${LOGO_PATH}" alt="Logo" class="h-12 w-12 rounded-lg object-contain">
                     <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Olá, <span id="user-name" class="text-blue-600"></span>!</h1>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -315,6 +329,7 @@ function renderAppScreen() {
             </div>
         </div>
     `;
+    
     authContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
 
@@ -706,7 +721,6 @@ async function initializeAuthenticatedState(user) {
         userProfile = profile;
         renderAppScreen();
         
-        // Dispara o modal automaticamente se não estiver preenchido
         if (!userProfile.par_q_filled) {
             setTimeout(renderParQModal, 1500);
         }
