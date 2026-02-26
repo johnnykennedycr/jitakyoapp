@@ -27,7 +27,14 @@ async function fetchWithAuth(endpoint, options = {}) {
         'Content-Type': 'application/json',
         ...options.headers,
     };
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    
+    // Adiciona timestamp para quebrar o cache de requisições GET do navegador
+    const timestamp = Date.now();
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const finalEndpoint = `${endpoint}${separator}t=${timestamp}`;
+
+    const response = await fetch(`${API_BASE_URL}${finalEndpoint}`, { ...options, headers });
+    
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Falha ao decodificar erro da API.' }));
         console.error('Erro na API:', response.status, errorData);
@@ -138,7 +145,6 @@ function renderParQModal() {
 
             <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
                 <button type="button" id="cancel-parq" class="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">Depois</button>
-                <!-- Botão com ID explícito e FOR referenciando o form -->
                 <button type="submit" form="parq-form" id="submit-parq-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
                     SALVAR E DECLARAR
                 </button>
@@ -155,7 +161,6 @@ function renderParQModal() {
     form.onsubmit = async (e) => {
         e.preventDefault();
         
-        // Evita o TypeError buscando pelo ID diretamente
         const btn = document.getElementById('submit-parq-btn');
         if (btn) {
             btn.disabled = true;

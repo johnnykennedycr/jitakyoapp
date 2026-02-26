@@ -30,12 +30,12 @@ class UserService:
     def _get_installation_guide_html(self, name, email, password):
         """
         Gera o corpo do e-mail em HTML com o guia de instalação do PWA incorporado.
-        Utiliza estilos inline para máxima compatibilidade com clientes de e-mail.
+        Utiliza o logo oficial de 512px.
         """
         return f"""
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border-radius: 16px; overflow: hidden; background-color: #0f172a; color: #ffffff; border: 1px solid #334155;">
             <div style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); padding: 40px 20px; text-align: center;">
-                <img src="https://jitakyoapp.web.app/aluno/icons/android-launchericon-192-192.png" alt="Logo" style="width: 80px; height: 80px; margin-bottom: 15px; border-radius: 20px;">
+                <img src="https://aluno-jitakyoapp.web.app/icons/android-launchericon-512-512.png" alt="Logo" style="width: 80px; height: 80px; margin-bottom: 15px; border-radius: 20px;">
                 <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -0.025em;">JitaKyoApp</h1>
                 <p style="margin-top: 8px; opacity: 0.9; font-size: 16px;">Seu portal de treinos está pronto!</p>
             </div>
@@ -52,7 +52,7 @@ class UserService:
                 </div>
 
                 <div style="text-align: center; margin: 32px 0;">
-                    <a href="https://jitakyoapp.web.app/instalar.html" style="background-color: #4f46e5; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);">
+                    <a href="https://aluno-jitakyoapp.web.app/instalar.html" style="background-color: #4f46e5; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);">
                         VER GUIA DE INSTALAÇÃO
                     </a>
                 </div>
@@ -89,7 +89,6 @@ class UserService:
         if self.mail:
             try:
                 msg = Message('Guia de Instalação - JitaKyoApp', recipients=[student.email])
-                # Para alunos existentes, ocultamos a senha ou enviamos uma mensagem padrão
                 msg.html = self._get_installation_guide_html(student.name, student.email, "Sua senha atual")
                 self.mail.send(msg)
                 return True
@@ -212,12 +211,13 @@ class UserService:
         return students
 
     def update_user(self, uid, data):
-        """Atualiza dados e suporta biometria facial."""
+        """Atualiza dados e suporta biometria facial e PAR-Q."""
         try:
             update_data = {}
             auth_update_data = {}
 
-            fields = ['name', 'email', 'role', 'phone', 'guardians', 'face_descriptor', 'has_face_registered']
+            # IMPORTANTE: par_q_data e par_q_filled foram adicionados à lista de campos permitidos
+            fields = ['name', 'email', 'role', 'phone', 'guardians', 'face_descriptor', 'has_face_registered', 'par_q_data', 'par_q_filled']
             for f in fields:
                 if f in data: update_data[f] = data[f]
 
