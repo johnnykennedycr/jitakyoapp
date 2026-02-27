@@ -87,6 +87,10 @@ export async function renderAuthenticatedApp(user, container) {
         router.off(router.routes); // Limpa rotas antigas
 
         router.on({
+            // Nova regra de redirecionamento da raiz
+            '/': () => {
+                router.navigate('/admin/dashboard');
+            },
             '/admin/dashboard': () => navigateToAdmin((el) => renderAdminDashboard(el, getUserProfile())),
             '/admin/teachers': () => navigateToAdmin(renderTeacherList),
             '/admin/students': () => navigateToAdmin(renderStudentList),
