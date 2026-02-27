@@ -7,7 +7,9 @@ class User:
     """
     def __init__(self, id=None, name=None, email=None, role='student',
                  date_of_birth=None, phone=None, guardians=None, 
-                 enrolled_disciplines=None, created_at=None, updated_at=None):
+                 enrolled_disciplines=None, created_at=None, updated_at=None,
+                 par_q_data=None, par_q_filled=False, 
+                 has_face_registered=False, face_descriptor=None):
         
         self.id = id
         self.name = name
@@ -19,6 +21,12 @@ class User:
         self.enrolled_disciplines = enrolled_disciplines if enrolled_disciplines is not None else []
         self.created_at = created_at
         self.updated_at = updated_at
+        
+        # Novos campos mapeados (Saúde e Biometria)
+        self.par_q_data = par_q_data
+        self.par_q_filled = par_q_filled
+        self.has_face_registered = has_face_registered
+        self.face_descriptor = face_descriptor
 
     @staticmethod
     def from_dict(source_dict, doc_id):
@@ -26,13 +34,20 @@ class User:
         Cria um objeto User a partir de um dicionário do Firestore.
         Lida com a conversão de Timestamps e Strings de data para datetime do Python.
         """
+        if not source_dict:
+            return None
+
         dob = source_dict.get('date_of_birth')
         # LÓGICA DE CONVERSÃO DE DATA ROBUSTA
         if hasattr(dob, 'to_date_time'): # Verifica se é um Timestamp do Firestore
             dob = dob.to_date_time()
         elif isinstance(dob, str): # Se for uma string, tenta converter
             try:
-                dob = datetime.strptime(dob, '%Y-%m-%d')
+                # Lida com strings ISO (com ou sem 'T' e fuso horário)
+                if 'T' in dob:
+                    dob = datetime.fromisoformat(dob.replace('Z', '+00:00'))
+                else:
+                    dob = datetime.strptime(dob, '%Y-%m-%d')
             except ValueError:
                 print(f"Aviso: formato de data inválido para a string '{dob}'. Ignorando.")
                 dob = None
@@ -55,7 +70,12 @@ class User:
             guardians=source_dict.get('guardians', []),
             enrolled_disciplines=source_dict.get('enrolled_disciplines', []),
             created_at=created,
-            updated_at=updated
+            updated_at=updated,
+            # Recuperando os novos campos do dicionário Firestore
+            par_q_data=source_dict.get('par_q_data'),
+            par_q_filled=source_dict.get('par_q_filled', False),
+            has_face_registered=source_dict.get('has_face_registered', False),
+            face_descriptor=source_dict.get('face_descriptor')
         )
 
     def to_dict(self):
@@ -71,6 +91,12 @@ class User:
             "age": self.age,
             "guardians": self.guardians,
             "enrolled_disciplines": self.enrolled_disciplines,
+            # Incluindo os novos campos na serialização JSON enviada para a API
+            "par_q_data": self.par_q_data,
+            "par_q_filled": self.par_q_filled,
+            "has_face_registered": self.has_face_registered,
+            "face_descriptor": self.face_descriptor,
+            # Datas
             "date_of_birth": self.date_of_birth.isoformat() if isinstance(self.date_of_birth, (datetime, date)) else None,
             "created_at": self.created_at.isoformat() if isinstance(self.created_at, (datetime, date)) else None,
             "updated_at": self.updated_at.isoformat() if isinstance(self.updated_at, (datetime, date)) else None
@@ -91,4 +117,3 @@ class User:
         
     def __repr__(self):
         return f"<User(id='{self.id}', name='{self.name}', role='{self.role}')>"
-
