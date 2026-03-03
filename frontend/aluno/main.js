@@ -2,7 +2,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, getMessa
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a47a6298-8f74-4469-8440-a538a351daa2';
 const LOGO_PATH = 'aluno/icons/Square150x150Logo.scale-400.png';
 
 // --- ESTADO DA APLICAÇÃO ---
