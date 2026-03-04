@@ -3,7 +3,7 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, getMessa
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
 const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
-const LOGO_PATH = 'icons/Square150x150Logo.scale-400.png';
+const LOGO_PATH = 'aluno/icons/Square150x150Logo.scale-400.png';
 
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
@@ -675,16 +675,24 @@ function handlePayment(paymentId, paymentAmount) {
     const cpfForm = document.getElementById('cpf-form');
     cpfForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const cpf = document.getElementById('cpf').value;
-        initializeBrick(paymentId, paymentAmount, cpf);
+        const rawCpf = document.getElementById('cpf').value;
+        // Remove pontos e traços do CPF para evitar rejeição da API
+        const cleanCpf = rawCpf.replace(/\D/g, '');
+        
+        if (cleanCpf.length !== 11) {
+            alert("Por favor, insira um CPF válido com 11 dígitos.");
+            return;
+        }
+        
+        initializeBrick(paymentId, paymentAmount, cleanCpf);
     });
 }
 
-async function initializeBrick(paymentId, paymentAmount, cpf) {
+async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
     const modalContent = document.getElementById('payment-modal-content');
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6 border-b pb-4">
-            <h3 class="text-2xl font-bold text-gray-800">Finalizar</h3>
+            <h3 class="text-2xl font-bold text-gray-800">Finalizar PIX</h3>
             <button id="close-modal-button" class="text-gray-400 hover:text-gray-800 text-3xl font-light">&times;</button>
         </div>
         <div id="payment-error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
@@ -692,16 +700,14 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
             <span id="payment-error-message" class="block sm:inline"></span>
         </div>
         <div class="flex-grow overflow-y-auto">
-             <div id="payment-brick-container"><p class="text-center text-gray-500 py-8 italic animate-pulse">Iniciando ambiente seguro...</p></div>
+             <div id="payment-brick-container"><p class="text-center text-gray-500 py-8 italic animate-pulse">Gerando código PIX seguro...</p></div>
         </div>
     `;
     
     try {
-        // O backend ainda é acionado para caso ele precise registrar algo
-        // mas a preferenceId não será repassada ao Brick para evitar bloqueios de Wallet
         await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { 
             method: 'POST',
-            body: JSON.stringify({ cpf })
+            body: JSON.stringify({ cpf: cleanCpf })
         });
         
         if (currentBrick) {
@@ -709,28 +715,52 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
         }
         document.getElementById('payment-brick-container').innerHTML = '';
         
+        // Tenta quebrar o nome do aluno em primeiro e último nome
+        let firstName = 'Aluno';
+        let lastName = 'JitaKyo';
+        if (userProfile && userProfile.name) {
+            const nameParts = userProfile.name.trim().split(' ');
+            firstName = nameParts[0];
+            if (nameParts.length > 1) {
+                lastName = nameParts.slice(1).join(' ');
+            }
+        }
+        
         const settings = {
             initialization: {
                 amount: parseFloat(paymentAmount), 
-                // A preferenceId foi removida daqui para forçar o checkout transparente
                 payer: {
                     email: userProfile ? userProfile.email : '',
+                    entityType: 'individual', // Remove o erro do console
                     identification: {
                         type: 'CPF',
-                        number: cpf
+                        number: cleanCpf
                     }
                 }
             },
             customization: {
-                // A chave correta para habilitar apenas o PIX no Mercado Pago é 'bankTransfer'
                 paymentMethods: {
-                    bankTransfer: "all"
+                    bankTransfer: "all" // Isso habilita exclusivamente o PIX
                 },
             },
             callbacks: {
-                onReady: () => { console.log("Brick pronto."); },
+                onReady: () => { console.log("Brick PIX pronto."); },
                 onSubmit: async ({ formData }) => {
                     document.getElementById('payment-error-container').classList.add('hidden');
+                    
+                    // --- FIX PIX ---
+                    // O Mercado Pago rejeita pagamentos PIX se o pagador não tiver nome.
+                    // Nós injetamos o nome aqui antes de mandar para o servidor.
+                    if (formData.payer) {
+                        formData.payer.first_name = formData.payer.first_name || firstName;
+                        formData.payer.last_name = formData.payer.last_name || lastName;
+                        formData.payer.entity_type = 'individual';
+                        
+                        if (!formData.payer.identification) {
+                            formData.payer.identification = { type: 'CPF', number: cleanCpf };
+                        }
+                    }
+                    
                     try {
                         const response = await fetchWithAuth(`/api/student/payments/process`, {
                             method: 'POST',
@@ -757,7 +787,7 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
                 },
                 onError: (error) => {
                     console.error('Erro no brick:', error);
-                    document.getElementById('payment-error-message').textContent = "Erro ao carregar formulário.";
+                    document.getElementById('payment-error-message').textContent = "Erro ao carregar formulário PIX.";
                     document.getElementById('payment-error-container').classList.remove('hidden');
                 },
             },
@@ -765,8 +795,8 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
         
         currentBrick = await mp.bricks().create("payment", "payment-brick-container", settings);
     } catch (error) {
-        console.error("Erro preferência:", error);
-        document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-bold py-8">Indisponível no momento.</p>';
+        console.error("Erro ao gerar PIX:", error);
+        document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-bold py-8">PIX indisponível no momento.</p>';
     }
 }
 
