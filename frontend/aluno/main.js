@@ -235,7 +235,6 @@ function renderParQModal() {
             modal.remove();
             userProfile.par_q_filled = true;
             renderAppScreen(); 
-            showSuccessModal("Questionário PAR-Q salvo com sucesso!");
         } catch (error) {
             console.error("Erro ao salvar PAR-Q:", error);
             if (btn) {
@@ -245,13 +244,6 @@ function renderParQModal() {
             alert("Falha ao salvar o questionário. Verifique sua conexão e tente novamente.");
         }
     };
-}
-
-function showSuccessModal(message) {
-    const modal = document.getElementById('success-modal');
-    const msgEl = modal.querySelector('p');
-    if (msgEl) msgEl.textContent = message;
-    modal.classList.remove('hidden');
 }
 
 // --- FUNÇÕES DE RENDERIZAÇÃO E UI ---
@@ -354,7 +346,8 @@ function renderAppScreen() {
                 </section>
             </main>
         </div>
-        <!-- MODAIS -->
+
+        <!-- MODAIS PADRÃO -->
         <div id="notifications-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
             <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-auto">
                 <div class="flex justify-between items-center mb-4">
@@ -364,17 +357,14 @@ function renderAppScreen() {
                 <div id="notifications-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
             </div>
         </div>
-        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
-             <div id="payment-modal-content" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;"></div>
+
+        <div id="payment-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 h-full w-full flex items-center justify-center z-50 p-4">
+             <div id="payment-modal-content" class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md mx-auto flex flex-col" style="max-height: 90vh;"></div>
         </div>
-        <div id="success-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
-            <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm mx-auto text-center">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                    <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Sucesso!</h3>
-                <div class="mt-2 px-7 py-3"><p class="text-sm text-gray-500">Operação processada com sucesso. Obrigado!</p></div>
-                <div class="mt-4"><button id="close-success-modal-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button></div>
+
+        <div id="success-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 h-full w-full flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md mx-auto text-center" id="success-modal-inner">
+                <!-- Conteúdo Injetado Dinamicamente -->
             </div>
         </div>
     `;
@@ -500,6 +490,7 @@ function setupModalListeners() {
     const paymentModal = document.getElementById('payment-modal');
     const successModal = document.getElementById('success-modal');
     
+    // Fechar Modal de Pagamento
     paymentModal.addEventListener('click', (event) => {
         if (event.target.id === 'close-modal-button' || event.target === paymentModal) {
             paymentModal.classList.add('hidden');
@@ -510,8 +501,12 @@ function setupModalListeners() {
         }
     });
 
-    document.getElementById('close-success-modal-button').addEventListener('click', () => {
-        successModal.classList.add('hidden');
+    // Fechar Modal de Sucesso (Delegação para botões injetados)
+    successModal.addEventListener('click', (event) => {
+        if (event.target.id === 'close-success-modal-button' || event.target === successModal) {
+            successModal.classList.add('hidden');
+            loadPayments();
+        }
     });
 }
 
@@ -589,11 +584,11 @@ function renderPaymentsTable(container, payments, isPaidTable) {
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Descrição</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Vencimento</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Valor</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Status</th>
-                        ${isPaidTable ? '<th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Data Pag.</th>' : '<th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase">Ações</th>'}
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Descrição</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Vencimento</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Valor</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Status</th>
+                        ${isPaidTable ? '<th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Data Pag.</th>' : '<th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-widest">Ações</th>'}
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -609,9 +604,9 @@ function renderPaymentsTable(container, payments, isPaidTable) {
                                     `<td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">${formatDate(p.payment_date)}</td>` 
                                     : 
                                     `<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button class="pay-button bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-1.5 rounded-lg font-bold transition-all text-xs" 
+                                        <button class="pay-button bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold transition-all shadow-md shadow-indigo-200" 
                                                 data-payment-id="${p.id}" 
-                                                data-payment-amount="${p.amount}">Pagar</button>
+                                                data-payment-amount="${p.amount}">PAGAR AGORA</button>
                                      </td>`
                                 }
                             </tr>
@@ -639,12 +634,12 @@ function renderPaymentStatus(payment) {
     today.setUTCHours(0, 0, 0, 0);
 
     if (payment.status === 'paid') {
-        return `<span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-bold rounded-full bg-green-100 text-green-800 uppercase">Pago</span>`;
+        return `<span class="px-3 py-1 inline-flex text-[10px] leading-5 font-black rounded-full bg-green-100 text-green-800 uppercase tracking-widest border border-green-200 shadow-sm">Pago</span>`;
     }
     if (dueDate < today) {
-        return `<span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-bold rounded-full bg-red-100 text-red-800 uppercase">Atrasado</span>`;
+        return `<span class="px-3 py-1 inline-flex text-[10px] leading-5 font-black rounded-full bg-red-100 text-red-800 uppercase tracking-widest border border-red-200 shadow-sm">Atrasado</span>`;
     }
-    return `<span class="px-2 py-0.5 inline-flex text-[10px] leading-5 font-bold rounded-full bg-yellow-100 text-yellow-800 uppercase">Pendente</span>`;
+    return `<span class="px-3 py-1 inline-flex text-[10px] leading-5 font-black rounded-full bg-amber-100 text-amber-800 uppercase tracking-widest border border-amber-200 shadow-sm">Pendente</span>`;
 }
 
 function handlePayment(paymentId, paymentAmount) {
@@ -653,18 +648,21 @@ function handlePayment(paymentId, paymentAmount) {
 
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6 border-b pb-4">
-            <h3 class="text-2xl font-bold text-gray-800">Pagamento</h3>
+            <h3 class="text-2xl font-black text-gray-800 tracking-tight">Finalizar Fatura</h3>
             <button id="close-modal-button" class="text-gray-400 hover:text-gray-800 text-3xl font-light">&times;</button>
         </div>
         <div id="payment-step-1">
-            <p class="text-gray-600 mb-6 text-sm text-left">Para processar seu pagamento com segurança via Mercado Pago, informe seu CPF.</p>
+            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6">
+                <p class="text-indigo-800 text-sm text-left">Para gerar o código PIX com segurança, o Banco Central exige o seu CPF.</p>
+            </div>
             <form id="cpf-form" class="text-left">
-                <div class="mb-6">
+                <div class="mb-8">
                     <label for="cpf" class="block text-gray-700 text-sm font-bold mb-2">CPF do Titular</label>
-                    <input type="text" id="cpf" placeholder="000.000.000-00" required class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all p-2">
+                    <input type="text" id="cpf" placeholder="Apenas números" required maxlength="14" class="shadow-sm appearance-none border border-gray-300 rounded-xl w-full py-4 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-lg">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl focus:outline-none focus:shadow-outline transition-all duration-300 shadow-lg">
-                    Continuar para Pagamento
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-4 rounded-xl focus:outline-none focus:shadow-outline transition-all duration-300 shadow-lg shadow-indigo-200 flex justify-center items-center gap-2">
+                    GERAR CÓDIGO PIX
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
             </form>
         </div>
@@ -676,8 +674,7 @@ function handlePayment(paymentId, paymentAmount) {
     cpfForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const rawCpf = document.getElementById('cpf').value;
-        // Remove pontos e traços do CPF para evitar rejeição da API
-        const cleanCpf = rawCpf.replace(/\D/g, '');
+        const cleanCpf = rawCpf.replace(/\D/g, ''); // Garante que vai limpo para a API
         
         if (cleanCpf.length !== 11) {
             alert("Por favor, insira um CPF válido com 11 dígitos.");
@@ -692,7 +689,7 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
     const modalContent = document.getElementById('payment-modal-content');
     modalContent.innerHTML = `
         <div class="flex-shrink-0 flex justify-between items-center mb-6 border-b pb-4">
-            <h3 class="text-2xl font-bold text-gray-800">Finalizar PIX</h3>
+            <h3 class="text-2xl font-black text-gray-800 tracking-tight">Finalizar PIX</h3>
             <button id="close-modal-button" class="text-gray-400 hover:text-gray-800 text-3xl font-light">&times;</button>
         </div>
         <div id="payment-error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
@@ -700,22 +697,22 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
             <span id="payment-error-message" class="block sm:inline"></span>
         </div>
         <div class="flex-grow overflow-y-auto">
-             <div id="payment-brick-container"><p class="text-center text-gray-500 py-8 italic animate-pulse">Gerando código PIX seguro...</p></div>
+             <div id="payment-brick-container" class="flex flex-col items-center justify-center py-12">
+                 <svg class="animate-spin h-10 w-10 text-indigo-600 mb-4" viewBox="0 0 24 24">
+                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                 </svg>
+                 <p class="text-center text-gray-500 font-medium">Conectando ao Banco Central...</p>
+             </div>
         </div>
     `;
     
     try {
-        await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { 
-            method: 'POST',
-            body: JSON.stringify({ cpf: cleanCpf })
-        });
-        
         if (currentBrick) {
             currentBrick.unmount();
         }
         document.getElementById('payment-brick-container').innerHTML = '';
         
-        // Tenta quebrar o nome do aluno em primeiro e último nome
         let firstName = 'Aluno';
         let lastName = 'JitaKyo';
         if (userProfile && userProfile.name) {
@@ -729,9 +726,11 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
         const settings = {
             initialization: {
                 amount: parseFloat(paymentAmount), 
+                // A preferenceId foi removida daqui
                 payer: {
                     email: userProfile ? userProfile.email : '',
-                    entityType: 'individual', // Remove o erro do console
+                    // OBRIGATÓRIO PARA PIX NO MERCADO PAGO
+                    entityType: 'individual', 
                     identification: {
                         type: 'CPF',
                         number: cleanCpf
@@ -740,7 +739,7 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
             },
             customization: {
                 paymentMethods: {
-                    bankTransfer: "all" // Isso habilita exclusivamente o PIX
+                    bankTransfer: "all" // Garante apenas o PIX
                 },
             },
             callbacks: {
@@ -748,14 +747,11 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
                 onSubmit: async ({ formData }) => {
                     document.getElementById('payment-error-container').classList.add('hidden');
                     
-                    // --- FIX PIX ---
-                    // O Mercado Pago rejeita pagamentos PIX se o pagador não tiver nome.
-                    // Nós injetamos o nome aqui antes de mandar para o servidor.
+                    // Injeção de Segurança (Evita o erro "recusado pelo processador")
                     if (formData.payer) {
                         formData.payer.first_name = formData.payer.first_name || firstName;
                         formData.payer.last_name = formData.payer.last_name || lastName;
                         formData.payer.entity_type = 'individual';
-                        
                         if (!formData.payer.identification) {
                             formData.payer.identification = { type: 'CPF', number: cleanCpf };
                         }
@@ -770,24 +766,87 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
                             }),
                         });
                         
-                        if (response && response.status === 'success') {
+                        // INTERCEPTADOR DE SUCESSO PIX
+                        // O backend envia "failed" mas o paymentInfo mostra que o pix foi gerado.
+                        const isPixPending = response?.paymentInfo?.status === 'pending' && response?.paymentInfo?.status_detail === 'pending_waiting_transfer';
+                        
+                        if ((response && response.status === 'success') || isPixPending) {
                             document.getElementById('payment-modal').classList.add('hidden');
-                            if (currentBrick) currentBrick.unmount();
+                            if (currentBrick) {
+                                currentBrick.unmount();
+                                currentBrick = null;
+                            }
+
+                            const successModalContent = document.getElementById('success-modal-inner');
+
+                            if (isPixPending) {
+                                const pixData = response.paymentInfo.point_of_interaction.transaction_data;
+                                successModalContent.innerHTML = `
+                                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-teal-100 mb-4 shadow-inner">
+                                        <svg class="h-6 w-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                                    </div>
+                                    <h3 class="text-2xl font-black text-gray-900 mb-2 tracking-tight">Pague via Pix</h3>
+                                    <p class="text-sm text-gray-500 mb-6 text-balance">Escaneie o código QR com o aplicativo do seu banco ou copie a chave abaixo.</p>
+
+                                    <div class="flex justify-center mb-6 bg-white p-4 rounded-2xl border-2 border-dashed border-gray-200">
+                                        <img src="data:image/jpeg;base64,${pixData.qr_code_base64}" alt="QR Code Pix" class="w-48 h-48 mix-blend-multiply">
+                                    </div>
+
+                                    <div class="mb-6 text-left">
+                                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">PIX Copia e Cola</label>
+                                        <div class="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1.5">
+                                            <input type="text" readonly value="${pixData.qr_code}" class="w-full bg-transparent text-sm text-gray-600 font-mono outline-none truncate px-2" id="pix-code-input">
+                                            <button type="button" id="copy-pix-btn" class="bg-teal-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-teal-700 transition whitespace-nowrap shadow-md">COPIAR</button>
+                                        </div>
+                                    </div>
+
+                                    <button id="close-success-modal-button" class="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-4 px-4 rounded-xl transition shadow-lg mt-2">
+                                        Já Paguei / Fechar
+                                    </button>
+                                `;
+
+                                // Listener dinâmico para o botão de copiar
+                                setTimeout(() => {
+                                    document.getElementById('copy-pix-btn').addEventListener('click', () => {
+                                        const input = document.getElementById('pix-code-input');
+                                        input.select();
+                                        document.execCommand('copy');
+                                        const btn = document.getElementById('copy-pix-btn');
+                                        btn.innerText = 'COPIADO!';
+                                        btn.classList.replace('bg-teal-600', 'bg-indigo-600');
+                                        setTimeout(() => {
+                                            btn.innerText = 'COPIAR';
+                                            btn.classList.replace('bg-indigo-600', 'bg-teal-600');
+                                        }, 3000);
+                                    });
+                                }, 100);
+
+                            } else {
+                                successModalContent.innerHTML = `
+                                    <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6 shadow-inner">
+                                        <svg class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                    <h3 class="text-2xl font-black text-gray-900 tracking-tight">Sucesso!</h3>
+                                    <div class="mt-2 mb-8"><p class="text-sm text-gray-500">Operação processada com sucesso. Obrigado!</p></div>
+                                    <button id="close-success-modal-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg">Fechar Painel</button>
+                                `;
+                            }
+
                             document.getElementById('success-modal').classList.remove('hidden');
-                            loadPayments();
+
                         } else {
                             const message = response.message || "Ocorreu um erro desconhecido.";
                             document.getElementById('payment-error-message').textContent = message;
                             document.getElementById('payment-error-container').classList.remove('hidden');
                         }
                     } catch (error) {
-                        document.getElementById('payment-error-message').textContent = "Erro de rede. Tente novamente.";
+                        document.getElementById('payment-error-message').textContent = "Erro de rede. Verifique sua conexão e tente novamente.";
                         document.getElementById('payment-error-container').classList.remove('hidden');
                     }
                 },
                 onError: (error) => {
                     console.error('Erro no brick:', error);
-                    document.getElementById('payment-error-message').textContent = "Erro ao carregar formulário PIX.";
+                    document.getElementById('payment-error-message').textContent = "Erro ao carregar formulário seguro.";
                     document.getElementById('payment-error-container').classList.remove('hidden');
                 },
             },
@@ -795,8 +854,8 @@ async function initializeBrick(paymentId, paymentAmount, cleanCpf) {
         
         currentBrick = await mp.bricks().create("payment", "payment-brick-container", settings);
     } catch (error) {
-        console.error("Erro ao gerar PIX:", error);
-        document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-bold py-8">PIX indisponível no momento.</p>';
+        console.error("Erro renderizando PIX:", error);
+        document.getElementById('payment-brick-container').innerHTML = '<p class="text-center text-red-500 font-bold py-8 bg-red-50 rounded-xl">Sistema de pagamentos indisponível no momento.</p>';
     }
 }
 
