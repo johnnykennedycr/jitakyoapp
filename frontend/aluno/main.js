@@ -16,6 +16,50 @@ let authContainer;
 let appContainer;
 let loadingIndicator;
 
+// --- CONTROLE AGRESSIVO DE CACHE E SERVICE WORKER ---
+function registerServiceWorkerAndClearCache() {
+    if ('caches' in window) {
+        caches.keys().then(names => {
+            names.forEach(name => {
+                if (name.includes('jitakyo') || name.includes('aluno')) {
+                    caches.delete(name);
+                }
+            });
+        });
+    }
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+                .then(registration => {
+                    console.log('ServiceWorker registrado. Verificando atualizações...');
+                    registration.update(); 
+
+                    registration.onupdatefound = () => {
+                        const installingWorker = registration.installing;
+                        if (installingWorker == null) return;
+                        
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('Nova versão detectada! Recarregando sistema...');
+                                installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        };
+                    };
+                })
+                .catch(err => console.error('Erro no Service Worker:', err));
+        });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload(); 
+            }
+        });
+    }
+}
+
 // --- FUNÇÕES DE API ---
 async function fetchWithAuth(endpoint, options = {}) {
     if (!currentUser) {
@@ -653,7 +697,9 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
     `;
     
     try {
-        const { preferenceId } = await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { 
+        // O backend ainda é acionado para caso ele precise registrar algo
+        // mas a preferenceId não será repassada ao Brick para evitar bloqueios de Wallet
+        await fetchWithAuth(`/api/student/payments/${paymentId}/create-preference`, { 
             method: 'POST',
             body: JSON.stringify({ cpf })
         });
@@ -666,12 +712,19 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
         const settings = {
             initialization: {
                 amount: parseFloat(paymentAmount), 
-                preferenceId: preferenceId,
+                // A preferenceId foi removida daqui para forçar o checkout transparente
+                payer: {
+                    email: userProfile ? userProfile.email : '',
+                    identification: {
+                        type: 'CPF',
+                        number: cpf
+                    }
+                }
             },
             customization: {
-                // AQUI: Deixamos apenas a opção PIX ativada.
+                // A chave correta para habilitar apenas o PIX no Mercado Pago é 'bankTransfer'
                 paymentMethods: {
-                    pix: "all"
+                    bankTransfer: "all"
                 },
             },
             callbacks: {
@@ -736,6 +789,8 @@ async function initializeAuthenticatedState(user) {
 }
 
 function initialize() {
+    registerServiceWorkerAndClearCache();
+    
     document.addEventListener('DOMContentLoaded', () => {
         authContainer = document.getElementById('auth-container');
         appContainer = document.getElementById('app-container');
