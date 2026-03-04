@@ -439,67 +439,71 @@ export async function renderStudentList(targetElement) {
             tableContainer.innerHTML = '<div class="p-16 text-center text-gray-400 bg-gray-800 rounded-3xl italic">Nenhum aluno encontrado com os filtros selecionados.</div>';
             return;
         }
+        
+        // Adicionada a div wrapper "overflow-x-auto w-full" ao redor da tabela para evitar corte das colunas em mobile.
         tableContainer.innerHTML = `
-            <div class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                        <tr>
-                            <th class="px-6 py-4 text-left">Aluno & Identificação</th>
-                            <th class="px-6 py-4 text-left">Matrículas</th>
-                            <th class="px-6 py-4 text-left">Contatos / Responsável</th>
-                            <th class="px-6 py-4 text-center">Saúde</th>
-                            <th class="px-6 py-4 text-right">Ações de Gestão</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
-                        ${students.map(s => `
-                            <tr class="hover:bg-gray-50/80 transition-colors group">
-                                <td class="px-6 py-5">
-                                    <div class="font-bold text-gray-900 text-base">${s.name}</div>
-                                    <div class="text-xs text-gray-500 font-mono mt-0.5">${s.email}</div>
-                                    <div class="flex items-center gap-2 mt-2">
-                                        <div class="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
-                                            ${calculateAge(s.date_of_birth)} anos
-                                        </div>
-                                        ${(s.face_descriptor && s.face_descriptor.length > 0) || s.has_face_registered 
-                                            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700 uppercase tracking-wider shadow-sm border border-green-200">FACE OK</span>' 
-                                            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-gray-100 text-gray-400 uppercase tracking-wider">SEM BIOMETRIA</span>'}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-5 text-sm text-gray-600">
-                                    ${(s.enrollments || []).map(e => `<div class="truncate max-w-[200px] mb-1"><span class="text-indigo-400 font-bold mr-1">•</span>${e.class_name}</div>`).join('') || '<span class="text-gray-300 italic">Sem turmas</span>'}
-                                </td>
-                                <td class="px-6 py-5 text-sm text-gray-600">
-                                    ${(s.guardians && s.guardians.length > 0) 
-                                        ? s.guardians.map(g => `<div class="truncate max-w-[200px]" title="${g.name}: ${g.contact}"><strong class="text-gray-800">${g.name}</strong>: <span class="font-mono text-xs">${g.contact}</span></div>`).join('') 
-                                        : `<div class="text-indigo-600 font-bold font-mono text-xs">${s.phone || 'Sem telefone'}</div>`
-                                    }
-                                </td>
-                                <td class="px-6 py-5 text-center">
-                                    ${(s.par_q_filled || s.par_q_data) 
-                                        ? `<button data-action="view-parq" data-student-id="${s.id}" data-student-name="${s.name}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100 hover:border-transparent">PAR-Q OK</button>` 
-                                        : `<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 uppercase tracking-widest border border-amber-100">Pendente</span>`}
-                                </td>
-                                <td class="px-6 py-5 text-right">
-                                    <div class="flex justify-end gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                                        <button data-action="send-guide" data-student-id="${s.id}" data-student-name="${s.name}" data-student-email="${s.email}" data-student-phone="${s.phone || ''}" class="p-2.5 text-orange-600 hover:bg-orange-50 hover:shadow-sm rounded-xl transition" title="Compartilhar Guia PWA">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
-                                        </button>
-                                        <button data-action="face-register" data-student-id="${s.id}" data-student-name="${s.name}" class="p-2.5 text-blue-600 hover:bg-blue-50 hover:shadow-sm rounded-xl transition" title="Cadastrar Face">
-                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                        </button>
-                                        <button data-action="edit" data-student-id="${s.id}" class="p-2.5 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm rounded-xl transition" title="Editar Aluno">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                        </button>
-                                        <button data-action="delete" data-student-id="${s.id}" data-student-name="${s.name}" class="p-2.5 text-red-500 hover:bg-red-50 hover:shadow-sm rounded-xl transition" title="Deletar Aluno">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
+            <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto w-full">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                            <tr>
+                                <th class="px-6 py-4 text-left">Aluno & Identificação</th>
+                                <th class="px-6 py-4 text-left">Matrículas</th>
+                                <th class="px-6 py-4 text-left">Contatos / Responsável</th>
+                                <th class="px-6 py-4 text-center">Saúde</th>
+                                <th class="px-6 py-4 text-right">Ações de Gestão</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            ${students.map(s => `
+                                <tr class="hover:bg-gray-50/80 transition-colors group">
+                                    <td class="px-6 py-5 whitespace-nowrap">
+                                        <div class="font-bold text-gray-900 text-base">${s.name}</div>
+                                        <div class="text-xs text-gray-500 font-mono mt-0.5">${s.email}</div>
+                                        <div class="flex items-center gap-2 mt-2">
+                                            <div class="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                                                ${calculateAge(s.date_of_birth)} anos
+                                            </div>
+                                            ${(s.face_descriptor && s.face_descriptor.length > 0) || s.has_face_registered 
+                                                ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700 uppercase tracking-wider shadow-sm border border-green-200">FACE OK</span>' 
+                                                : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black bg-gray-100 text-gray-400 uppercase tracking-wider">SEM BIOMETRIA</span>'}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-5 text-sm text-gray-600 whitespace-nowrap">
+                                        ${(s.enrollments || []).map(e => `<div class="truncate max-w-[200px] mb-1"><span class="text-indigo-400 font-bold mr-1">•</span>${e.class_name}</div>`).join('') || '<span class="text-gray-300 italic">Sem turmas</span>'}
+                                    </td>
+                                    <td class="px-6 py-5 text-sm text-gray-600 whitespace-nowrap">
+                                        ${(s.guardians && s.guardians.length > 0) 
+                                            ? s.guardians.map(g => `<div class="truncate max-w-[200px]" title="${g.name}: ${g.contact}"><strong class="text-gray-800">${g.name}</strong>: <span class="font-mono text-xs">${g.contact}</span></div>`).join('') 
+                                            : `<div class="text-indigo-600 font-bold font-mono text-xs">${s.phone || 'Sem telefone'}</div>`
+                                        }
+                                    </td>
+                                    <td class="px-6 py-5 text-center whitespace-nowrap">
+                                        ${(s.par_q_filled || s.par_q_data) 
+                                            ? `<button data-action="view-parq" data-student-id="${s.id}" data-student-name="${s.name}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-700 uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100 hover:border-transparent">PAR-Q OK</button>` 
+                                            : `<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 uppercase tracking-widest border border-amber-100">Pendente</span>`}
+                                    </td>
+                                    <td class="px-6 py-5 text-right whitespace-nowrap">
+                                        <div class="flex justify-end gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                            <button data-action="send-guide" data-student-id="${s.id}" data-student-name="${s.name}" data-student-email="${s.email}" data-student-phone="${s.phone || ''}" class="p-2.5 text-orange-600 hover:bg-orange-50 hover:shadow-sm rounded-xl transition" title="Compartilhar Guia PWA">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                            </button>
+                                            <button data-action="face-register" data-student-id="${s.id}" data-student-name="${s.name}" class="p-2.5 text-blue-600 hover:bg-blue-50 hover:shadow-sm rounded-xl transition" title="Cadastrar Face">
+                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                            </button>
+                                            <button data-action="edit" data-student-id="${s.id}" class="p-2.5 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm rounded-xl transition" title="Editar Aluno">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                            <button data-action="delete" data-student-id="${s.id}" data-student-name="${s.name}" class="p-2.5 text-red-500 hover:bg-red-50 hover:shadow-sm rounded-xl transition" title="Deletar Aluno">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     };
