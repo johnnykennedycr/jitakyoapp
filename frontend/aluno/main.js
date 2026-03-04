@@ -2,8 +2,8 @@ import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut, getMessa
 
 // --- CONFIGURAÇÕES ---
 const API_BASE_URL = 'https://jitakyoapp-217073545024.southamerica-east1.run.app';
-const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a47a6298-8f74-4469-8440-a538a351daa2';
-const LOGO_PATH = 'aluno/icons/Square150x150Logo.scale-400.png';
+const MERCADO_PAGO_PUBLIC_KEY = 'APP_USR-a89c1142-728d-4318-ba55-9ff8e7fdfb90';
+const LOGO_PATH = 'icons/Square150x150Logo.scale-400.png';
 
 // --- ESTADO DA APLICAÇÃO ---
 let currentUser = null;
@@ -293,11 +293,11 @@ function renderAppScreen() {
             ${parQAlertHtml}
 
             <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6 pb-12">
-                <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md border border-gray-50">
+                <section class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-md border border-gray-50 text-left">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Minhas Turmas</h2>
                     <div id="classes-list" class="space-y-4"></div>
                 </section>
-                <section class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-md border border-gray-50">
+                <section class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-md border border-gray-50 text-left">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Faturas</h2>
                     <div class="border-b border-gray-200">
                         <nav class="-mb-px flex space-x-6" aria-label="Tabs">
@@ -669,11 +669,9 @@ async function initializeBrick(paymentId, paymentAmount, cpf) {
                 preferenceId: preferenceId,
             },
             customization: {
+                // AQUI: Deixamos apenas a opção PIX ativada.
                 paymentMethods: {
-                    creditCard: "all",
-                    debitCard: "all",
-                    ticket: "all",
-                    pix: "all", 
+                    pix: "all"
                 },
             },
             callbacks: {
